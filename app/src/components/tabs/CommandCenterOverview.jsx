@@ -2221,24 +2221,26 @@ function SalesTab({modalAgent,setModalAgent}) {
       </div>
 
       {/* 3 ── Campaign performance sandbox ── */}
-      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:12,flexWrap:'wrap',gap:8}}>
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:12}}>
         <div className="cc-sect-label" style={{marginBottom:0}}>Campaign performance sandbox</div>
-        <div style={{position:'relative',flexShrink:0}}>
-          <span style={{position:'absolute',left:10,top:'50%',transform:'translateY(-50%)',color:'#7E8DB5',fontSize:13,pointerEvents:'none'}}>🔍</span>
-          <input
-            value={sbSearch}
-            onChange={e=>{ setSbSearch(e.target.value); setSbPage(0); }}
-            placeholder="Search campaigns…"
-            style={{paddingLeft:32,paddingRight:12,height:32,borderRadius:8,border:'1px solid rgba(255,255,255,.15)',
-              background:'rgba(255,255,255,.05)',color:'#EAF0FF',font:'13px Inter,sans-serif',
-              outline:'none',width:220}}/>
-          {sbSearch&&(
-            <span onClick={()=>{ setSbSearch(''); setSbPage(0); }}
-              style={{position:'absolute',right:8,top:'50%',transform:'translateY(-50%)',
-                color:'#7E8DB5',cursor:'pointer',fontSize:14,lineHeight:1}}>×</span>
-          )}
-        </div>
-        <div style={{display:'flex',gap:8}}>
+        <div style={{display:'flex',alignItems:'center',gap:8}}>
+          <div style={{position:'relative',flexShrink:0}}>
+            <svg style={{position:'absolute',left:9,top:'50%',transform:'translateY(-50%)',pointerEvents:'none'}} width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#7E8DB5" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+            </svg>
+            <input
+              value={sbSearch}
+              onChange={e=>{ setSbSearch(e.target.value); setSbPage(0); }}
+              placeholder="Search campaigns…"
+              style={{paddingLeft:30,paddingRight:sbSearch?24:10,height:32,borderRadius:8,
+                border:'1px solid rgba(255,255,255,.15)',background:'rgba(255,255,255,.05)',
+                color:'#EAF0FF',font:'13px Inter,sans-serif',outline:'none',width:200}}/>
+            {sbSearch&&(
+              <span onClick={()=>{ setSbSearch(''); setSbPage(0); }}
+                style={{position:'absolute',right:8,top:'50%',transform:'translateY(-50%)',
+                  color:'#7E8DB5',cursor:'pointer',fontSize:14,lineHeight:1}}>×</span>
+            )}
+          </div>
           <button onClick={()=>setSbCallModal(true)}
             style={{display:'inline-flex',alignItems:'center',gap:6,padding:'6px 14px',borderRadius:8,
               border:'1px solid rgba(245,185,69,.4)',background:'rgba(245,185,69,.08)',
