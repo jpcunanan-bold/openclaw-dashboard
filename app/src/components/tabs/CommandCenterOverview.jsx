@@ -303,6 +303,7 @@ function SalesTab({modalAgent,setModalAgent}) {
   const [sbOpen,setSbOpen]=useState(null);
   const [sdrPage,setSdrPage]=useState(0);
   const [sbPage,setSbPage]=useState(0);
+  const [sbSearch,setSbSearch]=useState('');
   const SDR_PER_PAGE=10;
   const SB_PER_PAGE=10;
   const [campIdx,setCampIdx]=useState(0);
@@ -2220,8 +2221,23 @@ function SalesTab({modalAgent,setModalAgent}) {
       </div>
 
       {/* 3 ── Campaign performance sandbox ── */}
-      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:12}}>
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:12,flexWrap:'wrap',gap:8}}>
         <div className="cc-sect-label" style={{marginBottom:0}}>Campaign performance sandbox</div>
+        <div style={{position:'relative',flexShrink:0}}>
+          <span style={{position:'absolute',left:10,top:'50%',transform:'translateY(-50%)',color:'#7E8DB5',fontSize:13,pointerEvents:'none'}}>🔍</span>
+          <input
+            value={sbSearch}
+            onChange={e=>{ setSbSearch(e.target.value); setSbPage(0); }}
+            placeholder="Search campaigns…"
+            style={{paddingLeft:32,paddingRight:12,height:32,borderRadius:8,border:'1px solid rgba(255,255,255,.15)',
+              background:'rgba(255,255,255,.05)',color:'#EAF0FF',font:'13px Inter,sans-serif',
+              outline:'none',width:220}}/>
+          {sbSearch&&(
+            <span onClick={()=>{ setSbSearch(''); setSbPage(0); }}
+              style={{position:'absolute',right:8,top:'50%',transform:'translateY(-50%)',
+                color:'#7E8DB5',cursor:'pointer',fontSize:14,lineHeight:1}}>×</span>
+          )}
+        </div>
         <div style={{display:'flex',gap:8}}>
           <button onClick={()=>setSbCallModal(true)}
             style={{display:'inline-flex',alignItems:'center',gap:6,padding:'6px 14px',borderRadius:8,
@@ -2257,7 +2273,7 @@ function SalesTab({modalAgent,setModalAgent}) {
           : (sbData?.campaigns||[]).length===0
             ? <div style={{padding:32,textAlign:'center',font:'13px Inter,sans-serif',color:'#7E8DB5'}}>No campaigns found for this date range.</div>
             : (()=>{
-                const sbCamps=sbData.campaigns||[];
+                const sbCamps=(sbData.campaigns||[]).filter(c=>!sbSearch||c.name.toLowerCase().includes(sbSearch.toLowerCase())||(c.target_icp||'').toLowerCase().includes(sbSearch.toLowerCase()));
                 const sbPaged=sbCamps.slice(sbPage*SB_PER_PAGE,(sbPage+1)*SB_PER_PAGE);
                 return <>{ sbPaged.map((c,i)=>{
                 const open=sbOpen===i;
