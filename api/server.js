@@ -451,7 +451,7 @@ async function authMiddleware(req, res, next) {
   // Session token from Google login (Postgres-backed)
   if (token) {
     const sess = await loadSession(token);
-    if (sess) return next();
+    if (sess) { req.user = sess; return next(); }
   }
 
   res.status(401).json({ error: 'Unauthorized. Sign in with your @boldbusiness.com Google account.' });
@@ -5156,11 +5156,19 @@ app.delete('/api/sales-dashboard/campaigns/:id', async (req, res) => {
 
 // ── User Tasks (users.user_tasks in smt_db) ──
 
-/** GET /api/user-tasks — fetch tasks, optionally filtered by status */
+/** GET /api/user-tasks — fetch tasks for the logged-in user (resolved by email) */
 app.get('/api/user-tasks', async (req, res) => {
   try {
-    const { status, user_id = 17, limit = 100 } = req.query;
-    const params = [Number(user_id)];
+    const { status, limit = 200 } = req.query;
+    // Resolve user_id from logged-in email
+    const email = req.user?.email || null;
+    if (!email) return res.status(401).json({ ok: false, error: 'Not authenticated' });
+    const userRow = await smtAdminPool.query(
+      `SELECT id FROM users.users WHERE email = $1 LIMIT 1`, [email]
+    );
+    if (!userRow.rows.length) return res.json({ ok: true, tasks: [], note: 'No user record found for ' + email });
+    const userId = userRow.rows[0].id;
+    const params = [userId];
     let where = 'WHERE user_id = $1';
     if (status) { params.push(status); where += ` AND status = $${params.length}`; }
     const { rows } = await smtAdminPool.query(
@@ -5173,24 +5181,29 @@ app.get('/api/user-tasks', async (req, res) => {
        LIMIT $${params.length + 1}`,
       [...params, Number(limit)]
     );
-    res.json({ ok: true, tasks: rows });
+    res.json({ ok: true, tasks: rows, user_id: userId });
   } catch (e) {
     console.error('GET /api/user-tasks error:', e.message);
     res.status(500).json({ ok: false, tasks: [] });
   }
 });
 
-/** POST /api/user-tasks — create a new task */
+/** POST /api/user-tasks — create a new task for the logged-in user */
 app.post('/api/user-tasks', async (req, res) => {
   try {
     const { description, status='pending', task_type='Next Action', horizon='Ground',
-            accountable_person, due_date_suggestion, priority_score, details, user_id=17 } = req.body;
+            accountable_person, due_date_suggestion, priority_score, details } = req.body;
     if (!description) return res.status(400).json({ error: 'description is required' });
+    const email = req.user?.email || null;
+    if (!email) return res.status(401).json({ ok: false, error: 'Not authenticated' });
+    const userRow = await smtAdminPool.query(`SELECT id FROM users.users WHERE email = $1 LIMIT 1`, [email]);
+    if (!userRow.rows.length) return res.status(404).json({ ok: false, error: 'User not found: ' + email });
+    const userId = userRow.rows[0].id;
     const result = await smtAdminPool.query(
       `INSERT INTO users.user_tasks
          (user_id, description, status, task_type, horizon, accountable_person, due_date_suggestion, priority_score, details)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *`,
-      [Number(user_id), description, status, task_type, horizon,
+      [userId, description, status, task_type, horizon,
        accountable_person||null, due_date_suggestion||null, priority_score||null, details||null]
     );
     res.status(201).json({ ok: true, task: result.rows[0] });
