@@ -276,11 +276,13 @@ const STATUS_CFG={
 const TASK_TYPES=['Next Action','Project'];
 const HORIZONS=['Ground','Horizon 1','Horizon 2','Horizon 3','Horizon 4','Horizon 5'];
 
+const TASK_PER_PAGE=10;
 function TaskListSection({authHeaders}){
   const [tasks,setTasks]=useState([]);
   const [loading,setLoading]=useState(true);
   const [filterStatus,setFilterStatus]=useState('all');
   const [search,setSearch]=useState('');
+  const [taskPage,setTaskPage]=useState(0);
   const [modal,setModal]=useState(null); // null | {mode:'add'} | {mode:'edit', task}
   const [saving,setSaving]=useState(false);
   const BLANK={description:'',status:'pending',task_type:'Next Action',horizon:'Ground',
@@ -338,6 +340,8 @@ function TaskListSection({authHeaders}){
   const filtered=tasks
     .filter(t=>filterStatus==='all'||t.status===filterStatus)
     .filter(t=>!search||t.description.toLowerCase().includes(search.toLowerCase())||(t.accountable_person||'').toLowerCase().includes(search.toLowerCase()));
+  const taskPages=Math.ceil(filtered.length/TASK_PER_PAGE);
+  const pagedTasks=filtered.slice(taskPage*TASK_PER_PAGE,(taskPage+1)*TASK_PER_PAGE);
 
   const fi={width:'100%',boxSizing:'border-box',padding:'8px 12px',borderRadius:8,
     border:'1px solid rgba(255,255,255,.12)',background:'rgba(255,255,255,.04)',
@@ -354,15 +358,15 @@ function TaskListSection({authHeaders}){
           {/* Search */}
           <div style={{position:'relative'}}>
             <svg style={{position:'absolute',left:9,top:'50%',transform:'translateY(-50%)',pointerEvents:'none'}} width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#7E8DB5" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-            <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search tasks…"
+            <input value={search} onChange={e=>{ setSearch(e.target.value); setTaskPage(0); }} placeholder="Search tasks…"
               style={{paddingLeft:30,paddingRight:search?24:10,height:32,borderRadius:8,
                 border:'1px solid rgba(255,255,255,.15)',background:'rgba(255,255,255,.05)',
                 color:'#EAF0FF',font:'13px Inter,sans-serif',outline:'none',width:180}}/>
-            {search&&<span onClick={()=>setSearch('')} style={{position:'absolute',right:8,top:'50%',
+            {search&&<span onClick={()=>{ setSearch(''); setTaskPage(0); }} style={{position:'absolute',right:8,top:'50%',
               transform:'translateY(-50%)',color:'#7E8DB5',cursor:'pointer',fontSize:14}}>×</span>}
           </div>
           {/* Status filter */}
-          <select value={filterStatus} onChange={e=>setFilterStatus(e.target.value)}
+          <select value={filterStatus} onChange={e=>{ setFilterStatus(e.target.value); setTaskPage(0); }}
             style={{height:32,padding:'0 10px',borderRadius:8,border:'1px solid rgba(255,255,255,.15)',
               background:'rgba(255,255,255,.05)',color:'#EAF0FF',font:'12px Inter,sans-serif',outline:'none'}}>
             <option value="all">All statuses</option>
@@ -400,7 +404,7 @@ function TaskListSection({authHeaders}){
             ? <div style={{padding:32,textAlign:'center',font:'13px Inter,sans-serif',color:'#7E8DB5'}}>
                 {search||filterStatus!=='all'?'No matching tasks.':'No tasks yet. Click “+ New Task” to add one.'}
               </div>
-            : filtered.map(t=>{
+            : pagedTasks.map(t=>{
                 const sc=STATUS_CFG[t.status]||STATUS_CFG.pending;
                 return (
                   <div key={t.id} style={{display:'grid',gridTemplateColumns:'32px 1fr 100px 100px 110px 120px 80px',
@@ -453,9 +457,12 @@ function TaskListSection({authHeaders}){
 
       {/* Count */}
       {!loading&&filtered.length>0&&(
-        <div style={{font:'11px Inter,sans-serif',color:'#7E8DB5',marginTop:8,textAlign:'right'}}>
-          {filtered.length} task{filtered.length!==1?'s':''}
-          {filterStatus!=='all'?` · filtered by ${STATUS_CFG[filterStatus]?.label}`:''}
+        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginTop:8}}>
+          <span style={{font:'11px Inter,sans-serif',color:'#7E8DB5'}}>
+            {filtered.length} task{filtered.length!==1?'s':''}
+            {filterStatus!=='all'?` · filtered by ${STATUS_CFG[filterStatus]?.label}`:''}
+          </span>
+          {taskPages>1&&<Pager page={taskPage} setPage={setTaskPage} total={filtered.length} perPage={TASK_PER_PAGE}/>}
         </div>
       )}
 
