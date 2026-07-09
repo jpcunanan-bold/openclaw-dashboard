@@ -1,0 +1,76 @@
+name: Deploy to EC2
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: # allow manual trigger from GitHub UI
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Deploy to EC2
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ vars.EC2_HOST }}
+          username: ubuntu
+          key: ${{ secrets.EC2_SSH_KEY }}
+          port: 22
+          script: |
+            set -e
+
+            echo "=== Pulling latest code ==="
+            cd /var/www/laura-dashboard
+            git fetch https://${{ secrets.GH_PAT }}@github.com/jpcunanan-bold/openclaw-dashboard.git main
+            git reset --hard FETCH_HEAD
+
+            echo "=== Writing .env ==="
+            cat > /var/www/laura-dashboard/api/.env << 'ENVEOF'
+            GOOGLE_CLIENT_ID=${{ vars.GOOGLE_CLIENT_ID }}
+            GOOGLE_CLIENT_SECRET=${{ secrets.GOOGLE_CLIENT_SECRET }}
+            ALLOWED_DOMAIN=${{ vars.ALLOWED_DOMAIN }}
+            ALLOWED_EMAILS=${{ vars.ALLOWED_EMAILS }}
+            ANTHROPIC_ADMIN_API_KEY=${{ secrets.ANTHROPIC_ADMIN_API_KEY }}
+            ANTHROPIC_API_KEY=${{ secrets.ANTHROPIC_API_KEY }}
+            ANTHROPIC_AGENT_API_KEY_ID=${{ vars.ANTHROPIC_AGENT_API_KEY_ID }}
+            HUBSPOT_TOKEN=${{ secrets.HUBSPOT_TOKEN }}
+            PORT=${{ vars.PORT }}
+            BB_AGENTS_HOST=${{ vars.BB_AGENTS_HOST }}
+            BB_AGENTS_DB=${{ vars.BB_AGENTS_DB }}
+            BB_AGENTS_USER=${{ vars.BB_AGENTS_USER }}
+            BB_AGENTS_PASSWORD=${{ secrets.BB_AGENTS_PASSWORD }}
+            PG_HOST=${{ vars.PG_HOST }}
+            PG_PORT=5432
+            PG_USER=${{ vars.PG_USER }}
+            PG_PASSWORD=${{ secrets.PG_PASSWORD }}
+            PG_DATABASE=${{ vars.PG_DATABASE }}
+            AGENT_SECRET=${{ secrets.AGENT_SECRET }}
+            OPENCLAW_GATEWAY_TOKEN=${{ secrets.OPENCLAW_GATEWAY_TOKEN }}
+            LAURA_AGENT_ID=laura-abhi-agent
+            ENVEOF
+
+            echo "=== Installing API dependencies ==="
+            cd /var/www/laura-dashboard/api
+            npm install --omit=dev --silent
+
+            echo "=== Building frontend ==="
+            cd /var/www/laura-dashboard/app
+            npm install --silent
+            npm run build
+
+            echo "=== Copying build to web root ==="
+            cp -r /var/www/laura-dashboard/app/dist/* /var/www/laura-dashboard/
+
+            echo "=== Restarting API ==="
+            pkill -f "node server.js" || true
+            sleep 1
+            cd /var/www/laura-dashboard/api
+            nohup node server.js >> /tmp/laura-api.log 2>&1 &
+            sleep 3
+            curl -sf http://127.0.0.1:3100/api/health > /dev/null && echo "API healthy" || echo "WARNING: health check failed"
+
+            echo "=== Deploy complete ==="
