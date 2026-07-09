@@ -16,24 +16,24 @@ jobs:
       - name: Write .env
         env:
           GOOGLE_CLIENT_ID: ${{ vars.GOOGLE_CLIENT_ID }}
-          GOOGLE_CLIENT_SECRET: *** secrets.GOOGLE_CLIENT_SECRET }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
           ALLOWED_DOMAIN: ${{ vars.ALLOWED_DOMAIN }}
           ALLOWED_EMAILS: ${{ vars.ALLOWED_EMAILS }}
-          ANTHROPIC_ADMIN_API_KEY: *** secrets.ANTHROPIC_ADMIN_API_KEY }}
-          ANTHROPIC_API_KEY: *** secrets.ANTHROPIC_API_KEY }}
+          ANTHROPIC_ADMIN_API_KEY: ${{ secrets.ANTHROPIC_ADMIN_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           ANTHROPIC_AGENT_API_KEY_ID: ${{ vars.ANTHROPIC_AGENT_API_KEY_ID }}
-          HUBSPOT_TOKEN: *** secrets.HUBSPOT_TOKEN }}
+          HUBSPOT_TOKEN: ${{ secrets.HUBSPOT_TOKEN }}
           PORT: ${{ vars.PORT }}
           BB_AGENTS_HOST: ${{ vars.BB_AGENTS_HOST }}
           BB_AGENTS_DB: ${{ vars.BB_AGENTS_DB }}
           BB_AGENTS_USER: ${{ vars.BB_AGENTS_USER }}
-          BB_AGENTS_PASSWORD: *** secrets.BB_AGENTS_PASSWORD }}
+          BB_AGENTS_PASSWORD: ${{ secrets.BB_AGENTS_PASSWORD }}
           PG_HOST: ${{ vars.PG_HOST }}
           PG_USER: ${{ vars.PG_USER }}
-          PG_PASSWORD: *** secrets.PG_PASSWORD }}
+          PG_PASSWORD: ${{ secrets.PG_PASSWORD }}
           PG_DATABASE: ${{ vars.PG_DATABASE }}
-          AGENT_SECRET: *** secrets.AGENT_SECRET }}
-          OPENCLAW_GATEWAY_TOKEN: *** secrets.OPENCLAW_GATEWAY_TOKEN }}
+          AGENT_SECRET: ${{ secrets.AGENT_SECRET }}
+          OPENCLAW_GATEWAY_TOKEN: ${{ secrets.OPENCLAW_GATEWAY_TOKEN }}
         run: |
           {
             echo "GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}"
@@ -81,4 +81,4 @@ jobs:
           cd /var/www/laura-dashboard/api
           nohup node server.js >> /tmp/laura-api.log 2>&1 &
           sleep 4
-          curl -sf http://127.0.0.1:3100/api/health > /dev/null && echo "✅ API healthy" || echo "⚠️ health check failed"
+          curl -sf http://127.0.0.1:3100/api/health > /dev/null && echo "API healthy" || echo "WARNING: health check failed"
