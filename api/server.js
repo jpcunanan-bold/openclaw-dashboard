@@ -5154,6 +5154,91 @@ app.delete('/api/sales-dashboard/campaigns/:id', async (req, res) => {
   }
 });
 
+// ── User Tasks (users.user_tasks in smt_db) ──
+
+/** GET /api/user-tasks — fetch tasks, optionally filtered by status */
+app.get('/api/user-tasks', async (req, res) => {
+  try {
+    const { status, user_id = 17, limit = 100 } = req.query;
+    const params = [Number(user_id)];
+    let where = 'WHERE user_id = $1';
+    if (status) { params.push(status); where += ` AND status = $${params.length}`; }
+    const { rows } = await smtAdminPool.query(
+      `SELECT id, description, status, task_type, horizon, accountable_person,
+              due_date_suggestion, priority_score, details, created_at
+       FROM users.user_tasks ${where}
+       ORDER BY
+         CASE status WHEN 'pending' THEN 1 WHEN 'captured' THEN 2 WHEN 'done' THEN 3 ELSE 4 END,
+         priority_score DESC NULLS LAST, created_at DESC
+       LIMIT $${params.length + 1}`,
+      [...params, Number(limit)]
+    );
+    res.json({ ok: true, tasks: rows });
+  } catch (e) {
+    console.error('GET /api/user-tasks error:', e.message);
+    res.status(500).json({ ok: false, tasks: [] });
+  }
+});
+
+/** POST /api/user-tasks — create a new task */
+app.post('/api/user-tasks', async (req, res) => {
+  try {
+    const { description, status='pending', task_type='Next Action', horizon='Ground',
+            accountable_person, due_date_suggestion, priority_score, details, user_id=17 } = req.body;
+    if (!description) return res.status(400).json({ error: 'description is required' });
+    const result = await smtAdminPool.query(
+      `INSERT INTO users.user_tasks
+         (user_id, description, status, task_type, horizon, accountable_person, due_date_suggestion, priority_score, details)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *`,
+      [Number(user_id), description, status, task_type, horizon,
+       accountable_person||null, due_date_suggestion||null, priority_score||null, details||null]
+    );
+    res.status(201).json({ ok: true, task: result.rows[0] });
+  } catch (e) {
+    console.error('POST /api/user-tasks error:', e.message);
+    res.status(500).json({ ok: false, error: e.message });
+  }
+});
+
+/** PATCH /api/user-tasks/:id — update a task */
+app.patch('/api/user-tasks/:id', async (req, res) => {
+  try {
+    const { description, status, task_type, horizon, accountable_person,
+            due_date_suggestion, priority_score, details } = req.body;
+    const result = await smtAdminPool.query(
+      `UPDATE users.user_tasks SET
+         description         = COALESCE($1, description),
+         status              = COALESCE($2, status),
+         task_type           = COALESCE($3, task_type),
+         horizon             = COALESCE($4, horizon),
+         accountable_person  = COALESCE($5, accountable_person),
+         due_date_suggestion = COALESCE($6, due_date_suggestion),
+         priority_score      = COALESCE($7, priority_score),
+         details             = COALESCE($8, details)
+       WHERE id = $9 RETURNING *`,
+      [description||null, status||null, task_type||null, horizon||null,
+       accountable_person||null, due_date_suggestion||null,
+       priority_score||null, details||null, req.params.id]
+    );
+    if (!result.rows.length) return res.status(404).json({ error: 'Task not found' });
+    res.json({ ok: true, task: result.rows[0] });
+  } catch (e) {
+    console.error('PATCH /api/user-tasks error:', e.message);
+    res.status(500).json({ ok: false, error: e.message });
+  }
+});
+
+/** DELETE /api/user-tasks/:id — delete a task */
+app.delete('/api/user-tasks/:id', async (req, res) => {
+  try {
+    await smtAdminPool.query('DELETE FROM users.user_tasks WHERE id = $1', [req.params.id]);
+    res.json({ ok: true });
+  } catch (e) {
+    console.error('DELETE /api/user-tasks error:', e.message);
+    res.status(500).json({ ok: false, error: e.message });
+  }
+});
+
 // ── Campaign Briefs (rich brief content stored as jsonb) ──
 
 /** GET /api/campaign-briefs — fetch all user-created campaign briefs */

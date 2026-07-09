@@ -266,6 +266,281 @@ const SEQUENCE = [
 
 const PERIODS=[{id:'today',label:'Today'},{id:'7d',label:'Last 7 days'},{id:'30d',label:'Last 30 days'},{id:'all',label:'All time'}];
 
+// ─── Task List Section ─────────────────────────────────────────────────────
+const STATUS_CFG={
+  pending:   {label:'Pending',   color:'#F5B945', bg:'rgba(245,185,69,.12)'},
+  captured:  {label:'Captured',  color:'#4D8DFF', bg:'rgba(77,141,255,.12)'},
+  done:      {label:'Done',      color:'#2DD4BF', bg:'rgba(45,212,191,.12)'},
+  dismissed: {label:'Dismissed', color:'#7E8DB5', bg:'rgba(126,141,181,.1)'},
+};
+const TASK_TYPES=['Next Action','Project'];
+const HORIZONS=['Ground','Horizon 1','Horizon 2','Horizon 3','Horizon 4','Horizon 5'];
+
+function TaskListSection({authHeaders}){
+  const [tasks,setTasks]=useState([]);
+  const [loading,setLoading]=useState(true);
+  const [filterStatus,setFilterStatus]=useState('all');
+  const [search,setSearch]=useState('');
+  const [modal,setModal]=useState(null); // null | {mode:'add'} | {mode:'edit', task}
+  const [saving,setSaving]=useState(false);
+  const BLANK={description:'',status:'pending',task_type:'Next Action',horizon:'Ground',
+    accountable_person:'',due_date_suggestion:'',priority_score:'',details:''};
+  const [form,setForm]=useState(BLANK);
+
+  const load=()=>{
+    setLoading(true);
+    fetch('/api/user-tasks?limit=200',{headers:authHeaders()})
+      .then(r=>r.ok?r.json():null)
+      .then(j=>{ if(j?.tasks) setTasks(j.tasks); })
+      .catch(()=>{})
+      .finally(()=>setLoading(false));
+  };
+  useEffect(()=>{ load(); },[]);
+
+  const openAdd=()=>{ setForm(BLANK); setModal({mode:'add'}); };
+  const openEdit=(t)=>{ setForm({
+    description:t.description||'', status:t.status||'pending',
+    task_type:t.task_type||'Next Action', horizon:t.horizon||'Ground',
+    accountable_person:t.accountable_person||'', due_date_suggestion:t.due_date_suggestion||'',
+    priority_score:t.priority_score||'', details:t.details||'',
+  }); setModal({mode:'edit',task:t}); };
+
+  const handleSave=async(e)=>{
+    e.preventDefault(); setSaving(true);
+    try{
+      const body={...form, priority_score:form.priority_score?Number(form.priority_score):null};
+      const isEdit=modal.mode==='edit';
+      const res=await fetch(isEdit?`/api/user-tasks/${modal.task.id}`:'/api/user-tasks',{
+        method:isEdit?'PATCH':'POST',
+        headers:{...authHeaders(),'Content-Type':'application/json'},
+        body:JSON.stringify(body),
+      });
+      if(res.ok){ setModal(null); load(); }
+    }finally{ setSaving(false); }
+  };
+
+  const handleDelete=async(id)=>{
+    if(!window.confirm('Delete this task?')) return;
+    await fetch(`/api/user-tasks/${id}`,{method:'DELETE',headers:authHeaders()});
+    setTasks(prev=>prev.filter(t=>t.id!==id));
+  };
+
+  const handleStatusToggle=async(task)=>{
+    const next=task.status==='done'?'pending':'done';
+    await fetch(`/api/user-tasks/${task.id}`,{
+      method:'PATCH',
+      headers:{...authHeaders(),'Content-Type':'application/json'},
+      body:JSON.stringify({status:next}),
+    });
+    setTasks(prev=>prev.map(t=>t.id===task.id?{...t,status:next}:t));
+  };
+
+  const filtered=tasks
+    .filter(t=>filterStatus==='all'||t.status===filterStatus)
+    .filter(t=>!search||t.description.toLowerCase().includes(search.toLowerCase())||(t.accountable_person||'').toLowerCase().includes(search.toLowerCase()));
+
+  const fi={width:'100%',boxSizing:'border-box',padding:'8px 12px',borderRadius:8,
+    border:'1px solid rgba(255,255,255,.12)',background:'rgba(255,255,255,.04)',
+    color:'#EAF0FF',font:'13px Inter,sans-serif',outline:'none'};
+  const lbl={font:'600 10px Inter,sans-serif',letterSpacing:'.07em',textTransform:'uppercase',
+    color:'#7E8DB5',marginBottom:5,display:'block'};
+
+  return (
+    <div style={{marginTop:32,marginBottom:32}}>
+      {/* Header */}
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:14}}>
+        <div className="cc-sect-label" style={{marginBottom:0}}>Task list</div>
+        <div style={{display:'flex',alignItems:'center',gap:8}}>
+          {/* Search */}
+          <div style={{position:'relative'}}>
+            <svg style={{position:'absolute',left:9,top:'50%',transform:'translateY(-50%)',pointerEvents:'none'}} width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#7E8DB5" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search tasks…"
+              style={{paddingLeft:30,paddingRight:search?24:10,height:32,borderRadius:8,
+                border:'1px solid rgba(255,255,255,.15)',background:'rgba(255,255,255,.05)',
+                color:'#EAF0FF',font:'13px Inter,sans-serif',outline:'none',width:180}}/>
+            {search&&<span onClick={()=>setSearch('')} style={{position:'absolute',right:8,top:'50%',
+              transform:'translateY(-50%)',color:'#7E8DB5',cursor:'pointer',fontSize:14}}>×</span>}
+          </div>
+          {/* Status filter */}
+          <select value={filterStatus} onChange={e=>setFilterStatus(e.target.value)}
+            style={{height:32,padding:'0 10px',borderRadius:8,border:'1px solid rgba(255,255,255,.15)',
+              background:'rgba(255,255,255,.05)',color:'#EAF0FF',font:'12px Inter,sans-serif',outline:'none'}}>
+            <option value="all">All statuses</option>
+            {Object.entries(STATUS_CFG).map(([k,v])=>(
+              <option key={k} value={k}>{v.label}</option>
+            ))}
+          </select>
+          {/* Add button */}
+          <button onClick={openAdd}
+            style={{display:'inline-flex',alignItems:'center',gap:6,height:32,padding:'0 14px',
+              borderRadius:8,border:'1px solid rgba(6,229,236,.4)',background:'rgba(6,229,236,.08)',
+              color:'#06E5EC',font:'600 12px Inter,sans-serif',cursor:'pointer'}}>
+            <span style={{fontSize:16,lineHeight:1}}>+</span> New Task
+          </button>
+        </div>
+      </div>
+
+      {/* Task cards */}
+      <div style={{background:'rgba(255,255,255,.025)',border:'1px solid rgba(255,255,255,.08)',borderRadius:12,overflow:'hidden'}}>
+        {/* Table header */}
+        <div style={{display:'grid',gridTemplateColumns:'32px 1fr 100px 100px 110px 120px 80px',
+          padding:'10px 16px',borderBottom:'1px solid rgba(255,255,255,.08)',background:'rgba(2,8,32,.3)'}}>
+          {['','Task','Type','Horizon','Assigned to','Due','Status'].map((h,i)=>(
+            <span key={i} style={{font:'600 10px Inter,sans-serif',letterSpacing:'.06em',textTransform:'uppercase',color:'#7E8DB5'}}>{h}</span>
+          ))}
+        </div>
+
+        {loading
+          ? [1,2,3].map(i=>(
+              <div key={i} style={{padding:'14px 16px',borderBottom:'1px solid rgba(255,255,255,.05)'}}>
+                <div className="cc-skel" style={{height:16,width:'60%'}}/>
+              </div>
+            ))
+          : filtered.length===0
+            ? <div style={{padding:32,textAlign:'center',font:'13px Inter,sans-serif',color:'#7E8DB5'}}>
+                {search||filterStatus!=='all'?'No matching tasks.':'No tasks yet. Click “+ New Task” to add one.'}
+              </div>
+            : filtered.map(t=>{
+                const sc=STATUS_CFG[t.status]||STATUS_CFG.pending;
+                return (
+                  <div key={t.id} style={{display:'grid',gridTemplateColumns:'32px 1fr 100px 100px 110px 120px 80px',
+                    alignItems:'center',padding:'11px 16px',
+                    borderBottom:'1px solid rgba(255,255,255,.05)',
+                    opacity:t.status==='dismissed'?.5:1,
+                    transition:'background .1s'}}
+                    onMouseEnter={e=>e.currentTarget.style.background='rgba(255,255,255,.03)'}
+                    onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
+                    {/* Checkbox */}
+                    <span onClick={()=>handleStatusToggle(t)} style={{cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center'}}>
+                      <span style={{width:16,height:16,borderRadius:4,border:`2px solid ${t.status==='done'?'#2DD4BF':'rgba(255,255,255,.25)'}`,
+                        background:t.status==='done'?'#2DD4BF':'transparent',display:'flex',alignItems:'center',justifyContent:'center',transition:'all .15s'}}>
+                        {t.status==='done'&&<svg width="9" height="9" viewBox="0 0 12 12"><polyline points="2,6 5,9 10,3" stroke="#000" strokeWidth="2" fill="none" strokeLinecap="round"/></svg>}
+                      </span>
+                    </span>
+                    {/* Description */}
+                    <span style={{font:'13px Inter,sans-serif',color:t.status==='done'?'#7E8DB5':'#EAF0FF',
+                      textDecoration:t.status==='done'?'line-through':'none',
+                      overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',paddingRight:12}}
+                      title={t.description}>{t.description}</span>
+                    {/* Type */}
+                    <span style={{font:'11px Inter,sans-serif',color:'#9FB0D8'}}>{t.task_type||'—'}</span>
+                    {/* Horizon */}
+                    <span style={{font:'11px Inter,sans-serif',color:'#9FB0D8'}}>{t.horizon||'—'}</span>
+                    {/* Assigned */}
+                    <span style={{font:'11px Inter,sans-serif',color:'#9FB0D8',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{t.accountable_person||'—'}</span>
+                    {/* Due */}
+                    <span style={{font:'11px Inter,sans-serif',color:t.due_date_suggestion?'#F5B945':'#7E8DB5'}}>{t.due_date_suggestion||'—'}</span>
+                    {/* Status + actions */}
+                    <span style={{display:'flex',alignItems:'center',gap:6}}>
+                      <span style={{font:'700 10px Inter,sans-serif',padding:'2px 8px',borderRadius:20,
+                        color:sc.color,background:sc.bg,textTransform:'uppercase',letterSpacing:'.04em',whiteSpace:'nowrap'}}>
+                        {sc.label}
+                      </span>
+                      <button onClick={()=>openEdit(t)} title="Edit"
+                        style={{width:22,height:22,borderRadius:5,border:'1px solid rgba(255,255,255,.12)',
+                          background:'rgba(255,255,255,.06)',color:'#9FB0D8',cursor:'pointer',fontSize:11,
+                          display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>✎</button>
+                      <button onClick={()=>handleDelete(t.id)} title="Delete"
+                        style={{width:22,height:22,borderRadius:5,border:'1px solid rgba(242,102,122,.25)',
+                          background:'rgba(242,102,122,.06)',color:'#F2667A',cursor:'pointer',fontSize:13,
+                          display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>×</button>
+                    </span>
+                  </div>
+                );
+              })
+        }
+      </div>
+
+      {/* Count */}
+      {!loading&&filtered.length>0&&(
+        <div style={{font:'11px Inter,sans-serif',color:'#7E8DB5',marginTop:8,textAlign:'right'}}>
+          {filtered.length} task{filtered.length!==1?'s':''}
+          {filterStatus!=='all'?` · filtered by ${STATUS_CFG[filterStatus]?.label}`:''}
+        </div>
+      )}
+
+      {/* Add / Edit Modal */}
+      {modal&&(
+        <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,.7)',zIndex:1000,display:'flex',alignItems:'center',justifyContent:'center',padding:20}}
+          onClick={()=>setModal(null)}>
+          <div style={{width:'100%',maxWidth:560,background:'#080f2a',border:'1px solid rgba(255,255,255,.12)',
+            borderRadius:14,boxShadow:'0 40px 80px rgba(0,0,0,.7)',overflow:'hidden'}}
+            onClick={e=>e.stopPropagation()}>
+            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',
+              padding:'16px 24px',borderBottom:'1px solid rgba(255,255,255,.08)'}}>
+              <div style={{font:'700 16px Inter,sans-serif',color:'#fff'}}>
+                {modal.mode==='edit'?'Edit Task':'New Task'}
+              </div>
+              <button onClick={()=>setModal(null)}
+                style={{background:'none',border:'none',color:'#7E8DB5',fontSize:20,cursor:'pointer',lineHeight:1}}>×</button>
+            </div>
+            <form onSubmit={handleSave} style={{padding:'20px 24px',display:'flex',flexDirection:'column',gap:14}}>
+              <div>
+                <label style={lbl}>Description *</label>
+                <textarea required rows={3} value={form.description}
+                  onChange={e=>setForm(f=>({...f,description:e.target.value}))}
+                  style={{...fi,resize:'vertical',fontFamily:'Inter,sans-serif'}}/>
+              </div>
+              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
+                <div>
+                  <label style={lbl}>Status</label>
+                  <select value={form.status} onChange={e=>setForm(f=>({...f,status:e.target.value}))} style={{...fi,height:38}}>
+                    {Object.entries(STATUS_CFG).map(([k,v])=>(<option key={k} value={k}>{v.label}</option>))}
+                  </select>
+                </div>
+                <div>
+                  <label style={lbl}>Task Type</label>
+                  <select value={form.task_type} onChange={e=>setForm(f=>({...f,task_type:e.target.value}))} style={{...fi,height:38}}>
+                    {TASK_TYPES.map(t=>(<option key={t} value={t}>{t}</option>))}
+                  </select>
+                </div>
+                <div>
+                  <label style={lbl}>Horizon</label>
+                  <select value={form.horizon} onChange={e=>setForm(f=>({...f,horizon:e.target.value}))} style={{...fi,height:38}}>
+                    {HORIZONS.map(h=>(<option key={h} value={h}>{h}</option>))}
+                  </select>
+                </div>
+                <div>
+                  <label style={lbl}>Assigned To</label>
+                  <input value={form.accountable_person} onChange={e=>setForm(f=>({...f,accountable_person:e.target.value}))}
+                    placeholder="e.g. Abhinanda" style={fi}/>
+                </div>
+                <div>
+                  <label style={lbl}>Due</label>
+                  <input value={form.due_date_suggestion} onChange={e=>setForm(f=>({...f,due_date_suggestion:e.target.value}))}
+                    placeholder="e.g. today, ASAP, 2026-07-15" style={fi}/>
+                </div>
+                <div>
+                  <label style={lbl}>Priority (1–100)</label>
+                  <input type="number" min="1" max="100" value={form.priority_score}
+                    onChange={e=>setForm(f=>({...f,priority_score:e.target.value}))} style={fi}/>
+                </div>
+              </div>
+              <div>
+                <label style={lbl}>Details</label>
+                <textarea rows={2} value={form.details} onChange={e=>setForm(f=>({...f,details:e.target.value}))}
+                  style={{...fi,resize:'vertical',fontFamily:'Inter,sans-serif'}}/>
+              </div>
+              <div style={{display:'flex',justifyContent:'flex-end',gap:10,marginTop:4}}>
+                <button type="button" onClick={()=>setModal(null)}
+                  style={{padding:'8px 20px',borderRadius:8,border:'1px solid rgba(255,255,255,.15)',
+                    background:'none',color:'#9FB0D8',font:'600 13px Inter,sans-serif',cursor:'pointer'}}>Cancel</button>
+                <button type="submit" disabled={saving}
+                  style={{padding:'8px 24px',borderRadius:8,border:'none',
+                    background:saving?'rgba(6,229,236,.4)':'#06E5EC',
+                    color:'#000814',font:'700 13px Inter,sans-serif',cursor:saving?'default':'pointer'}}>
+                  {saving?'Saving…':modal.mode==='edit'?'Save Changes':'Create Task'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+// ────────────────────────────────────────────────────────────────────────────
+
 function SalesTab({modalAgent,setModalAgent}) {
   const [period,setPeriod]=useState('7d');
 
@@ -2970,6 +3245,9 @@ function SalesTab({modalAgent,setModalAgent}) {
           })}
         </div>
       </div>
+
+      {/* ── Task List ── */}
+      <TaskListSection authHeaders={authHeaders}/>
 
       {/* ── Email Domains ── */}
       <div className="cc-sect-label" style={{marginTop:32}}>Email sending domains</div>
