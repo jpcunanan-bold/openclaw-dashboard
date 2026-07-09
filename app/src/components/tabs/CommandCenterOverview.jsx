@@ -3303,21 +3303,30 @@ function Pager({page,setPage,total,perPage}){
       font:'600 11px Inter,sans-serif',cursor:disabled?'default':'pointer',transition:'all .15s',
     }}>{label}</button>
   );
+  const pageBtn=(i)=>(
+    <button key={i} onClick={()=>setPage(i)} style={{
+      width:28,height:26,borderRadius:6,border:i===page?'none':'1px solid rgba(255,255,255,.12)',
+      background:i===page?'#06E5EC':'rgba(255,255,255,.05)',
+      color:i===page?'#000':'#9FB0D8',
+      font:`${i===page?700:400} 11px Inter,sans-serif`,cursor:'pointer',transition:'all .15s',
+    }}>{i+1}</button>
+  );
+  // sliding window of up to 5 pages around current
+  const WINDOW=2;
+  const start=Math.max(0,Math.min(page-WINDOW,pages-WINDOW*2-1));
+  const end=Math.min(pages-1,start+WINDOW*2);
+  const pageNums=[];
+  for(let i=start;i<=end;i++) pageNums.push(i);
   return (
-    <div style={{display:'flex',alignItems:'center',justifyContent:'flex-end',gap:6,marginTop:10,paddingTop:8,borderTop:'1px solid rgba(255,255,255,.06)'}}>
-      <span style={{font:'11px Inter,sans-serif',color:'#7E8DB5',marginRight:4}}>
+    <div style={{display:'flex',alignItems:'center',justifyContent:'flex-end',gap:4,marginTop:10,paddingTop:8,borderTop:'1px solid rgba(255,255,255,.06)',flexWrap:'wrap'}}>
+      <span style={{font:'11px Inter,sans-serif',color:'#7E8DB5',marginRight:6}}>
         {page*perPage+1}–{Math.min((page+1)*perPage,total)} of {total}
       </span>
       {btn('«',page===0,()=>setPage(0))}
       {btn('‹',page===0,()=>setPage(p=>Math.max(0,p-1)))}
-      {Array.from({length:pages},(_,i)=>(
-        <button key={i} onClick={()=>setPage(i)} style={{
-          width:26,height:26,borderRadius:6,border:i===page?'none':'1px solid rgba(255,255,255,.12)',
-          background:i===page?'#06E5EC':'rgba(255,255,255,.05)',
-          color:i===page?'#000':'#9FB0D8',
-          font:`${i===page?700:400} 11px Inter,sans-serif`,cursor:'pointer',transition:'all .15s',
-        }}>{i+1}</button>
-      ))}
+      {start>0&&<span style={{color:'#7E8DB5',font:'11px Inter,sans-serif',padding:'0 2px'}}>…</span>}
+      {pageNums.map(i=>pageBtn(i))}
+      {end<pages-1&&<span style={{color:'#7E8DB5',font:'11px Inter,sans-serif',padding:'0 2px'}}>…</span>}
       {btn('›',page===pages-1,()=>setPage(p=>Math.min(pages-1,p+1)))}
       {btn('»',page===pages-1,()=>setPage(pages-1))}
     </div>
