@@ -1,0 +1,71 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120">
+  <defs>
+    <radialGradient id="bgD" cx="50%" cy="40%" r="60%">
+      <stop offset="0%" stop-color="#78350f"/>
+      <stop offset="100%" stop-color="#3d1a05"/>
+    </radialGradient>
+    <radialGradient id="skinD" cx="50%" cy="35%" r="55%">
+      <stop offset="0%" stop-color="#FDDBB4"/>
+      <stop offset="100%" stop-color="#F0BC8C"/>
+    </radialGradient>
+    <radialGradient id="glowD" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#F59E0B" stop-opacity="0.3"/>
+      <stop offset="100%" stop-color="#F59E0B" stop-opacity="0"/>
+    </radialGradient>
+    <clipPath id="circleD">
+      <circle cx="60" cy="60" r="60"/>
+    </clipPath>
+  </defs>
+
+  <!-- Background -->
+  <circle cx="60" cy="60" r="60" fill="url(#bgD)"/>
+  <!-- Glow overlay -->
+  <circle cx="60" cy="60" r="60" fill="url(#glowD)"/>
+
+  <!-- Shoulders / suit body -->
+  <ellipse cx="60" cy="107" rx="36" ry="22" fill="#1a1a2e"/>
+  <!-- Suit jacket -->
+  <path d="M40 92 Q52 98 60 96 Q68 98 80 92 L82 107 Q60 118 38 107 Z" fill="#252545"/>
+  <!-- White shirt + tie -->
+  <path d="M55 92 L60 96 L65 92 L63 107 L57 107Z" fill="#e8eaff"/>
+  <!-- Tie -->
+  <path d="M59 93 L60 96 L61 93 L60.5 107 L59.5 107Z" fill="#F59E0B"/>
+
+  <!-- Neck -->
+  <rect x="54" y="76" width="12" height="18" rx="5" fill="url(#skinD)"/>
+
+  <!-- Head -->
+  <ellipse cx="60" cy="62" rx="21" ry="23" fill="url(#skinD)"/>
+
+  <!-- Hair — short, dark, professional male cut -->
+  <ellipse cx="60" cy="43" rx="21" ry="11" fill="#1a0f07"/>
+  <path d="M39 50 Q39 39 60 37 Q81 39 81 50 Q79 43 60 41 Q41 43 39 50Z" fill="#120b04"/>
+  <!-- Short sides -->
+  <path d="M39 50 Q38 56 39 62 Q41 54 41 50Z" fill="#1a0f07"/>
+  <path d="M81 50 Q82 56 81 62 Q79 54 79 50Z" fill="#1a0f07"/>
+
+  <!-- Eyes - slightly deeper set for masculine look -->
+  <ellipse cx="51" cy="62" rx="4" ry="3.2" fill="white"/>
+  <ellipse cx="69" cy="62" rx="4" ry="3.2" fill="white"/>
+  <circle cx="52" cy="62" r="2.5" fill="#4A3728"/>
+  <circle cx="70" cy="62" r="2.5" fill="#4A3728"/>
+  <circle cx="52.8" cy="61.2" r="0.8" fill="white"/>
+  <circle cx="70.8" cy="61.2" r="0.8" fill="white"/>
+
+  <!-- Stronger brows -->
+  <path d="M47 57 Q51 55.5 55 57" stroke="#1a0f07" stroke-width="2" fill="none" stroke-linecap="round"/>
+  <path d="M65 57 Q69 55.5 73 57" stroke="#1a0f07" stroke-width="2" fill="none" stroke-linecap="round"/>
+
+  <!-- Nose - wider for masculine look -->
+  <path d="M60 65 Q57.5 70 58.5 71.5 Q60 72 61.5 71.5 Q62.5 70 60 65" stroke="#C88A5A" stroke-width="1.2" fill="none" stroke-linecap="round"/>
+
+  <!-- Confident smile -->
+  <path d="M54 75 Q60 80 66 75" stroke="#B07040" stroke-width="1.8" fill="none" stroke-linecap="round"/>
+
+  <!-- Light stubble hint -->
+  <path d="M50 78 Q60 82 70 78" stroke="#C88A5A" stroke-width="0.5" fill="none" opacity="0.4" stroke-dasharray="1,2"/>
+
+  <!-- Amber glow ring -->
+  <circle cx="60" cy="60" r="59" fill="none" stroke="#F59E0B" stroke-width="1.5" opacity="0.7"/>
+  <circle cx="60" cy="60" r="57" fill="none" stroke="#F59E0B" stroke-width="0.5" opacity="0.35"/>
+</svg>

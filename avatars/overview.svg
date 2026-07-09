@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120">
+  <defs>
+    <radialGradient id="bgO" cx="50%" cy="40%" r="70%">
+      <stop offset="0%" stop-color="#1e2040"/>
+      <stop offset="100%" stop-color="#0a0e1a"/>
+    </radialGradient>
+    <radialGradient id="glowO" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#8B5CF6" stop-opacity="0.35"/>
+      <stop offset="100%" stop-color="#8B5CF6" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="iconGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#06E5EC"/>
+      <stop offset="100%" stop-color="#8B5CF6"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background -->
+  <circle cx="60" cy="60" r="60" fill="url(#bgO)"/>
+  <circle cx="60" cy="60" r="60" fill="url(#glowO)"/>
+
+  <!-- Bold Business BB logo mark — stylized -->
+  <!-- Two B shapes combined as a monogram -->
+  <g transform="translate(60,60)" opacity="0.95">
+    <!-- Left B spine -->
+    <rect x="-18" y="-26" width="6" height="52" rx="3" fill="url(#iconGrad)"/>
+    <!-- Top bump of B -->
+    <path d="M-12 -26 Q14 -26 14 -13 Q14 0 -12 0Z" fill="url(#iconGrad)" opacity="0.9"/>
+    <!-- Bottom bump of B -->
+    <path d="M-12 0 Q16 0 16 13 Q16 26 -12 26Z" fill="url(#iconGrad)" opacity="0.9"/>
+    <!-- Inner cutouts to make it look like B -->
+    <path d="M-8 -22 Q9 -22 9 -13 Q9 -4 -8 -4Z" fill="#1e2040"/>
+    <path d="M-8 4 Q11 4 11 13 Q11 22 -8 22Z" fill="#1e2040"/>
+  </g>
+
+  <!-- Subtle orbit ring — signifies multi-agent -->
+  <ellipse cx="60" cy="60" rx="50" ry="16" fill="none" stroke="#06E5EC" stroke-width="0.8" opacity="0.2" transform="rotate(-25 60 60)"/>
+  <ellipse cx="60" cy="60" rx="50" ry="16" fill="none" stroke="#F59E0B" stroke-width="0.8" opacity="0.2" transform="rotate(25 60 60)"/>
+
+  <!-- Two small agent dots orbiting -->
+  <circle cx="19" cy="48" r="4.5" fill="#06E5EC" opacity="0.85"/>
+  <circle cx="101" cy="72" r="4.5" fill="#F59E0B" opacity="0.85"/>
+
+  <!-- Glow ring -->
+  <circle cx="60" cy="60" r="59" fill="none" stroke="#8B5CF6" stroke-width="1.5" opacity="0.6"/>
+  <circle cx="60" cy="60" r="57" fill="none" stroke="#8B5CF6" stroke-width="0.5" opacity="0.3"/>
+</svg>

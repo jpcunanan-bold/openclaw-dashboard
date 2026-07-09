@@ -1,0 +1,31 @@
+{
+  "_comment": "Maps Anthropic api_key_id → agent_id in bb_agents. Update when keys rotate.",
+  "_last_updated": "2026-05-07",
+  "_updated_by": "JP Cunanan / Laura",
+
+  "apikey_01NLqHHwziEji98gwwq6SM3r": "laura-abhi-agent",
+  "apikey_012UW196UNRYiNkbkTFdSJVb": "laura-abhi-agent",
+  "apikey_01KjjgriGzX4swqoSDVUmRMe": "laura-abhi-agent",
+  "apikey_011CBCezpPumTarArVHh7yFC": "laura-abhi-agent",
+
+  "apikey_013DiYgu39cq8Hzrvb1hoSuL": "zara-mercuryz-agent",
+
+  "apikey_01QXkxB6uc4WGKJneFSpqonx": "darren-abhi-agent",
+
+  "apikey_01BKDP94kU5zMzVEmFwXPuJr": "camilla-boldbusiness-agent",
+
+  "apikey_01AxZC8vBMNoXNFsqQZQG5og": "brio-ed-agent",
+  "apikey_014SwSgBGPwqnjo7JThDMaxD": "brio-ed-agent",
+  "apikey_01WcrLYAga86ZQKapPPgPS3k": "brio-ed-agent",
+  "apikey_01KySrhDBYigkA5dAwg7GWS5": "brio-ed-agent",
+
+  "apikey_01YCnZaLXAxnTX3QZACpnGyZ": "ava-marketing-agent",
+  "apikey_016EdbhDrTB7iJvZgdbw9sVL": "ava-marketing-agent",
+  "apikey_01GTXH676syym1mfgripvtXq": "ava-marketing-agent",
+
+  "apikey_01WyX5UBgo7XBL6WaQM6pcL6": "pearl-agent",
+  "apikey_01Gvebw9ZiVnqftKPTAzoZM9": "lola-boldbusiness-agent",
+
+  "apikey_01UAu9A7vCGeeE7MCWvHcCrg": "clawbot-agent",
+  "apikey_01KFPimicDpThxiWSiUxaQhi": "clawbot-agent"
+}

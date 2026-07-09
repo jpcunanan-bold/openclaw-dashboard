@@ -1,0 +1,28 @@
+# Dependencies
+node_modules/
+app/node_modules/
+api/node_modules/
+
+# Build output
+app/dist/
+
+# Secrets — NEVER commit
+api/.env
+api-server/.env
+*.env
+
+# Credential plaintext files — contains live RDS passwords
+PG DATABase-Access-and-openclaw-connection.txt
+*credentials*.txt
+
+# Runtime data
+api/data/
+api-server/data/
+*.log
+
+# OS/editor
+.DS_Store
+*.swp
+
+# Secrets file — never commit
+.secrets.md

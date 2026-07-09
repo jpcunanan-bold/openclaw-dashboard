@@ -1,0 +1,1530 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Agent Cost Structure — Bold Business</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3.0.1"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+  
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  
+  body {
+    font-family: 'Inter', -apple-system, sans-serif;
+    background: #f8f9fc;
+    color: #1a1a2e;
+    line-height: 1.6;
+  }
+  
+  .container {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 40px 30px;
+  }
+  
+  .header {
+    text-align: center;
+    margin-bottom: 50px;
+  }
+  
+  .header h1 {
+    font-size: 32px;
+    font-weight: 800;
+    color: #1a1a2e;
+    margin-bottom: 8px;
+    letter-spacing: -0.5px;
+  }
+  
+  .header .subtitle {
+    font-size: 16px;
+    color: #6b7280;
+    font-weight: 400;
+  }
+  
+  .bold-badge {
+    display: inline-block;
+    background: #e63946;
+    color: white;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    padding: 4px 12px;
+    border-radius: 3px;
+    margin-bottom: 16px;
+    text-transform: uppercase;
+  }
+  
+  /* === LAYER DIAGRAM === */
+  .layer-section {
+    margin-bottom: 60px;
+  }
+  
+  .section-title {
+    font-size: 22px;
+    font-weight: 700;
+    margin-bottom: 6px;
+    color: #1a1a2e;
+  }
+  
+  .section-desc {
+    font-size: 14px;
+    color: #6b7280;
+    margin-bottom: 28px;
+  }
+  
+  .layers-container {
+    position: relative;
+    width: 100%;
+    max-width: 900px;
+    margin: 0 auto;
+  }
+  
+  .layer {
+    display: flex;
+    align-items: stretch;
+    margin-bottom: 3px;
+    border-radius: 12px;
+    overflow: hidden;
+    min-height: 140px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+  }
+  
+  .layer-color {
+    width: 8px;
+    flex-shrink: 0;
+  }
+  
+  .layer-body {
+    flex: 1;
+    padding: 24px 28px;
+    background: white;
+    display: flex;
+    align-items: center;
+    gap: 28px;
+  }
+  
+  .layer-number {
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 22px;
+    font-weight: 800;
+    color: white;
+    flex-shrink: 0;
+  }
+  
+  .layer-content { flex: 1; }
+  
+  .layer-label {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 1.2px;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+  }
+  
+  .layer-title {
+    font-size: 20px;
+    font-weight: 700;
+    color: #1a1a2e;
+    margin-bottom: 6px;
+  }
+  
+  .layer-desc {
+    font-size: 14px;
+    color: #4b5563;
+    line-height: 1.5;
+  }
+  
+  .layer-meta {
+    text-align: right;
+    min-width: 180px;
+    flex-shrink: 0;
+  }
+  
+  .meta-tag {
+    display: inline-block;
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 600;
+    margin-bottom: 6px;
+  }
+  
+  .meta-detail {
+    font-size: 12px;
+    color: #6b7280;
+    line-height: 1.6;
+  }
+  
+  /* Layer colors */
+  .layer-1 .layer-color, .layer-1 .layer-number { background: #3b82f6; }
+  .layer-1 .layer-label { color: #3b82f6; }
+  .layer-1 .meta-tag { background: #eff6ff; color: #1d4ed8; }
+  
+  .layer-2 .layer-color, .layer-2 .layer-number { background: #10b981; }
+  .layer-2 .layer-label { color: #10b981; }
+  .layer-2 .meta-tag { background: #ecfdf5; color: #047857; }
+  
+  .layer-3 .layer-color, .layer-3 .layer-number { background: #f59e0b; }
+  .layer-3 .layer-label { color: #f59e0b; }
+  .layer-3 .meta-tag { background: #fffbeb; color: #b45309; }
+  
+  /* Arrow connector */
+  .layer-arrow {
+    text-align: center;
+    padding: 4px 0;
+    color: #d1d5db;
+    font-size: 18px;
+  }
+  
+  /* === COST DRIVERS === */
+  .drivers-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+    margin-top: 32px;
+    margin-bottom: 60px;
+  }
+  
+  .driver-card {
+    background: white;
+    border-radius: 12px;
+    padding: 24px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    border-top: 4px solid;
+  }
+  
+  .driver-card.d1 { border-color: #3b82f6; }
+  .driver-card.d2 { border-color: #10b981; }
+  .driver-card.d3 { border-color: #f59e0b; }
+  
+  .driver-icon {
+    font-size: 28px;
+    margin-bottom: 12px;
+  }
+  
+  .driver-title {
+    font-size: 15px;
+    font-weight: 700;
+    margin-bottom: 8px;
+    color: #1a1a2e;
+  }
+  
+  .driver-text {
+    font-size: 13px;
+    color: #4b5563;
+    line-height: 1.5;
+  }
+  
+  .driver-action {
+    margin-top: 12px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #e63946;
+  }
+  
+  /* === CHARTS === */
+  .chart-section {
+    background: white;
+    border-radius: 16px;
+    padding: 36px;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+    margin-bottom: 40px;
+  }
+  
+  .chart-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 24px;
+  }
+  
+  .chart-title {
+    font-size: 20px;
+    font-weight: 700;
+    color: #1a1a2e;
+  }
+  
+  .chart-subtitle {
+    font-size: 13px;
+    color: #6b7280;
+    margin-top: 4px;
+  }
+  
+  .chart-canvas-wrap {
+    position: relative;
+    height: 380px;
+  }
+  
+  /* Annotations below chart */
+  .chart-annotations {
+    margin-top: 24px;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 12px;
+  }
+  
+  .annotation {
+    display: flex;
+    gap: 10px;
+    padding: 12px 14px;
+    background: #f8f9fc;
+    border-radius: 8px;
+    border-left: 3px solid;
+  }
+  
+  .annotation.a-wk1 { border-color: #ef4444; }
+  .annotation.a-wk4 { border-color: #f59e0b; }
+  .annotation.a-wk8 { border-color: #10b981; }
+  .annotation.a-wk12 { border-color: #3b82f6; }
+  
+  .annotation-week {
+    font-size: 11px;
+    font-weight: 700;
+    color: #6b7280;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  
+  .annotation-text {
+    font-size: 12px;
+    color: #374151;
+    line-height: 1.4;
+  }
+  
+  /* Legend override */
+  .custom-legend {
+    display: flex;
+    justify-content: center;
+    gap: 28px;
+    margin-bottom: 16px;
+  }
+  
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    font-weight: 500;
+    color: #374151;
+  }
+  
+  .legend-dot {
+    width: 14px;
+    height: 14px;
+    border-radius: 4px;
+  }
+  
+  /* === PIE CHART ROW === */
+  .pie-row {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 24px;
+    margin-bottom: 40px;
+  }
+  
+  .pie-card {
+    background: white;
+    border-radius: 16px;
+    padding: 28px;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+    text-align: center;
+  }
+  
+  .pie-label {
+    font-size: 13px;
+    font-weight: 600;
+    color: #6b7280;
+    margin-bottom: 4px;
+  }
+  
+  .pie-week {
+    font-size: 18px;
+    font-weight: 700;
+    color: #1a1a2e;
+    margin-bottom: 16px;
+  }
+  
+  .pie-canvas-wrap {
+    position: relative;
+    height: 180px;
+  }
+  
+  .pie-total {
+    margin-top: 12px;
+    font-size: 24px;
+    font-weight: 800;
+    color: #1a1a2e;
+  }
+  
+  .pie-total-label {
+    font-size: 12px;
+    color: #6b7280;
+  }
+  
+  /* === KEY INSIGHT === */
+  .insight-box {
+    background: linear-gradient(135deg, #1a1a2e 0%, #2d2d52 100%);
+    border-radius: 16px;
+    padding: 36px;
+    color: white;
+    margin-bottom: 40px;
+  }
+  
+  .insight-title {
+    font-size: 18px;
+    font-weight: 700;
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  
+  .insight-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 20px;
+  }
+  
+  .insight-item {
+    background: rgba(255,255,255,0.08);
+    border-radius: 10px;
+    padding: 20px;
+  }
+  
+  .insight-item h4 {
+    font-size: 13px;
+    font-weight: 600;
+    opacity: 0.7;
+    margin-bottom: 6px;
+  }
+  
+  .insight-item p {
+    font-size: 14px;
+    line-height: 1.5;
+  }
+  
+  .footer {
+    text-align: center;
+    margin-top: 40px;
+    padding-top: 24px;
+    border-top: 1px solid #e5e7eb;
+    font-size: 12px;
+    color: #9ca3af;
+  }
+  
+  @media (max-width: 768px) {
+    .drivers-grid, .pie-row, .insight-grid { grid-template-columns: 1fr; }
+    .layer-body { flex-direction: column; gap: 12px; }
+    .layer-meta { text-align: left; min-width: auto; }
+  }
+</style>
+</head>
+<body>
+
+<div class="container">
+  
+  <div class="header">
+    <div class="bold-badge">Bold Business</div>
+    <h1>Agent Cost Structure</h1>
+    <div class="subtitle">A 3-Layer Framework for Understanding, Managing &amp; Optimizing AI Agent Costs</div>
+    <div style="margin-top:12px; font-size:12px; color:#9ca3af;">Updated April 4, 2026 — Based on real production data from a live production executive agent</div>
+  </div>
+
+  <!-- === THE KEY TO AGENT COSTS: RIGHT MODEL FOR EACH JOB === -->
+  <div style="background:linear-gradient(135deg, #1e293b 0%, #334155 100%); border-radius:20px; padding:36px; color:white; margin-bottom:40px; position:relative; overflow:hidden;">
+    <div style="display:flex; align-items:center; gap:14px; margin-bottom:20px;">
+      <div style="font-size:36px;">🧠</div>
+      <div>
+        <div style="font-size:13px; font-weight:700; letter-spacing:2px; text-transform:uppercase; color:#94a3b8;">How Agent Costs Actually Work</div>
+        <div style="font-size:22px; font-weight:800; line-height:1.2;">Three Models, Three Price Points — Use the Right One for Each Job</div>
+      </div>
+    </div>
+
+    <div style="font-size:14px; line-height:1.7; opacity:0.9; margin-bottom:24px;">
+      Anthropic offers three model tiers. An agent doesn't use one model for everything — it uses <strong>the cheapest model that can do the job well.</strong> Routine background tasks run on the budget model. Complex reasoning and executive-facing work runs on the premium model. Everything else runs on the mid-tier. Getting this model selection right is the single biggest factor in agent cost.
+    </div>
+
+    <!-- Model Tiers -->
+    <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:16px; margin-bottom:24px;">
+      <div style="background:rgba(251,191,36,0.1); border-radius:12px; padding:18px; border:1px solid rgba(251,191,36,0.25);">
+        <div style="font-size:13px; font-weight:700; color:#fbbf24; margin-bottom:4px;">⭐ OPUS (Premium)</div>
+        <div style="font-size:11px; color:#94a3b8; margin-bottom:10px;">Complex reasoning · Executive-facing work</div>
+        <table style="width:100%; font-size:12px; border-collapse:collapse;">
+          <tr style="border-bottom:1px solid rgba(255,255,255,0.1);"><td style="padding:3px 0; color:#94a3b8;">Input</td><td style="text-align:right; font-weight:600;">$5.00 / MTok</td></tr>
+          <tr style="border-bottom:1px solid rgba(255,255,255,0.1);"><td style="padding:3px 0; color:#94a3b8;">Output</td><td style="text-align:right; font-weight:600;">$25.00 / MTok</td></tr>
+          <tr><td style="padding:3px 0; color:#94a3b8;">Cache Read</td><td style="text-align:right; font-weight:600; color:#6ee7b7;">$0.50 / MTok</td></tr>
+        </table>
+        <div style="font-size:11px; color:#fbbf24; margin-top:8px; font-weight:600;">Used for: Executive tasks, strategic analysis, drafts</div>
+      </div>
+
+      <div style="background:rgba(99,102,241,0.1); border-radius:12px; padding:18px; border:1px solid rgba(99,102,241,0.25);">
+        <div style="font-size:13px; font-weight:700; color:#818cf8; margin-bottom:4px;">🔷 SONNET (Mid-Tier)</div>
+        <div style="font-size:11px; color:#94a3b8; margin-bottom:10px;">General tasks · Good balance of quality and cost</div>
+        <table style="width:100%; font-size:12px; border-collapse:collapse;">
+          <tr style="border-bottom:1px solid rgba(255,255,255,0.1);"><td style="padding:3px 0; color:#94a3b8;">Input</td><td style="text-align:right; font-weight:600;">$3.00 / MTok</td></tr>
+          <tr style="border-bottom:1px solid rgba(255,255,255,0.1);"><td style="padding:3px 0; color:#94a3b8;">Output</td><td style="text-align:right; font-weight:600;">$15.00 / MTok</td></tr>
+          <tr><td style="padding:3px 0; color:#94a3b8;">Cache Read</td><td style="text-align:right; font-weight:600; color:#6ee7b7;">$0.30 / MTok</td></tr>
+        </table>
+        <div style="font-size:11px; color:#818cf8; margin-top:8px; font-weight:600;">Used for: Developer work, standard operations</div>
+      </div>
+
+      <div style="background:rgba(16,185,129,0.1); border-radius:12px; padding:18px; border:1px solid rgba(16,185,129,0.25);">
+        <div style="font-size:13px; font-weight:700; color:#6ee7b7; margin-bottom:4px;">⚡ HAIKU (Budget)</div>
+        <div style="font-size:11px; color:#94a3b8; margin-bottom:10px;">Fast, cheap · Routine automation</div>
+        <table style="width:100%; font-size:12px; border-collapse:collapse;">
+          <tr style="border-bottom:1px solid rgba(255,255,255,0.1);"><td style="padding:3px 0; color:#94a3b8;">Input</td><td style="text-align:right; font-weight:600;">$0.80 / MTok</td></tr>
+          <tr style="border-bottom:1px solid rgba(255,255,255,0.1);"><td style="padding:3px 0; color:#94a3b8;">Output</td><td style="text-align:right; font-weight:600;">$4.00 / MTok</td></tr>
+          <tr><td style="padding:3px 0; color:#94a3b8;">Cache Read</td><td style="text-align:right; font-weight:600; color:#6ee7b7;">$0.08 / MTok</td></tr>
+        </table>
+        <div style="font-size:11px; color:#6ee7b7; margin-top:8px; font-weight:600;">Used for: Inbox scans, heartbeats, cron jobs</div>
+      </div>
+    </div>
+
+    <!-- The Caching Advantage -->
+    <div style="background:rgba(16,185,129,0.08); border-radius:12px; padding:20px; border:1px solid rgba(16,185,129,0.2); margin-bottom:20px;">
+      <div style="font-size:15px; font-weight:700; color:#6ee7b7; margin-bottom:8px;">💰 The Caching Advantage — Why Effective Cost Is Much Lower</div>
+      <div style="font-size:13px; line-height:1.7; opacity:0.9;">
+        Every time an agent processes a request, it re-sends its full context — system instructions, memory files, workspace documents. That's 90%+ of every call. Anthropic's <strong>prompt caching</strong> stores this context so it doesn't get re-processed each time. Cache reads cost a fraction of full input pricing. For Opus, that means 90% of tokens cost <strong>$0.50/MTok instead of $5.00</strong>. This is what collapses the effective cost far below headline rates.
+      </div>
+    </div>
+
+    <!-- Configuration Lesson -->
+    <div style="background:rgba(239,68,68,0.08); border-radius:12px; padding:20px; border:1px solid rgba(239,68,68,0.2); margin-bottom:20px;">
+      <div style="font-size:15px; font-weight:700; color:#f87171; margin-bottom:8px;">⚠️ Configuration Matters — A Real Lesson</div>
+      <div style="font-size:13px; line-height:1.7; opacity:0.9;">
+        We discovered that misconfigured model selection can <strong>multiply costs by 10×</strong>. When routine cron jobs accidentally ran on Opus instead of Haiku, daily cost jumped from ~$3 to ~$12 — with no change in output quality. The fix: every automated job must have an explicit model assignment. <strong>Token costs absolutely matter</strong> — the key is matching the right model tier to each type of work.
+      </div>
+    </div>
+
+    <!-- Competitive Context (secondary) -->
+    <div style="font-size:13px; opacity:0.6; line-height:1.5;">
+      <strong>For comparison:</strong> OpenAI GPT-5.2 ($1.75/$14 per MTok) and Google Gemini 3.1 Pro ($2/$12 per MTok) have lower headline pricing, but Anthropic's caching architecture and superior agentic reasoning mean fewer retries and lower cost per completed task. The right question isn't just "what does a token cost?" — it's "which model completes the task reliably and cheaply?"
+    </div>
+  </div>
+
+  <!-- === HEADLINE CALLOUT: STEADY STATE === -->
+  <div style="background:linear-gradient(135deg, #064e3b 0%, #065f46 100%); border-radius:20px; padding:40px 36px; color:white; margin-bottom:50px; position:relative; overflow:hidden;">
+    <div style="position:absolute; top:-20px; right:-20px; font-size:200px; opacity:0.05; font-weight:900;">$</div>
+    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:36px; align-items:center;">
+      <div>
+        <div style="font-size:12px; font-weight:700; letter-spacing:2px; text-transform:uppercase; opacity:0.7; margin-bottom:8px;">Steady-State Operating Cost</div>
+        <div style="font-size:52px; font-weight:900; letter-spacing:-1px; line-height:1;">$75–125<span style="font-size:22px; font-weight:500; opacity:0.7;">/month</span></div>
+        <div style="font-size:15px; margin-top:12px; opacity:0.85; line-height:1.5;">Once an agent is past initial setup and properly configured, the ongoing cost has three components — each running on the appropriate model tier.</div>
+      </div>
+      <div>
+        <div style="background:rgba(255,255,255,0.1); border-radius:14px; padding:24px;">
+          <div style="font-size:13px; font-weight:600; opacity:0.7; margin-bottom:16px;">THREE COST COMPONENTS</div>
+          <div style="display:flex; align-items:center; gap:14px; margin-bottom:16px;">
+            <div style="width:48px; height:48px; border-radius:12px; background:rgba(74,222,128,0.2); display:flex; align-items:center; justify-content:center; font-size:22px; flex-shrink:0;">🔄</div>
+            <div>
+              <div style="font-size:15px; font-weight:700;">Routine: ~$10–15/mo</div>
+              <div style="font-size:12px; opacity:0.7;">Inbox scans, briefings, heartbeats — runs on <strong>Haiku</strong> ($0.80/$4 per MTok)</div>
+            </div>
+          </div>
+          <div style="display:flex; align-items:center; gap:14px; margin-bottom:16px;">
+            <div style="width:48px; height:48px; border-radius:12px; background:rgba(251,191,36,0.2); display:flex; align-items:center; justify-content:center; font-size:22px; flex-shrink:0;">⭐</div>
+            <div>
+              <div style="font-size:15px; font-weight:700;">User Tasks: ~$50–90/mo</div>
+              <div style="font-size:12px; opacity:0.7;">Executive requests — runs on <strong>Opus</strong> ($5/$25 per MTok). Scales with activity.</div>
+            </div>
+          </div>
+          <div style="border-top:1px solid rgba(255,255,255,0.15); padding-top:14px;">
+            <div style="display:flex; align-items:center; gap:14px;">
+              <div style="width:48px; height:48px; border-radius:12px; background:rgba(99,102,241,0.15); display:flex; align-items:center; justify-content:center; font-size:22px; flex-shrink:0;">🔧</div>
+              <div>
+                <div style="font-size:15px; font-weight:700;">Developer: ~$10–20/mo</div>
+                <div style="font-size:12px; opacity:0.7;">Runs on <strong>Sonnet</strong> ($3/$15 per MTok). Upfront setup fades — maintenance + upgrades continue.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- === LAYER DIAGRAM === -->
+  <div class="layer-section">
+    <h2 class="section-title">The 3 Cost Layers</h2>
+    <p class="section-desc">Every AI agent's costs decompose into three distinct layers — each with different behaviors, drivers, and optimization strategies.</p>
+    
+    <div class="layers-container">
+      
+      <div class="layer layer-1">
+        <div class="layer-color"></div>
+        <div class="layer-body">
+          <div class="layer-number">1</div>
+          <div class="layer-content">
+            <div class="layer-label">Layer 1</div>
+            <div class="layer-title">Routine / Fixed Costs</div>
+            <div class="layer-desc">
+              Programmed operational cadence — runs regardless of user activity. Hourly inbox scans, morning/noon/EOD briefings, heartbeat checks, calendar monitoring, cron jobs. The "cost of the agent existing." <strong>Only pure operational runs belong here</strong> — if a developer has to decide to do it, it's Layer 3.
+            </div>
+          </div>
+          <div class="layer-meta">
+            <div class="meta-tag">Semi-Fixed</div><br>
+            <div class="meta-detail">
+              ~25–30 tasks/day<br>
+              Predictable monthly cost<br>
+              Runs on lowest-cost model (Haiku)
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <div class="layer-arrow">▼</div>
+      
+      <div class="layer layer-2">
+        <div class="layer-color"></div>
+        <div class="layer-body">
+          <div class="layer-number">2</div>
+          <div class="layer-content">
+            <div class="layer-label">Layer 2</div>
+            <div class="layer-title">User-Generated / Marginal Costs</div>
+            <div class="layer-desc">
+              Tasks initiated by the user — explicit requests, approved implicit tasks, research, drafts, emails, scheduling. Completely variable. Heavy days with complex Opus tasks; light days with quick lookups.
+            </div>
+          </div>
+          <div class="layer-meta">
+            <div class="meta-tag">Variable / Marginal</div><br>
+            <div class="meta-detail">
+              Fluctuates daily<br>
+              Driven by user demand + model choice<br>
+              Highest ROI — direct time saved
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <div class="layer-arrow">▼</div>
+      
+      <div class="layer layer-3">
+        <div class="layer-color"></div>
+        <div class="layer-body">
+          <div class="layer-number">3</div>
+          <div class="layer-content">
+            <div class="layer-label">Layer 3</div>
+            <div class="layer-title">Developer / Maintenance Costs</div>
+            <div class="layer-desc">
+              This layer has <strong>three distinct components</strong> — not all are temporary:
+              <div style="margin-top:8px; font-size:13px; line-height:1.6;">
+                <strong>a) Upfront Setup</strong> — Initial build, onboarding, dashboard creation, core integrations. <em>One-time; goes to near-zero.</em><br>
+                <strong>b) Troubleshooting & Maintenance</strong> — Bug fixes, API repairs, config tweaks. <em>Ongoing but small (~$3–5/mo).</em><br>
+                <strong>c) Growth & Upgrades</strong> — New data source integrations, capability expansions, new API connections. <em>Continuous as the agent grows (~$5–10/mo).</em>
+              </div>
+            </div>
+          </div>
+          <div class="layer-meta">
+            <div class="meta-tag">Setup Declines → Ongoing Remains</div><br>
+            <div class="meta-detail">
+              Setup costs drop post-launch<br>
+              Maintenance + upgrades are permanent<br>
+              A growing agent always needs dev work
+            </div>
+          </div>
+        </div>
+      </div>
+      
+    </div>
+  </div>
+
+  <!-- === LIVE DASHBOARD SECTION === -->
+  <div class="layer-section">
+    <h2 class="section-title">The Dashboard In Action</h2>
+    <p class="section-desc">Here's how the 3-layer cost model looks on the live dashboard today — real data, real categories, real costs.</p>
+    
+    <div style="margin: 24px auto; border-radius:16px; overflow:hidden; box-shadow: 0 8px 32px rgba(0,0,0,0.18); border: 1px solid #1e293b; position:relative;">
+      <img src="dashboard-screenshot.png" alt="Agent Activity & Cost Tracker Dashboard" style="width:100%; display:block;">
+      <div style="position:absolute; bottom:12px; right:12px; background:rgba(0,0,0,0.7); color:white; font-size:11px; padding:4px 10px; border-radius:6px;">
+        <a href="/app/" style="color:#60a5fa; text-decoration:none;">View live dashboard →</a>
+      </div>
+    </div>
+    
+    <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:16px; margin-top:28px;">
+      
+      <div style="background:white; border-radius:12px; padding:24px; box-shadow:0 2px 8px rgba(0,0,0,0.06); border-left:4px solid #f59e0b;">
+        <div style="font-size:13px; font-weight:700; color:#f59e0b; text-transform:uppercase; letter-spacing:1px; margin-bottom:8px;">👤 User-Generated</div>
+        <div style="font-size:28px; font-weight:800; color:#1a1a2e; margin-bottom:4px;">3 tasks — $0.39</div>
+        <div style="font-size:13px; color:#4b5563; line-height:1.5;">
+          Tasks the user initiates — explicit requests or implicit tasks the user approves. This is where the ROI lives. Every dollar here saves real time. Today: examples: declined a solicitation, pulled priority email links, requested transcription + cost analysis.
+        </div>
+        <div style="margin-top:12px; padding:8px 12px; background:#fffbeb; border-radius:6px; font-size:12px; color:#92400e;">
+          <strong>3% of total cost</strong> — highest value per dollar
+        </div>
+      </div>
+      
+      <div style="background:white; border-radius:12px; padding:24px; box-shadow:0 2px 8px rgba(0,0,0,0.06); border-left:4px solid #10b981;">
+        <div style="font-size:13px; font-weight:700; color:#10b981; text-transform:uppercase; letter-spacing:1px; margin-bottom:8px;">🔄 Routine</div>
+        <div style="font-size:28px; font-weight:800; color:#1a1a2e; margin-bottom:4px;">5 tasks — $0.19</div>
+        <div style="font-size:13px; color:#4b5563; line-height:1.5;">
+          The agent's programmed cadence — hourly inbox scans, morning briefing, calendar checks, heartbeat health monitoring. Runs whether the user asks for anything or not. This is the "cost of the agent existing."
+        </div>
+        <div style="margin-top:12px; padding:8px 12px; background:#ecfdf5; border-radius:6px; font-size:12px; color:#065f46;">
+          <strong>1% of total cost</strong> — predictable baseline, optimized on Haiku
+        </div>
+        <div style="margin-top:8px; font-size:12px; color:#6b7280; line-height:1.4;">
+          <em>Note: Only pure operational cadence belongs here. Troubleshooting (like fixing the API cost feed) is Developer cost — even if the agent performs the fix. If it wouldn't happen without a developer deciding to do it, it's Developer.</em>
+        </div>
+      </div>
+      
+      <div style="background:white; border-radius:12px; padding:24px; box-shadow:0 2px 8px rgba(0,0,0,0.06); border-left:4px solid #3b82f6;">
+        <div style="font-size:13px; font-weight:700; color:#3b82f6; text-transform:uppercase; letter-spacing:1px; margin-bottom:8px;">🔧 Developer</div>
+        <div style="font-size:28px; font-weight:800; color:#1a1a2e; margin-bottom:4px;">38 tasks — $14.06</div>
+        <div style="font-size:13px; color:#4b5563; line-height:1.5;">
+          Setup, configuration, troubleshooting, and upgrades by Ron, Jewel, JP & Alex — building the dashboard, fixing the API cost feed, updating logging structure, Git workflow setup. Includes all maintenance and debugging work. This is investment that pays off over time.
+        </div>
+        <div style="margin-top:12px; padding:8px 12px; background:#eff6ff; border-radius:6px; font-size:12px; color:#1e40af;">
+          <strong>96% of total cost</strong> — expected during build phase, will drop significantly
+        </div>
+        <div style="margin-top:8px; font-size:12px; color:#6b7280; line-height:1.4;">
+          <em>Includes: API feed troubleshooting, dashboard bug fixes, prompt tuning, new feature builds, cost tracking setup — anything that improves the agent's capability or fixes an issue.</em>
+        </div>
+      </div>
+      
+    </div>
+    
+    <div style="margin-top:24px; background:white; border-radius:12px; padding:24px; box-shadow:0 2px 8px rgba(0,0,0,0.06);">
+      <div style="font-size:16px; font-weight:700; color:#1a1a2e; margin-bottom:12px;">📊 What This Dashboard Shows</div>
+      <div style="display:grid; grid-template-columns: 1fr 1fr; gap:20px;">
+        <div>
+          <div style="font-size:14px; font-weight:600; color:#374151; margin-bottom:6px;">Top Banner — Daily Cost Total</div>
+          <div style="font-size:13px; color:#4b5563; line-height:1.5;">Shows the real Anthropic API cost for the day ($14.08), total tokens consumed (98M), and what percentage is attributed to user tasks ($14.44 / 103% — which means all recorded task costs slightly exceed the API total due to cost estimation overlap).</div>
+        </div>
+        <div>
+          <div style="font-size:14px; font-weight:600; color:#374151; margin-bottom:6px;">Task Cost Categories Table</div>
+          <div style="font-size:13px; color:#4b5563; line-height:1.5;">The core breakdown — each row is a category with task count, dollar cost, time saved, and percentage of total. Click any row for detailed activity descriptions. This is where the user sees exactly what the agent did and what it cost.</div>
+        </div>
+        <div>
+          <div style="font-size:14px; font-weight:600; color:#374151; margin-bottom:6px;">Summary Cards — Quick Pulse</div>
+          <div style="font-size:13px; color:#4b5563; line-height:1.5;">Four KPI cards at a glance: total user tasks tracked (41), average cost per user task ($0.35), total time saved (496 min ≈ 8.3 hrs), and background overhead cost ($0.00). These are the numbers that matter most for ROI.</div>
+        </div>
+        <div>
+          <div style="font-size:14px; font-weight:600; color:#374151; margin-bottom:6px;">The Target State</div>
+          <div style="font-size:13px; color:#4b5563; line-height:1.5;">Over time, the Developer row (96%) should shrink toward 5-10%. User-Generated should become the dominant category — that means the agent is doing real work for the executive, not being built/fixed. Routine stays as a stable, optimized baseline.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- === COST DRIVER CARDS === -->
+  <h2 class="section-title">Cost Optimization Levers</h2>
+  <p class="section-desc">Each layer has distinct levers to reduce or optimize spend.</p>
+  
+  <div class="drivers-grid">
+    <div class="driver-card d1">
+      <div class="driver-icon">⚙️</div>
+      <div class="driver-title">Layer 1: Reduce Fixed Costs</div>
+      <div class="driver-text">
+        Run all routine tasks on the lowest-cost model (Haiku). Reduce scan frequency if hourly isn't needed. Batch operations to minimize API calls. Optimize prompt caching.
+      </div>
+      <div class="driver-action">→ Lowers the floor cost of agent operation</div>
+    </div>
+    <div class="driver-card d2">
+      <div class="driver-icon">📊</div>
+      <div class="driver-title">Layer 2: Optimize Marginal Costs</div>
+      <div class="driver-text">
+        Match model to task complexity — Haiku for routine, Sonnet for standard, Opus 4.6 for executive work. Smart model routing + prompt caching reduces effective cost 80–90% vs naive pricing.
+      </div>
+      <div class="driver-action">→ More output per dollar spent</div>
+    </div>
+    <div class="driver-card d3">
+      <div class="driver-icon">🔧</div>
+      <div class="driver-title">Layer 3: Mature the Agent</div>
+      <div class="driver-text">
+        Front-load investment in setup, then reduce. Optimize prompts and agent structure for performance. Better architecture = fewer bugs = less developer time. This cost naturally drops over time.
+      </div>
+      <div class="driver-action">→ Declining investment as agent stabilizes</div>
+    </div>
+  </div>
+
+  <!-- === 12-WEEK STACKED AREA CHART === -->
+  <div class="chart-section">
+    <div class="chart-header">
+      <div>
+        <div class="chart-title">Hypothetical Agent Cost Profile — 12 Week Cycle</div>
+        <div class="chart-subtitle">Illustrative weekly cost breakdown showing how the cost mix shifts as an agent matures</div>
+      </div>
+    </div>
+    
+    <div class="custom-legend">
+      <div class="legend-item"><div class="legend-dot" style="background:#3b82f6"></div> Routine (Fixed)</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#10b981"></div> User-Generated (Marginal)</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#f59e0b"></div> Developer (Maintenance)</div>
+    </div>
+    
+    <div class="chart-canvas-wrap">
+      <canvas id="stackedAreaChart"></canvas>
+    </div>
+    
+    <div class="chart-annotations">
+      <div class="annotation a-wk1">
+        <div>
+          <div class="annotation-week">Weeks 1–2: Launch Phase</div>
+          <div class="annotation-text">Developer costs dominate (~50%). Heavy setup, configuration, testing. Routine costs stabilizing. Minimal user tasks — still learning the agent.</div>
+        </div>
+      </div>
+      <div class="annotation a-wk4">
+        <div>
+          <div class="annotation-week">Weeks 3–5: Ramp-Up</div>
+          <div class="annotation-text">User adoption grows. Developer costs dropping as initial bugs are fixed. Routine costs stable. User-generated costs rising as trust builds.</div>
+        </div>
+      </div>
+      <div class="annotation a-wk8">
+        <div>
+          <div class="annotation-week">Weeks 6–9: Steady State</div>
+          <div class="annotation-text">User-generated costs now the largest share — this is the target state. Routine is a predictable baseline. Developer drops to maintenance-only.</div>
+        </div>
+      </div>
+      <div class="annotation a-wk12">
+        <div>
+          <div class="annotation-week">Weeks 10–12: Optimized</div>
+          <div class="annotation-text">Total cost may actually decrease as model routing improves. Developer costs minimal. The agent is paying for itself in time saved.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- === PIE CHART SNAPSHOTS === -->
+  <h2 class="section-title" style="margin-bottom:6px;">Cost Mix Snapshots</h2>
+  <p class="section-desc">How the proportions shift from launch to maturity — upfront setup (yellow) drops sharply, but ongoing dev work remains as a permanent layer</p>
+  
+  <div style="background:#fef3c7; border-radius:10px; padding:16px 20px; margin-bottom:20px; border-left:4px solid #f59e0b; display:flex; align-items:center; gap:14px;">
+    <div style="font-size:28px;">⚠️</div>
+    <div>
+      <div style="font-size:14px; font-weight:700; color:#92400e;">Week 1 costs are dominated by upfront setup — not ongoing operations.</div>
+      <div style="font-size:13px; color:#78350f; margin-top:2px;">Upfront <em>setup</em> costs (initial build, dashboard creation) are temporary and drop sharply. But ongoing maintenance and upgrades are permanent — a growing agent always needs developer work for new integrations and capability expansions. The <strong>$75–125/month steady-state</strong> includes Routine + User + ongoing Developer.</div>
+    </div>
+  </div>
+  
+  <div class="pie-row">
+    <div class="pie-card">
+      <div class="pie-label">LAUNCH</div>
+      <div class="pie-week">Week 1</div>
+      <div class="pie-canvas-wrap"><canvas id="pie1"></canvas></div>
+      <div class="pie-total">$185</div>
+      <div class="pie-total-label">estimated weekly cost</div>
+    </div>
+    <div class="pie-card">
+      <div class="pie-label">RAMP-UP</div>
+      <div class="pie-week">Week 6</div>
+      <div class="pie-canvas-wrap"><canvas id="pie2"></canvas></div>
+      <div class="pie-total">$29</div>
+      <div class="pie-total-label">estimated weekly cost</div>
+    </div>
+    <div class="pie-card" style="border:2px solid #10b981; position:relative;">
+      <div style="position:absolute; top:-10px; left:50%; transform:translateX(-50%); background:#10b981; color:white; font-size:10px; font-weight:700; padding:2px 12px; border-radius:10px; text-transform:uppercase; letter-spacing:0.5px;">Steady State ←</div>
+      <div class="pie-label" style="color:#10b981;">OPTIMIZED</div>
+      <div class="pie-week">Week 12+</div>
+      <div class="pie-canvas-wrap"><canvas id="pie3"></canvas></div>
+      <div class="pie-total" style="color:#10b981;">$16</div>
+      <div class="pie-total-label">estimated weekly cost</div>
+      <div style="font-size:11px; color:#065f46; margin-top:6px; font-weight:600;">= $64/month (incl. ongoing dev)</div>
+    </div>
+  </div>
+
+  <!-- === TRANSITION: SETUP → STEADY STATE === -->
+  <div style="text-align:center; margin:40px 0; padding:28px;">
+    <div style="font-size:40px; margin-bottom:12px;">⬇️</div>
+    <div style="font-size:20px; font-weight:800; color:#1a1a2e;">Setup costs drop. What remains?</div>
+    <div style="font-size:14px; color:#6b7280; margin-top:6px;">Once the agent is past initial build, three ongoing cost layers remain:</div>
+    <div style="display:inline-flex; gap:14px; margin-top:16px; flex-wrap:wrap; justify-content:center;">
+      <div style="background:#f0fdf4; border:1px solid #bbf7d0; border-radius:10px; padding:10px 16px; font-size:13px; font-weight:600; color:#166534;">🔄 Routine: $10–15/mo</div>
+      <div style="font-size:20px; color:#d1d5db; line-height:2;">+</div>
+      <div style="background:#fefce8; border:1px solid #fef08a; border-radius:10px; padding:10px 16px; font-size:13px; font-weight:600; color:#854d0e;">👤 User: $50–90/mo</div>
+      <div style="font-size:20px; color:#d1d5db; line-height:2;">+</div>
+      <div style="background:#fef2f2; border:1px solid #fecaca; border-radius:10px; padding:10px 16px; font-size:13px; font-weight:600; color:#991b1b;">🔧 Ongoing Dev: $5–15/mo</div>
+      <div style="font-size:20px; color:#d1d5db; line-height:2;">=</div>
+      <div style="background:#064e3b; border-radius:10px; padding:10px 16px; font-size:14px; font-weight:700; color:white;">$75–125/mo</div>
+    </div>
+  </div>
+
+  <!-- === STEADY STATE COST ESTIMATES === -->
+  <div class="chart-section" style="border:2px solid #10b981;">
+    <div class="chart-header">
+      <div>
+        <div class="chart-title">💰 What Does a Mature Agent Actually Cost? (The $75–125 Answer)</div>
+        <div class="chart-subtitle">Estimated monthly costs post-setup — routine + user + ongoing development (maintenance, upgrades, new integrations)</div>
+      </div>
+    </div>
+    
+    <!-- Routine baseline -->
+    <div style="background:#f0fdf4; border-radius:12px; padding:24px; margin-bottom:20px; border:1px solid #bbf7d0;">
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <div>
+          <div style="font-size:13px; font-weight:700; color:#16a34a; text-transform:uppercase; letter-spacing:1px;">🔄 Routine Baseline — The Fixed Floor</div>
+          <div style="font-size:14px; color:#166534; margin-top:6px;">25–30 automated tasks/day — inbox scans, briefings, heartbeats, calendar sync, Laura Dashboard sync</div>
+          <div style="font-size:13px; color:#4b5563; margin-top:4px;">All running on lowest-cost models (Haiku). This is what the agent costs just to exist and keep the user informed.</div>
+        </div>
+        <div style="text-align:right;">
+          <div style="font-size:36px; font-weight:800; color:#16a34a;">$12–15</div>
+          <div style="font-size:13px; color:#166534;">/month</div>
+          <div style="font-size:11px; color:#6b7280; margin-top:2px;">$0.45/day · $3.15/week</div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- User-generated scenarios -->
+    <div style="font-size:16px; font-weight:700; color:#1a1a2e; margin-bottom:16px;">👤 User-Generated — What User Tasks Add</div>
+    
+    <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:16px; margin-bottom:24px;">
+      
+      <div style="background:white; border-radius:12px; padding:20px; border:1px solid #e5e7eb; text-align:center;">
+        <div style="font-size:11px; font-weight:700; color:#6b7280; text-transform:uppercase; letter-spacing:1px;">Light Usage</div>
+        <div style="font-size:13px; color:#9ca3af; margin-top:2px;">5 tasks/day</div>
+        <div style="font-size:32px; font-weight:800; color:#1a1a2e; margin:12px 0 4px;">$19</div>
+        <div style="font-size:12px; color:#6b7280;">/month</div>
+        <div style="font-size:12px; color:#4b5563; margin-top:10px; text-align:left; line-height:1.4;">Quick lookups, email drafts, scheduling, priority alerts. Sonnet for standard, Opus for executive-facing.</div>
+      </div>
+      
+      <div style="background:white; border-radius:12px; padding:20px; border:2px solid #3b82f6; text-align:center; position:relative;">
+        <div style="position:absolute; top:-10px; left:50%; transform:translateX(-50%); background:#3b82f6; color:white; font-size:10px; font-weight:700; padding:2px 10px; border-radius:10px; text-transform:uppercase; letter-spacing:0.5px;">Typical</div>
+        <div style="font-size:11px; font-weight:700; color:#3b82f6; text-transform:uppercase; letter-spacing:1px;">Normal Usage</div>
+        <div style="font-size:13px; color:#9ca3af; margin-top:2px;">8–10 tasks/day</div>
+        <div style="font-size:32px; font-weight:800; color:#1a1a2e; margin:12px 0 4px;">$40</div>
+        <div style="font-size:12px; color:#6b7280;">/month</div>
+        <div style="font-size:12px; color:#4b5563; margin-top:10px; text-align:left; line-height:1.4;">Emails, research summaries, meeting prep, document drafts, follow-ups. Opus for executive work, Sonnet for standard tasks.</div>
+      </div>
+      
+      <div style="background:white; border-radius:12px; padding:20px; border:1px solid #e5e7eb; text-align:center;">
+        <div style="font-size:11px; font-weight:700; color:#6b7280; text-transform:uppercase; letter-spacing:1px;">Heavy Usage</div>
+        <div style="font-size:13px; color:#9ca3af; margin-top:2px;">12+ tasks/day</div>
+        <div style="font-size:32px; font-weight:800; color:#1a1a2e; margin:12px 0 4px;">$75</div>
+        <div style="font-size:12px; color:#6b7280;">/month</div>
+        <div style="font-size:12px; color:#4b5563; margin-top:10px; text-align:left; line-height:1.4;">Client-facing drafts, strategic analysis, presentations, complex chains. Heavy Opus usage for high-stakes work.</div>
+      </div>
+      
+    </div>
+    
+    <!-- Total estimates table -->
+    <div style="background:#1a1a2e; border-radius:12px; padding:24px; color:white;">
+      <div style="font-size:15px; font-weight:700; margin-bottom:16px;">📊 Total Monthly Agent Cost (Routine + User — No Developer)</div>
+      <table style="width:100%; border-collapse:collapse; font-size:14px;">
+        <tr style="border-bottom:1px solid rgba(255,255,255,0.1);">
+          <th style="text-align:left; padding:10px 8px; color:#9ca3af; font-size:12px;">SCENARIO</th>
+          <th style="text-align:center; padding:10px 8px; color:#9ca3af; font-size:12px;">TASKS/DAY</th>
+          <th style="text-align:center; padding:10px 8px; color:#9ca3af; font-size:12px;">ROUTINE</th>
+          <th style="text-align:center; padding:10px 8px; color:#9ca3af; font-size:12px;">USER</th>
+          <th style="text-align:center; padding:10px 8px; color:#9ca3af; font-size:12px;">ONGOING DEV</th>
+          <th style="text-align:right; padding:10px 8px; color:#9ca3af; font-size:12px;">TOTAL/MONTH</th>
+        </tr>
+        <tr style="border-bottom:1px solid rgba(255,255,255,0.05);">
+          <td style="padding:12px 8px;">Light</td>
+          <td style="text-align:center;">30</td>
+          <td style="text-align:center; color:#4ade80;">$14</td>
+          <td style="text-align:center; color:#fbbf24;">$19</td>
+          <td style="text-align:center; color:#f87171;">$5</td>
+          <td style="text-align:right; font-weight:700; font-size:18px;">$38</td>
+        </tr>
+        <tr style="border-bottom:1px solid rgba(255,255,255,0.05); background:rgba(59,130,246,0.1);">
+          <td style="padding:12px 8px; font-weight:600;">Normal (typical) ←</td>
+          <td style="text-align:center;">35</td>
+          <td style="text-align:center; color:#4ade80;">$14</td>
+          <td style="text-align:center; color:#fbbf24;">$40</td>
+          <td style="text-align:center; color:#f87171;">$10</td>
+          <td style="text-align:right; font-weight:700; font-size:18px;">$64</td>
+        </tr>
+        <tr>
+          <td style="padding:12px 8px;">Heavy</td>
+          <td style="text-align:center;">40+</td>
+          <td style="text-align:center; color:#4ade80;">$15</td>
+          <td style="text-align:center; color:#fbbf24;">$75</td>
+          <td style="text-align:center; color:#f87171;">$15</td>
+          <td style="text-align:right; font-weight:700; font-size:18px;">$105</td>
+        </tr>
+      </table>
+      <div style="margin-top:16px; padding:12px 16px; background:rgba(245,158,11,0.15); border-radius:8px; border-left:3px solid #f59e0b;">
+        <div style="font-size:13px; color:#fbbf24; font-weight:600;">⚡ The takeaway: $75–125/month steady-state for a well-optimized, growing agent.</div>
+        <div style="font-size:12px; color:#d1d5db; margin-top:4px;">Normal usage with smart model routing lands at ~$64/month. Even heavy daily usage stays around $105/month. <strong>Key distinction:</strong> Upfront setup costs (building the agent) drop sharply after launch, but ongoing development (maintenance, new integrations, capability upgrades) is permanent — a growing agent always needs developer work. That's ~$5–15/month and is a sign of a <em>healthy, evolving</em> agent. <strong>Prompt caching ($0.50/MTok on 90% of usage) is the hidden multiplier that keeps real costs far below headline token rates.</strong></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- === ROI: TIME SAVED === -->
+  <div class="chart-section">
+    <div class="chart-header">
+      <div>
+        <div class="chart-title">⏱️ ROI: Time Saved Is Just the Beginning</div>
+        <div class="chart-subtitle">Time savings are the first measurable metric — but agent value extends far beyond hours saved. We're building toward a full ROI framework.</div>
+      </div>
+    </div>
+    
+    <div style="background:#fef3c7; border-radius:12px; padding:20px; margin-bottom:24px; border:1px solid #fde68a;">
+      <div style="font-size:14px; font-weight:700; color:#92400e;">💡 The ROI equation is simple:</div>
+      <div style="font-size:20px; font-weight:800; color:#78350f; margin:8px 0;">ROI = Time Saved × Executive Hourly Value − Agent Cost</div>
+      <div style="font-size:13px; color:#92400e;">If the agent saves 8 hours/week and his time is worth $500/hr, that's $4,000/week of value against ~$15–25/week of total agent cost. The ROI isn't close — it's overwhelming.</div>
+    </div>
+    
+    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:20px; margin-bottom:24px;">
+      
+      <div style="background:linear-gradient(135deg, #064e3b 0%, #065f46 100%); border-radius:12px; padding:28px; color:white;">
+        <div style="font-size:12px; font-weight:600; opacity:0.7; text-transform:uppercase; letter-spacing:1px;">Today's Time Saved (Apr 3)</div>
+        <div style="font-size:48px; font-weight:800; margin:8px 0;">2.8 hrs</div>
+        <div style="font-size:14px; opacity:0.8;">170 minutes across 8 user-requested tasks</div>
+        <div style="margin-top:16px; padding-top:16px; border-top:1px solid rgba(255,255,255,0.2);">
+          <div style="font-size:12px; opacity:0.6;">Breakdown:</div>
+          <div style="font-size:13px; margin-top:4px;">
+            ▸ Meeting transcription & distribution: 30 min<br>
+            ▸ Cost structure doc creation: 20 min<br>
+            ▸ Visual charts & diagrams: 45 min<br>
+            ▸ Dashboard data & estimates: 30 min<br>
+            ▸ Priority email scan with links: 15 min<br>
+            ▸ Inbox triage & vendor decline: 5 min<br>
+            ▸ Logging rules update: 15 min<br>
+            ▸ Dashboard requirements capture: 10 min
+          </div>
+        </div>
+      </div>
+      
+      <div style="background:white; border-radius:12px; padding:28px; border:1px solid #e5e7eb;">
+        <div style="font-size:12px; font-weight:700; color:#6b7280; text-transform:uppercase; letter-spacing:1px;">Time Saved Per Task — By Type</div>
+        <div style="margin-top:16px;">
+          <table style="width:100%; border-collapse:collapse; font-size:13px;">
+            <tr style="border-bottom:1px solid #f3f4f6;">
+              <td style="padding:10px 0; font-weight:600;">Email scan + links</td>
+              <td style="text-align:right; color:#10b981; font-weight:700;">15 min</td>
+            </tr>
+            <tr style="border-bottom:1px solid #f3f4f6;">
+              <td style="padding:10px 0; font-weight:600;">Meeting transcription</td>
+              <td style="text-align:right; color:#10b981; font-weight:700;">30 min</td>
+            </tr>
+            <tr style="border-bottom:1px solid #f3f4f6;">
+              <td style="padding:10px 0; font-weight:600;">Document drafting</td>
+              <td style="text-align:right; color:#10b981; font-weight:700;">20 min</td>
+            </tr>
+            <tr style="border-bottom:1px solid #f3f4f6;">
+              <td style="padding:10px 0; font-weight:600;">Visual/chart creation</td>
+              <td style="text-align:right; color:#10b981; font-weight:700;">45 min</td>
+            </tr>
+            <tr style="border-bottom:1px solid #f3f4f6;">
+              <td style="padding:10px 0; font-weight:600;">Vendor decline + unsubscribe</td>
+              <td style="text-align:right; color:#10b981; font-weight:700;">5 min</td>
+            </tr>
+            <tr style="border-bottom:1px solid #f3f4f6;">
+              <td style="padding:10px 0; font-weight:600;">Research / analysis</td>
+              <td style="text-align:right; color:#10b981; font-weight:700;">30 min</td>
+            </tr>
+          </table>
+        </div>
+        <div style="margin-top:16px; padding:12px; background:#f0fdf4; border-radius:8px;">
+          <div style="font-size:12px; color:#166534;"><strong>Every task logs time saved.</strong> This makes ROI visible at a glance — not just costs, but what the user got back.</div>
+        </div>
+      </div>
+      
+    </div>
+    
+    <!-- Monthly ROI projection -->
+    <div style="background:#1a1a2e; border-radius:12px; padding:24px; color:white;">
+      <div style="font-size:15px; font-weight:700; margin-bottom:16px;">📈 Monthly ROI Projection (Normal Usage)</div>
+      <div style="display:grid; grid-template-columns: repeat(4, 1fr); gap:16px;">
+        <div style="text-align:center; padding:16px; background:rgba(255,255,255,0.05); border-radius:8px;">
+          <div style="font-size:11px; color:#9ca3af; text-transform:uppercase;">Time Saved/Month</div>
+          <div style="font-size:28px; font-weight:800; color:#4ade80; margin:6px 0;">~61 hrs</div>
+          <div style="font-size:11px; color:#6b7280;">2.8 hrs/day × 22 days</div>
+        </div>
+        <div style="text-align:center; padding:16px; background:rgba(255,255,255,0.05); border-radius:8px;">
+          <div style="font-size:11px; color:#9ca3af; text-transform:uppercase;">Value of Time</div>
+          <div style="font-size:28px; font-weight:800; color:#fbbf24; margin:6px 0;">$30,800</div>
+          <div style="font-size:11px; color:#6b7280;">at $500/hr CEO rate</div>
+        </div>
+        <div style="text-align:center; padding:16px; background:rgba(255,255,255,0.05); border-radius:8px;">
+          <div style="font-size:11px; color:#9ca3af; text-transform:uppercase;">Agent Cost</div>
+          <div style="font-size:28px; font-weight:800; color:#f87171; margin:6px 0;">$64</div>
+          <div style="font-size:11px; color:#6b7280;">routine + user + ongoing dev</div>
+        </div>
+        <div style="text-align:center; padding:16px; background:rgba(16,185,129,0.15); border-radius:8px; border:1px solid rgba(16,185,129,0.3);">
+          <div style="font-size:11px; color:#4ade80; text-transform:uppercase; font-weight:700;">NET ROI</div>
+          <div style="font-size:28px; font-weight:800; color:#4ade80; margin:6px 0;">48,000%</div>
+          <div style="font-size:11px; color:#6b7280;">$30,800 value / $64 cost</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- === ROI VISION: BEYOND TIME SAVINGS === -->
+  <div class="chart-section" style="border:2px solid #7c3aed;">
+    <div class="chart-header">
+      <div>
+        <div class="chart-title">🚀 The ROI Roadmap: From Time Savings to Business Impact</div>
+        <div class="chart-subtitle">Time saved is the first metric we measure. It's not the only one — or even the most valuable. Here's the vision for how agent ROI compounds across the business.</div>
+      </div>
+    </div>
+    
+    <div style="display:grid; grid-template-columns: 1fr; gap:0; margin-bottom:24px;">
+      
+      <!-- Phase 1: Current -->
+      <div style="display:flex; gap:20px; padding:24px; background:linear-gradient(90deg, rgba(16,185,129,0.1) 0%, transparent 100%); border-left:4px solid #10b981; border-radius:0 12px 0 0;">
+        <div style="flex-shrink:0; width:80px; text-align:center;">
+          <div style="font-size:11px; font-weight:700; color:#10b981; text-transform:uppercase; letter-spacing:1px;">Phase 1</div>
+          <div style="font-size:24px; font-weight:800; color:#10b981;">NOW</div>
+          <div style="font-size:10px; color:#6b7280;">Measuring</div>
+        </div>
+        <div>
+          <div style="font-size:16px; font-weight:700; color:#1a1a2e; margin-bottom:6px;">⏱️ Time Savings</div>
+          <div style="font-size:13px; color:#4b5563; line-height:1.6;">
+            Every task logs estimated time saved. Currently tracking ~2.8 hrs/day of executive time recaptured. This is the baseline: <strong>how many hours does the agent give back?</strong>
+            <div style="margin-top:8px; font-size:12px; color:#6b7280;">
+              ▸ Inbox triage, email drafts, calendar management<br>
+              ▸ Document creation, meeting prep, research<br>
+              ▸ Vendor management, follow-ups, scheduling
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Phase 2: Near-term -->
+      <div style="display:flex; gap:20px; padding:24px; background:linear-gradient(90deg, rgba(59,130,246,0.08) 0%, transparent 100%); border-left:4px solid #3b82f6;">
+        <div style="flex-shrink:0; width:80px; text-align:center;">
+          <div style="font-size:11px; font-weight:700; color:#3b82f6; text-transform:uppercase; letter-spacing:1px;">Phase 2</div>
+          <div style="font-size:24px; font-weight:800; color:#3b82f6;">NEXT</div>
+          <div style="font-size:10px; color:#6b7280;">Building</div>
+        </div>
+        <div>
+          <div style="font-size:16px; font-weight:700; color:#1a1a2e; margin-bottom:6px;">⚡ Process Acceleration</div>
+          <div style="font-size:13px; color:#4b5563; line-height:1.6;">
+            Faster processes create measurable business impact beyond time alone:
+            <div style="margin-top:8px; display:grid; grid-template-columns: 1fr 1fr; gap:12px;">
+              <div style="background:white; padding:12px; border-radius:8px; border:1px solid #e5e7eb;">
+                <div style="font-size:12px; font-weight:700; color:#3b82f6;">💰 Faster Collections</div>
+                <div style="font-size:11px; color:#4b5563; margin-top:4px;">Invoices sent same-day vs. 3–5 day delay. Faster processes → quicker payment cycles → improved cash flow.</div>
+              </div>
+              <div style="background:white; padding:12px; border-radius:8px; border:1px solid #e5e7eb;">
+                <div style="font-size:12px; font-weight:700; color:#3b82f6;">📅 Sales Appointments Set</div>
+                <div style="font-size:11px; color:#4b5563; margin-top:4px;">SDR agents (Abhi's team) booking meetings autonomously. Track: appointments set per day, pipeline created.</div>
+              </div>
+              <div style="background:white; padding:12px; border-radius:8px; border:1px solid #e5e7eb;">
+                <div style="font-size:12px; font-weight:700; color:#3b82f6;">👥 Candidates Identified Faster</div>
+                <div style="font-size:11px; color:#4b5563; margin-top:4px;">Screening resumes, sourcing candidates, scheduling interviews. Days-to-hire reduced = direct recruiting cost savings.</div>
+              </div>
+              <div style="background:white; padding:12px; border-radius:8px; border:1px solid #e5e7eb;">
+                <div style="font-size:12px; font-weight:700; color:#3b82f6;">🔄 Reduced Errors</div>
+                <div style="font-size:11px; color:#4b5563; margin-top:4px;">Agent consistency eliminates human mistakes — wrong addresses, missed follow-ups, dropped tasks. Fewer errors = fewer costly fixes.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Phase 3: Strategic -->
+      <div style="display:flex; gap:20px; padding:24px; background:linear-gradient(90deg, rgba(124,58,237,0.08) 0%, transparent 100%); border-left:4px solid #7c3aed; border-radius:0 0 12px 0;">
+        <div style="flex-shrink:0; width:80px; text-align:center;">
+          <div style="font-size:11px; font-weight:700; color:#7c3aed; text-transform:uppercase; letter-spacing:1px;">Phase 3</div>
+          <div style="font-size:24px; font-weight:800; color:#7c3aed;">GOAL</div>
+          <div style="font-size:10px; color:#6b7280;">Proving</div>
+        </div>
+        <div>
+          <div style="font-size:16px; font-weight:700; color:#1a1a2e; margin-bottom:6px;">📊 Revenue & Business Impact</div>
+          <div style="font-size:13px; color:#4b5563; line-height:1.6;">
+            The ultimate measure: <strong>business closed with agent involvement</strong>.
+            <div style="margin-top:8px; display:grid; grid-template-columns: 1fr 1fr 1fr; gap:12px;">
+              <div style="background:#1a1a2e; padding:14px; border-radius:8px; text-align:center;">
+                <div style="font-size:11px; color:#9ca3af; text-transform:uppercase;">Revenue Influenced</div>
+                <div style="font-size:20px; font-weight:800; color:#fbbf24; margin:6px 0;">$?</div>
+                <div style="font-size:10px; color:#6b7280;">Deals where agent assisted</div>
+              </div>
+              <div style="background:#1a1a2e; padding:14px; border-radius:8px; text-align:center;">
+                <div style="font-size:11px; color:#9ca3af; text-transform:uppercase;">Cost Avoidance</div>
+                <div style="font-size:20px; font-weight:800; color:#fbbf24; margin:6px 0;">$?</div>
+                <div style="font-size:10px; color:#6b7280;">Vendor costs optimized</div>
+              </div>
+              <div style="background:#1a1a2e; padding:14px; border-radius:8px; text-align:center;">
+                <div style="font-size:11px; color:#9ca3af; text-transform:uppercase;">Speed-to-Close</div>
+                <div style="font-size:20px; font-weight:800; color:#fbbf24; margin:6px 0;">?d</div>
+                <div style="font-size:10px; color:#6b7280;">Days faster to close</div>
+              </div>
+            </div>
+            <div style="margin-top:12px; font-size:12px; color:#6b7280; font-style:italic;">
+              As the agent fleet scales (executive agent + SDR agents + specialized agents), these metrics become trackable across the organization. The framework is designed to grow.
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Anthropic pricing context -->
+    <div style="background:#f0fdf4; border-radius:12px; padding:20px; border:1px solid #bbf7d0;">
+      <div style="display:flex; align-items:center; gap:12px;">
+        <div style="font-size:28px;">💡</div>
+        <div>
+          <div style="font-size:14px; font-weight:700; color:#166534;">Caching Is the Hidden Cost Multiplier</div>
+          <div style="font-size:13px; color:#15803d; margin-top:4px; line-height:1.5;">
+            90%+ of every agent request is cached context (system prompt, memory, workspace). At <strong>$0.50/MTok</strong> for cache hits vs $5/MTok for fresh input, the effective per-token cost is far below headline rates. This is why Anthropic's premium model delivers $75–125/month total cost despite appearing more expensive per token than competitors.
+          </div>
+        </div>
+      </div>
+    </div>
+    
+  </div>
+
+  <!-- === COST-TO-TASK-TO-TIME FRAMEWORK === -->
+  <div class="chart-section">
+    <div class="chart-header">
+      <div>
+        <div class="chart-title">🔍 How We Connect Costs → Tasks → Time Saved</div>
+        <div class="chart-subtitle">The framework for understanding whether each dollar spent is delivering value — and identifying tasks that should be done differently</div>
+      </div>
+    </div>
+    
+    <div style="background:#f8f9fc; border-radius:12px; padding:24px; margin-bottom:24px;">
+      <div style="font-size:15px; font-weight:700; color:#1a1a2e; margin-bottom:16px;">Every task the agent performs is tracked with three data points:</div>
+      <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:16px;">
+        <div style="background:white; border-radius:10px; padding:20px; text-align:center; border-top:4px solid #e63946;">
+          <div style="font-size:32px; margin-bottom:8px;">💲</div>
+          <div style="font-size:15px; font-weight:700; color:#1a1a2e;">What It Cost</div>
+          <div style="font-size:13px; color:#4b5563; margin-top:6px;">Actual API cost in dollars — driven by model selection (Haiku $0.01 vs Opus $0.50+) and task complexity (tokens consumed)</div>
+        </div>
+        <div style="background:white; border-radius:10px; padding:20px; text-align:center; border-top:4px solid #3b82f6;">
+          <div style="font-size:32px; margin-bottom:8px;">📋</div>
+          <div style="font-size:15px; font-weight:700; color:#1a1a2e;">What Was Done</div>
+          <div style="font-size:13px; color:#4b5563; margin-top:6px;">Specific, human-readable description — not "chat with user" but "Declined solicitation from William Warren and added to block list"</div>
+        </div>
+        <div style="background:white; border-radius:10px; padding:20px; text-align:center; border-top:4px solid #10b981;">
+          <div style="font-size:32px; margin-bottom:8px;">⏱️</div>
+          <div style="font-size:15px; font-weight:700; color:#1a1a2e;">Time It Saved</div>
+          <div style="font-size:13px; color:#4b5563; margin-top:6px;">Estimated minutes the user would have spent doing this manually — the direct value the agent delivers</div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- The analysis framework -->
+    <div style="font-size:16px; font-weight:700; color:#1a1a2e; margin-bottom:16px;">Why This Matters: Identifying What Should Be Done Differently</div>
+    
+    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:16px; margin-bottom:24px;">
+      <div style="background:white; border-radius:12px; padding:20px; border:1px solid #e5e7eb;">
+        <div style="font-size:14px; font-weight:700; color:#10b981; margin-bottom:8px;">✅ High-Value Tasks</div>
+        <div style="font-size:13px; color:#4b5563; line-height:1.5;">
+          <strong>High time saved, low cost.</strong> These are the sweet spot — the agent is doing exactly what it should. Examples: inbox triage (15 min saved, $0.01), email drafts (10 min, $0.05), scheduling coordination (20 min, $0.03).
+        </div>
+        <div style="margin-top:10px; font-size:12px; color:#059669; font-weight:600;">→ Do more of these. Expand the agent's role here.</div>
+      </div>
+      <div style="background:white; border-radius:12px; padding:20px; border:1px solid #e5e7eb;">
+        <div style="font-size:14px; font-weight:700; color:#f59e0b; margin-bottom:8px;">⚠️ Optimization Candidates</div>
+        <div style="font-size:13px; color:#4b5563; line-height:1.5;">
+          <strong>High cost, moderate time saved.</strong> These tasks work, but the cost could be reduced. Usually means a premium model (Opus) was used where a cheaper model (Gemini/Sonnet) would suffice. Or the task generated excessive tokens.
+        </div>
+        <div style="margin-top:10px; font-size:12px; color:#d97706; font-weight:600;">→ Tune the model routing. Right-size the model to the task.</div>
+      </div>
+      <div style="background:white; border-radius:12px; padding:20px; border:1px solid #e5e7eb;">
+        <div style="font-size:14px; font-weight:700; color:#ef4444; margin-bottom:8px;">🚩 Red Flags</div>
+        <div style="font-size:13px; color:#4b5563; line-height:1.5;">
+          <strong>High cost, low/no time saved.</strong> Something is wrong. Either the task shouldn't be automated, the agent is spinning its wheels, or there's a structural issue (e.g., broken API feed generating costs with no output). Investigate immediately.
+        </div>
+        <div style="margin-top:10px; font-size:12px; color:#dc2626; font-weight:600;">→ Fix the root cause or stop the task.</div>
+      </div>
+      <div style="background:white; border-radius:12px; padding:20px; border:1px solid #e5e7eb;">
+        <div style="font-size:14px; font-weight:700; color:#6366f1; margin-bottom:8px;">🔄 Reallocation Opportunities</div>
+        <div style="font-size:13px; color:#4b5563; line-height:1.5;">
+          <strong>Tasks the agent does that a human should — or vice versa.</strong> Some tasks require judgment that makes agent execution unreliable. Other tasks are so repetitive that a human shouldn't touch them. The data shows which is which.
+        </div>
+        <div style="margin-top:10px; font-size:12px; color:#4f46e5; font-weight:600;">→ Reassign tasks to the right executor (agent vs. human vs. hybrid).</div>
+      </div>
+    </div>
+    
+    <!-- Example analysis table -->
+    <div style="font-size:14px; font-weight:700; color:#1a1a2e; margin-bottom:12px;">Example: Today's Tasks Analyzed</div>
+    <div style="overflow-x:auto;">
+      <table style="width:100%; border-collapse:collapse; font-size:13px; background:white; border-radius:8px; overflow:hidden;">
+        <tr style="background:#f8f9fc;">
+          <th style="text-align:left; padding:12px 10px; color:#6b7280; font-size:11px; text-transform:uppercase;">Task</th>
+          <th style="text-align:center; padding:12px 8px; color:#6b7280; font-size:11px; text-transform:uppercase;">Cost</th>
+          <th style="text-align:center; padding:12px 8px; color:#6b7280; font-size:11px; text-transform:uppercase;">Time Saved</th>
+          <th style="text-align:center; padding:12px 8px; color:#6b7280; font-size:11px; text-transform:uppercase;">Cost/Min</th>
+          <th style="text-align:left; padding:12px 8px; color:#6b7280; font-size:11px; text-transform:uppercase;">Verdict</th>
+        </tr>
+        <tr style="border-bottom:1px solid #f3f4f6;">
+          <td style="padding:10px;">Inbox scan + priority emails with links</td>
+          <td style="text-align:center; color:#10b981; font-weight:600;">$0.35</td>
+          <td style="text-align:center;">15 min</td>
+          <td style="text-align:center; color:#6b7280;">$0.02/min</td>
+          <td style="padding:10px;"><span style="background:#ecfdf5; color:#059669; padding:2px 8px; border-radius:10px; font-size:11px; font-weight:600;">✅ Sweet spot</span></td>
+        </tr>
+        <tr style="border-bottom:1px solid #f3f4f6;">
+          <td style="padding:10px;">Declined vendor + unsubscribed</td>
+          <td style="text-align:center; color:#10b981; font-weight:600;">$0.27</td>
+          <td style="text-align:center;">5 min</td>
+          <td style="text-align:center; color:#6b7280;">$0.05/min</td>
+          <td style="padding:10px;"><span style="background:#ecfdf5; color:#059669; padding:2px 8px; border-radius:10px; font-size:11px; font-weight:600;">✅ Sweet spot</span></td>
+        </tr>
+        <tr style="border-bottom:1px solid #f3f4f6;">
+          <td style="padding:10px;">Transcribed 16-min meeting recording</td>
+          <td style="text-align:center; color:#10b981; font-weight:600;">$0.55</td>
+          <td style="text-align:center;">30 min</td>
+          <td style="text-align:center; color:#6b7280;">$0.02/min</td>
+          <td style="padding:10px;"><span style="background:#ecfdf5; color:#059669; padding:2px 8px; border-radius:10px; font-size:11px; font-weight:600;">✅ Sweet spot</span></td>
+        </tr>
+        <tr style="border-bottom:1px solid #f3f4f6;">
+          <td style="padding:10px;">Created visual charts + diagrams</td>
+          <td style="text-align:center; color:#f59e0b; font-weight:600;">$0.82</td>
+          <td style="text-align:center;">45 min</td>
+          <td style="text-align:center; color:#6b7280;">$0.02/min</td>
+          <td style="padding:10px;"><span style="background:#ecfdf5; color:#059669; padding:2px 8px; border-radius:10px; font-size:11px; font-weight:600;">✅ Sweet spot</span></td>
+        </tr>
+        <tr style="border-bottom:1px solid #f3f4f6;">
+          <td style="padding:10px;">Cost structure document drafting</td>
+          <td style="text-align:center; color:#10b981; font-weight:600;">$0.42</td>
+          <td style="text-align:center;">20 min</td>
+          <td style="text-align:center; color:#6b7280;">$0.02/min</td>
+          <td style="padding:10px;"><span style="background:#ecfdf5; color:#059669; padding:2px 8px; border-radius:10px; font-size:11px; font-weight:600;">✅ Sweet spot</span></td>
+        </tr>
+        <tr>
+          <td style="padding:10px; font-weight:600;">API feed troubleshooting (developer)</td>
+          <td style="text-align:center; color:#ef4444; font-weight:600;">$7.22</td>
+          <td style="text-align:center;">—</td>
+          <td style="text-align:center; color:#6b7280;">N/A</td>
+          <td style="padding:10px;"><span style="background:#fef3c7; color:#d97706; padding:2px 8px; border-radius:10px; font-size:11px; font-weight:600;">⚠️ Investment (one-time)</span></td>
+        </tr>
+      </table>
+    </div>
+    
+    <div style="margin-top:20px; padding:16px; background:#eff6ff; border-radius:8px; border-left:4px solid #3b82f6;">
+      <div style="font-size:14px; font-weight:700; color:#1e40af; margin-bottom:6px;">The Continuous Improvement Loop</div>
+      <div style="font-size:13px; color:#1e3a5f; line-height:1.6;">
+        Every week, review the cost-per-task and time-saved data. Ask: <em>Which tasks are delivering the most value per dollar? Which are costing more than they should? Are there tasks the agent is struggling with that a human should handle — or tasks humans are doing that the agent could take over?</em> This data-driven approach turns agent management from guesswork into optimization.
+      </div>
+    </div>
+  </div>
+
+  <!-- === KEY INSIGHT BOX === -->
+  <div class="insight-box">
+    <div class="insight-title">💡 Key Insight: Total Cost Goes DOWN While Value Goes UP</div>
+    <div class="insight-grid">
+      <div class="insight-item">
+        <h4>Week 1 Total</h4>
+        <p>~$185/week<br>50% developer, 20% routine, 30% user — heavy setup investment, low ROI per dollar</p>
+      </div>
+      <div class="insight-item">
+        <h4>Week 12 Total (Steady State)</h4>
+        <p>~$16/week (~$64/mo)<br>22% routine, 62% user, 16% ongoing dev — upfront setup is gone, but maintenance + upgrades remain as a healthy, permanent layer.</p>
+      </div>
+      <div class="insight-item">
+        <h4>The Goal</h4>
+        <p>Maximize the green (user-generated) proportion. That's where every dollar saves real time. Routine is the floor. Developer should shrink to near-zero.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- === MODEL PRICING UPDATE === -->
+  <div class="chart-section">
+    <div class="chart-header">
+      <div>
+        <div class="chart-title">💰 Model Pricing — The Game Changer (April 2026)</div>
+        <div class="chart-subtitle">Current Anthropic pricing across model tiers — smart routing puts routine work on cheap models, executive work on premium</div>
+      </div>
+    </div>
+    
+    <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-top: 16px;">
+      <div>
+        <div style="font-size:14px; font-weight:700; color:#1a1a2e; margin-bottom:16px;">Current Token Pricing (per million tokens)</div>
+        <table style="width:100%; border-collapse:collapse; font-size:13px;">
+          <tr style="border-bottom:2px solid #e5e7eb;">
+            <th style="text-align:left; padding:10px 8px; color:#6b7280; font-size:11px;">MODEL</th>
+            <th style="text-align:center; padding:10px 8px; color:#6b7280; font-size:11px;">INPUT</th>
+            <th style="text-align:center; padding:10px 8px; color:#6b7280; font-size:11px;">OUTPUT</th>
+            <th style="text-align:center; padding:10px 8px; color:#6b7280; font-size:11px;">CACHE HITS</th>
+            <th style="text-align:left; padding:10px 8px; color:#6b7280; font-size:11px;">USED FOR</th>
+          </tr>
+          <tr style="border-bottom:1px solid #f3f4f6; background:rgba(139,92,246,0.05);">
+            <td style="padding:10px 8px; font-weight:700;">Opus 4.6</td>
+            <td style="text-align:center; font-weight:600;">$5</td>
+            <td style="text-align:center; font-weight:600;">$25</td>
+            <td style="text-align:center;">$0.50</td>
+            <td style="padding:10px 8px; font-size:12px; color:#4b5563;">Executive tasks, strategy, client comms</td>
+          </tr>
+
+          <tr style="border-bottom:1px solid #f3f4f6;">
+            <td style="padding:10px 8px; font-weight:600;">Sonnet 4.6</td>
+            <td style="text-align:center;">$3</td>
+            <td style="text-align:center;">$15</td>
+            <td style="text-align:center;">$0.30</td>
+            <td style="padding:10px 8px; font-size:12px; color:#4b5563;">Developer tasks, analysis, code</td>
+          </tr>
+          <tr>
+            <td style="padding:10px 8px; font-weight:600;">Haiku 4.5</td>
+            <td style="text-align:center;">$1</td>
+            <td style="text-align:center;">$5</td>
+            <td style="text-align:center;">$0.10</td>
+            <td style="padding:10px 8px; font-size:12px; color:#4b5563;">All routine/cron work</td>
+          </tr>
+        </table>
+      </div>
+      <div style="padding: 20px 0;">
+        <div style="background:linear-gradient(135deg, #7c3aed 0%, #5b21b6 100%); border-radius:12px; padding:24px; color:white; margin-bottom:16px;">
+          <div style="font-size:13px; font-weight:600; opacity:0.8;">THE KEY INSIGHT</div>
+          <div style="font-size:24px; font-weight:800; margin:8px 0;">Why Premium Wins on Cost</div>
+          <div style="font-size:14px; opacity:0.9; line-height:1.5;">Opus 4.6's superior reasoning means fewer retries, fewer errors, and less wasted tokens. Combined with $0.50/MTok caching on 90% of usage, the premium model often costs less per completed task than cheaper alternatives that need multiple attempts.</div>
+        </div>
+        <div style="background:#f0fdf4; border-radius:8px; padding:16px; border:1px solid #bbf7d0;">
+          <div style="font-size:13px; font-weight:700; color:#166534;">🔑 Prompt Caching = 90%+ Savings</div>
+          <div style="font-size:12px; color:#4b5563; margin-top:4px; line-height:1.5;">Most tokens in each request are cached system context (agent instructions, memory, workspace files). Cache hits cost $0.50/MTok on Opus 4.6 vs $5/MTok for fresh input — a 90% discount on the bulk of every request. This is the hidden multiplier that keeps real costs far below headline rates.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- === WHAT THIS MEANS === -->
+  <div class="insight-box" style="background:linear-gradient(135deg, #064e3b 0%, #065f46 100%);">
+    <div class="insight-title">📈 Where We're Headed: Cost Time Series on the Board</div>
+    <div class="insight-grid">
+      <div class="insight-item">
+        <h4>Daily Tracking</h4>
+        <p>Every day, the agent auto-logs a cost summary row to the activity & cost tab — broken down by Routine / User / Developer with task counts + cost.</p>
+      </div>
+      <div class="insight-item">
+        <h4>Per-Agent Rollup</h4>
+        <p>Same structure for every Bold agent (Vishal, AJ, Abhi SDRs). One "AGENT COST TRACKER" tab with all agents, enabling cross-agent comparison.</p>
+      </div>
+      <div class="insight-item">
+        <h4>Weekly + Monthly Views</h4>
+        <p>Dashboard chart auto-aggregates: cost per day, cost per week, cost makeup trend. The user sees if routine costs are dropping, user value is growing, and developer investment is paying off.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer">
+    Bold Business — Agent Cost Structure Framework — Updated April 4, 2026<br>
+    Based on real production data<br>
+    <span style="color:#d1d5db;">Laura Dashboard: </span><a  style="color:#3b82f6;">Laura Dashboard</a>
+  </div>
+
+</div>
+
+<!-- todayPie chart removed — replaced with model pricing table -->
+
+<script>
+// === 12-WEEK STACKED AREA CHART ===
+const weeks = ['Wk 1','Wk 2','Wk 3','Wk 4','Wk 5','Wk 6','Wk 7','Wk 8','Wk 9','Wk 10','Wk 11','Wk 12'];
+
+// Hypothetical data showing the shift
+const routine    = [4, 4, 3.5, 3.5, 3.5, 3.5, 3.5, 3.5, 3.5, 3.5, 3.5, 3.5];
+const userGen    = [5, 8, 9, 10, 10, 10, 10, 10, 10, 10, 10, 10];
+const developer  = [95, 78, 55, 38, 30, 15, 8, 5, 3, 2.5, 2.5, 2.5];
+
+const ctx1 = document.getElementById('stackedAreaChart').getContext('2d');
+new Chart(ctx1, {
+  type: 'bar',
+  data: {
+    labels: weeks,
+    datasets: [
+      {
+        label: 'Routine (Fixed)',
+        data: routine,
+        backgroundColor: '#3b82f6',
+        borderColor: '#3b82f6',
+        borderWidth: 0,
+        borderRadius: {topLeft: 0, topRight: 0},
+        order: 3
+      },
+      {
+        label: 'User-Generated (Marginal)',
+        data: userGen,
+        backgroundColor: '#10b981',
+        borderColor: '#10b981',
+        borderWidth: 0,
+        order: 2
+      },
+      {
+        label: 'Developer (Maintenance)',
+        data: developer,
+        backgroundColor: '#f59e0b',
+        borderColor: '#f59e0b',
+        borderWidth: 0,
+        borderRadius: {topLeft: 4, topRight: 4},
+        order: 1
+      }
+    ]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        callbacks: {
+          label: function(ctx) {
+            return ctx.dataset.label + ': $' + ctx.raw;
+          },
+          afterBody: function(tooltipItems) {
+            const total = tooltipItems.reduce((sum, item) => sum + item.raw, 0);
+            return 'Total: $' + total;
+          }
+        }
+      }
+    },
+    scales: {
+      x: {
+        stacked: true,
+        grid: { display: false },
+        ticks: { font: { family: 'Inter', size: 12, weight: '500' }, color: '#6b7280' }
+      },
+      y: {
+        stacked: true,
+        grid: { color: '#f3f4f6' },
+        ticks: {
+          font: { family: 'Inter', size: 12 },
+          color: '#6b7280',
+          callback: function(value) { return '$' + value; }
+        },
+        title: {
+          display: true,
+          text: 'Weekly Cost ($)',
+          font: { family: 'Inter', size: 13, weight: '600' },
+          color: '#6b7280'
+        }
+      }
+    }
+  }
+});
+
+// === PIE CHARTS ===
+const pieColors = ['#3b82f6', '#10b981', '#f59e0b'];
+const pieLabels = ['Routine', 'User-Generated', 'Developer'];
+
+function makePie(canvasId, data) {
+  const ctx = document.getElementById(canvasId).getContext('2d');
+  new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+      labels: pieLabels,
+      datasets: [{
+        data: data,
+        backgroundColor: pieColors,
+        borderWidth: 3,
+        borderColor: '#ffffff',
+        hoverOffset: 6
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      cutout: '55%',
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: function(ctx) {
+              const total = ctx.dataset.data.reduce((a, b) => a + b, 0);
+              const pct = Math.round(ctx.raw / total * 100);
+              return ctx.label + ': $' + ctx.raw + ' (' + pct + '%)';
+            }
+          }
+        }
+      }
+    }
+  });
+}
+
+// Week 1: Developer heavy
+makePie('pie1', [4, 5, 95]);
+// Week 6: User-generated growing, developer shrinking
+makePie('pie2', [3.5, 10, 15]);
+// Week 12: User-generated dominant, developer reduced but not zero
+makePie('pie3', [3.5, 10, 2.5]);
+</script>
+
+</body>
+</html>
