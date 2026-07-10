@@ -88,47 +88,191 @@ Google SSO via `@boldbusiness.com` account. Token returned as a session token st
 
 ---
 
-## 4. Dashboard Sections & Tabs
+## 4. Dashboard Sections & Data Sources
 
 The dashboard has two top-level modes: **Sales** and **Recruiting**.
+Every section is listed below with exactly where it pulls its data from.
 
-### Sales Mode Tabs
-| Tab | ID | What it shows |
-|---|---|---|
-| Overview | `overview` | Command Center: SDR stats, campaign performance, campaign briefs, task list |
-| Contacts | `contacts` | Lead contacts database with campaign tags |
-| Blacklist | `blacklist` | Do-not-contact list |
+---
 
-### Recruiting Mode Tabs (Laura)
-| Tab | ID | What it shows |
-|---|---|---|
-| Dashboard | `dashboard` | Agent overview + KPIs |
-| CET | `cet` | CET Designer contacts from Google Sheets |
-| Estimators | `estimators` | Estimator contacts |
-| SC/PM | `scpm` | Sales Coordinator / PM contacts |
-| BIM | `bim` | BIM Modeler contacts |
-| ROI | `roi` | ROI calculator |
-| Activities & Costs | `activities` | Agent activity log + cost breakdown |
-| Tasks | `tasks` | Laura's task board |
-| Costs | `costs` | Detailed cost history |
+### Sales Mode
 
-### Recruiting Mode Tabs (Darren)
-| Tab | ID | What it shows |
+#### Command Center Overview (`/api/skylead/*` + `/api/hubspot/followups` + `/api/campaign-briefs` + `/api/user-tasks`)
+
+| Section | API Endpoint | Database / Source |
 |---|---|---|
-| Dashboard | `dashboard` | Darren agent overview |
-| DWDM Companies | `dwdm` | DWDM outreach company list |
-| DWDM Outreach Plan | `dwdm_outreach` | Outreach plan |
-| DWDM Task Plan | `dwdm_tasks` | Task plan |
-| BEAD | `bead` | BEAD program contacts |
-| DC Contacts | `dc` | Data Center contacts |
-| DC All Projects | `dc_projects` | DC project list |
-| DC Job Demand | `dc_jobs` | DC job demand data |
-| DC Fiber Roles | `dc_fiber` | Fiber roles |
-| ROI | `roi` | ROI |
-| Activities & Costs | `activities` | Darren activity log |
-| Tasks | `tasks` | Darren task board |
-| Costs | `costs` | Cost history |
-| Analytics | `analytics` | Analytics view |
+| **KPI cards** (CR sent, replies, meetings) | `GET /api/skylead/stats` | `smt_db → sales.dashboard_campaigns` JOIN `sales.dashboard_skylead_ids` |
+| **SDR performance table** | `GET /api/skylead/sdr-summary` | `smt_db → sales.dashboard_campaigns` JOIN `sales.dashboard_skylead_ids` |
+| **Meetings breakdown** | `GET /api/skylead/meetings-breakdown` | `smt_db → sales.dashboard_campaigns` + `sales.dashboard_call_records` |
+| **HubSpot follow-ups** | `GET /api/hubspot/followups` | HubSpot CRM API (live, not cached in DB) |
+| **Campaign performance sandbox** | `GET /api/skylead/sandbox` | `smt_db → sales.dashboard_campaigns` (Skylead positive IDs) + manually-added (negative IDs) JOIN `sales.dashboard_skylead_ids` + `sales.dashboard_call_records` |
+| **Campaign briefs** | `GET /api/campaign-briefs` | `smt_db → sales.campaign_briefs` (dedicated table — separate from performance data) |
+| **Task list** | `GET /api/user-tasks` | `smt_db → users.user_tasks` JOIN `users.users` (scoped to logged-in user email) |
+
+#### Contacts Tab
+| Section | API Endpoint | Database / Source |
+|---|---|---|
+| **Contact list** | `GET /api/contacts` | `bb_agents → laura.contacts` (synced from Google Sheets via periodic read) |
+| **Campaign counts badge** | `GET /api/contacts/campaign-counts` | `bb_agents → laura.contacts` grouped by campaign |
+| **Blacklist action** | `PUT /api/contacts/:id/blacklist` | `bb_agents → laura.contacts` |
+
+#### Blacklist Tab
+| Section | API Endpoint | Database / Source |
+|---|---|---|
+| **Blacklist entries** | `GET /api/contacts` (blacklisted filter) | `bb_agents → laura.contacts` WHERE blacklisted = true |
+
+---
+
+### Recruiting Mode — Laura
+
+#### Dashboard Tab
+| Section | API Endpoint | Database / Source |
+|---|---|---|
+| **Agent overview** | `GET /api/bb/status` | `bb_agents → laura.activities` + `laura.tasks` + `laura.cost_snapshots` |
+| **Activities feed** | `GET /api/bb/activities` | `bb_agents → laura.activities` |
+| **Task board** | `GET /api/bb/tasks` | `bb_agents → laura.tasks` |
+
+#### CET Tab
+| Section | API Endpoint | Database / Source |
+|---|---|---|
+| **Contact table** | `GET /api/contacts?campaign=CET+Designers` | `bb_agents → laura.contacts` (synced from Google Sheets: `CET Designers` tab, Sheet ID `1WEIHITpnk_Ymrk6RTaKYzMK55vLnSViU4RKg5Py34WU`, account `lpetersen@boldbusiness.com`) |
+
+#### Estimators Tab
+| Section | API Endpoint | Database / Source |
+|---|---|---|
+| **Contact table** | `GET /api/contacts?campaign=Estimators` | `bb_agents → laura.contacts` (synced from `Estimators` tab, same sheet) |
+
+#### SC/PM Tab
+| Section | API Endpoint | Database / Source |
+|---|---|---|
+| **Contact table** | `GET /api/contacts?campaign=Sales+Coordinators+-+PMs` | `bb_agents → laura.contacts` (synced from `Sales Coordinators / PMs` tab, same sheet) |
+
+#### BIM Tab
+| Section | API Endpoint | Database / Source |
+|---|---|---|
+| **Contact table** | `GET /api/contacts?campaign=BIM+Modelers` | `bb_agents → laura.contacts` (synced from `BIM Modelers` tab, same sheet) |
+
+#### ROI Tab
+| Section | API Endpoint | Database / Source |
+|---|---|---|
+| **Cost history chart** | `GET /api/cost/history?days=14` | Anthropic Admin API (live usage data, not stored in DB) |
+| **Activity stats** | `GET /api/bb/activities` | `bb_agents → laura.activities` |
+| **Contact cost breakdown** | `GET /api/contacts/cost-breakdown` | `bb_agents → laura.contacts` |
+
+#### Activities & Costs Tab
+| Section | API Endpoint | Database / Source |
+|---|---|---|
+| **Activity log** | `GET /api/laura/activities` | `bb_agents → laura.activities` (local pgPool) |
+| **DB costs** | `GET /api/laura/db-costs` | `bb_agents → laura.cost_snapshots` (local pgPool) |
+
+#### Tasks Tab
+| Section | API Endpoint | Database / Source |
+|---|---|---|
+| **Laura task board** | `GET /api/bb/tasks?agent=laura` | `bb_agents → laura.tasks` |
+| **Abhi tasks** | `GET /api/abhi/tasks` | `bb_agents → laura.tasks` (pgPool) |
+
+#### Costs Tab
+| Section | API Endpoint | Database / Source |
+|---|---|---|
+| **Cost breakdown** | `GET /api/cost/breakdown` | Anthropic Admin API |
+| **History** | `GET /api/cost/history` | Anthropic Admin API |
+
+---
+
+### Recruiting Mode — Darren
+
+#### Dashboard Tab
+| Section | API Endpoint | Database / Source |
+|---|---|---|
+| **Overview stats** | `GET /api/darren/dashboard` | Google Sheets: Darren sheet (`1sP5lIYoCNFFU0xhh7SwWpTH_6L_EDO-ergHThYm4uGA`) — tabs: `DWDM Companies`, `DWDM Task plan`, `BEAD` |
+| **Activities** | `GET /api/darren/activities` | `bb_agents → darren.activities` (pgPool) |
+
+#### DWDM Companies Tab
+| Section | API Endpoint | Database / Source |
+|---|---|---|
+| **Company list** | `GET /api/darren/dwdm` | Google Sheets: Darren sheet → `DWDM Companies` tab |
+
+#### DWDM Outreach Plan Tab
+| Section | API Endpoint | Database / Source |
+|---|---|---|
+| **Outreach plan** | `GET /api/darren/dwdm-outreach` | Google Sheets: Darren sheet → `DWDM Outreach Plan` tab |
+
+#### DWDM Task Plan Tab
+| Section | API Endpoint | Database / Source |
+|---|---|---|
+| **Task plan** | `GET /api/darren/dwdm-taskplan` | Google Sheets: Darren sheet → `DWDM Task plan` tab |
+
+#### BEAD Tab
+| Section | API Endpoint | Database / Source |
+|---|---|---|
+| **BEAD contacts** | `GET /api/darren/bead` | Google Sheets: Darren sheet → `BEAD` tab |
+
+#### DC Contacts Tab
+| Section | API Endpoint | Database / Source |
+|---|---|---|
+| **DC contacts** | `GET /api/contacts?campaign=DC+Contacts` | `bb_agents → laura.contacts` (synced from Darren sheet → `DC - Contacts` tab) |
+
+#### DC All Projects Tab
+| Section | API Endpoint | Database / Source |
+|---|---|---|
+| **Project list** | `GET /api/contacts?campaign=DC+Projects` | `bb_agents → laura.contacts` (synced from Darren sheet → `DC - All Projects` tab) |
+
+#### DC Job Demand Tab
+| Section | API Endpoint | Database / Source |
+|---|---|---|
+| **Job demand data** | `GET /api/contacts?campaign=DC+Job+Demand` | `bb_agents → laura.contacts` (synced from Darren sheet → `DC - Job Demand` tab) |
+
+#### DC Fiber Roles Tab
+| Section | API Endpoint | Database / Source |
+|---|---|---|
+| **Fiber roles** | `GET /api/contacts?campaign=DC+Fiber+Roles` | `bb_agents → laura.contacts` (synced from Darren sheet → `DC - Fiber & Optical Roles` tab) |
+
+#### Activities & Costs Tab (Darren)
+| Section | API Endpoint | Database / Source |
+|---|---|---|
+| **Activity log** | `GET /api/darren/activities` | `bb_agents → darren.activities` (pgPool) |
+| **DB costs** | `GET /api/darren/db-costs` | `bb_agents → darren.cost_snapshots` (pgPool) |
+
+#### Analytics Tab
+| Section | API Endpoint | Database / Source |
+|---|---|---|
+| **Analytics** | `GET /api/analytics` | `bb_agents → laura.activities` + `darren.activities` aggregated |
+
+---
+
+### Zara (MercuryZ Candidates)
+| Section | API Endpoint | Database / Source |
+|---|---|---|
+| **Recruitment dashboard** | `GET /api/zara/candidates/dashboard` | Google Sheets: Zara MZ sheet (`1tXwJyHdrfHGqZR33NS6rBiFN0RBVU_25hefJDU0DcZo`) → `Recruitment Dashboard` tab |
+| **Per-role candidates** | `GET /api/zara/candidates/role/:roleName` | Same sheet → tab named after the role |
+| **Activities** | `GET /api/zara/activities` | `bb_agents → zara.activities` (pgPool) |
+
+### Camilla (Bold Business Candidates)
+| Section | API Endpoint | Database / Source |
+|---|---|---|
+| **Recruitment dashboard** | `GET /api/camilla/candidates/dashboard` | Google Sheets: Camilla BB sheet (`1dqHZ2iRqBbmE4Zi3jO83xWuLgkhLT6FweoDWU_Y-pAo`) → `Recruitment Dashboard` tab |
+| **Per-role candidates** | `GET /api/camilla/candidates/role/:roleName` | Same sheet → tab named after the role |
+| **Activities** | `GET /api/camilla/activities` | `bb_agents → camilla.activities` (pgPool) |
+
+---
+
+### Recruiter Performance (SMT)
+| Section | API Endpoint | Database / Source |
+|---|---|---|
+| **Recruiter goals** | `GET /api/smt/recruiter/goals` | `smt_db → recruiters schema` (smtPool — lola_readwrite) |
+| **Recruiter activities** | `GET /api/smt/recruiter/activities` | `smt_db → recruiters schema` (smtPool) |
+| **Recruiter names** | `GET /api/smt/recruiter/names` | `smt_db → recruiters schema` (smtReadPool — lola_readonly) |
+
+---
+
+### Google Sheets Reference
+
+| Sheet | Sheet ID | Used by | Account |
+|---|---|---|---|
+| Laura's Lead Generation | `1WEIHITpnk_Ymrk6RTaKYzMK55vLnSViU4RKg5Py34WU` | CET, Estimators, BIM, SC/PM tabs | `lpetersen@boldbusiness.com` |
+| Darren's Sheet | `1sP5lIYoCNFFU0xhh7SwWpTH_6L_EDO-ergHThYm4uGA` | DWDM, BEAD, DC tabs, Darren dashboard | `lpetersen@boldbusiness.com` |
+| Zara MZ Candidates | `1tXwJyHdrfHGqZR33NS6rBiFN0RBVU_25hefJDU0DcZo` | Zara candidates tab | `lpetersen@boldbusiness.com` |
+| Camilla BB Candidates | `1dqHZ2iRqBbmE4Zi3jO83xWuLgkhLT6FweoDWU_Y-pAo` | Camilla candidates tab | `lpetersen@boldbusiness.com` |
 
 ---
 
