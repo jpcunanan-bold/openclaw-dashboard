@@ -46,12 +46,15 @@ bbPool.on('error', (err) => console.error('bb_agents pool error:', err.message))
 // ── SMT DB (smt_db — recruiters performance) ─────────────────────────────────
 // lola_readwrite — can read public schema tables
 // lola_readonly  — can read recruiters schema (goals, activities, recruiters)
+const SMT_HOST     = process.env.SMT_HOST     || 'smt-db.c5vzhv0mqgjy.us-east-1.rds.amazonaws.com';
+const SMT_DATABASE = process.env.SMT_DATABASE || 'smt_db';
+
 const smtPool = new Pool({
-  host:     'smt-db.c5vzhv0mqgjy.us-east-1.rds.amazonaws.com',
+  host:     SMT_HOST,
   port:     5432,
-  user:     'lola_readwrite',
-  password: 'lolapassword',
-  database: 'smt_db',
+  user:     process.env.SMT_USER          || 'lola_readwrite',
+  password: process.env.SMT_PASSWORD      || 'lolapassword',
+  database: SMT_DATABASE,
   ssl:      { rejectUnauthorized: false },
   max:      5,
 });
@@ -59,11 +62,11 @@ smtPool.on('error', (err) => console.error('SMT pool error:', err.message));
 
 // lola_readonly — can read sales.dashboard_campaigns / dashboard_skylead_ids
 const smtReadPool = new Pool({
-  host:     'smt-db.c5vzhv0mqgjy.us-east-1.rds.amazonaws.com',
+  host:     SMT_HOST,
   port:     5432,
-  user:     'lola_readonly',
-  password: 'lenorekopko',
-  database: 'smt_db',
+  user:     process.env.SMT_READONLY_USER     || 'lola_readonly',
+  password: process.env.SMT_READONLY_PASSWORD || 'lenorekopko',
+  database: SMT_DATABASE,
   ssl:      { rejectUnauthorized: false },
   max:      5,
 });
@@ -71,11 +74,11 @@ smtReadPool.on('error', (err) => console.error('SMT-read pool error:', err.messa
 
 // postgres superuser — full access to sales schema (call_records, etc.)
 const smtAdminPool = new Pool({
-  host:     'smt-db.c5vzhv0mqgjy.us-east-1.rds.amazonaws.com',
+  host:     SMT_HOST,
   port:     5432,
-  user:     'postgres',
-  password: 'FeCvAStpTtNcrtQfqGeW',
-  database: 'smt_db',
+  user:     process.env.SMT_ADMIN_USER     || 'postgres',
+  password: process.env.SMT_ADMIN_PASSWORD || 'FeCvAStpTtNcrtQfqGeW',
+  database: SMT_DATABASE,
   ssl:      { rejectUnauthorized: false },
   max:      3,
 });
@@ -4701,7 +4704,7 @@ app.post('/api/skylead/trigger-sync', async (req, res) => {
   res.json({ ok: true, message: 'Skylead sync started in background.' });
 
   (async () => {
-    const SKYLEAD_KEY = 'ad7f28c6-58f1-4312-a133-10e34cc1b4b4';
+
     const BASE = 'https://api.multilead.io/api/open-api/v1';
     const USER_ID = 36116;
     const headers = { Authorization: SKYLEAD_KEY };
@@ -4910,7 +4913,8 @@ app.get('/api/skylead/sandbox', async (req, res) => {
 });
 
 // ── HubSpot Follow-Up Command Center ──
-const HUBSPOT_TOKEN = process.env.HUBSPOT_TOKEN || ''; // set HUBSPOT_TOKEN in .env
+const HUBSPOT_TOKEN = process.env.HUBSPOT_TOKEN || '';
+const SKYLEAD_KEY   = process.env.SKYLEAD_KEY   || 'ad7f28c6-58f1-4312-a133-10e34cc1b4b4';
 const HS_BASE = 'https://api.hubapi.com';
 
 async function hsGet(path, params = {}) {
@@ -5554,7 +5558,7 @@ app.get('/api/skylead/campaign-leads', async (req, res) => {
     const { campaignId, accountId } = req.query;
     if (!campaignId || !accountId) return res.status(400).json({ ok: false, error: 'campaignId and accountId are required' });
 
-    const SKYLEAD_KEY = 'ad7f28c6-58f1-4312-a133-10e34cc1b4b4';
+
     const BASE        = 'https://api.multilead.io/api/open-api/v1';
     const USER_ID     = 36116;
 
@@ -5604,7 +5608,7 @@ app.get('/api/skylead/lead-thread', async (req, res) => {
     const { leadId, campaignId, accountId } = req.query;
     if (!leadId || !accountId) return res.status(400).json({ ok: false, error: 'leadId and accountId are required' });
 
-    const SKYLEAD_KEY = 'ad7f28c6-58f1-4312-a133-10e34cc1b4b4';
+
     const BASE        = 'https://api.multilead.io/api/open-api/v1';
     const USER_ID     = 36116;
 

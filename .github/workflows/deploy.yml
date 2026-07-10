@@ -34,6 +34,15 @@ jobs:
           PG_DATABASE: ${{ vars.PG_DATABASE }}
           AGENT_SECRET: ${{ secrets.AGENT_SECRET }}
           OPENCLAW_GATEWAY_TOKEN: ${{ secrets.OPENCLAW_GATEWAY_TOKEN }}
+          SMT_HOST: ${{ vars.SMT_HOST }}
+          SMT_DATABASE: ${{ vars.SMT_DATABASE }}
+          SMT_USER: ${{ vars.SMT_USER }}
+          SMT_PASSWORD: ${{ secrets.SMT_PASSWORD }}
+          SMT_READONLY_USER: ${{ vars.SMT_READONLY_USER }}
+          SMT_READONLY_PASSWORD: ${{ secrets.SMT_READONLY_PASSWORD }}
+          SMT_ADMIN_USER: ${{ vars.SMT_ADMIN_USER }}
+          SMT_ADMIN_PASSWORD: ${{ secrets.SMT_ADMIN_PASSWORD }}
+          SKYLEAD_KEY: ${{ secrets.SKYLEAD_KEY }}
         run: |
           {
             echo "GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}"
@@ -57,6 +66,15 @@ jobs:
             echo "AGENT_SECRET=${AGENT_SECRET}"
             echo "OPENCLAW_GATEWAY_TOKEN=${OPENCLAW_GATEWAY_TOKEN}"
             echo "LAURA_AGENT_ID=laura-abhi-agent"
+            echo "SMT_HOST=${SMT_HOST}"
+            echo "SMT_DATABASE=${SMT_DATABASE}"
+            echo "SMT_USER=${SMT_USER}"
+            echo "SMT_PASSWORD=${SMT_PASSWORD}"
+            echo "SMT_READONLY_USER=${SMT_READONLY_USER}"
+            echo "SMT_READONLY_PASSWORD=${SMT_READONLY_PASSWORD}"
+            echo "SMT_ADMIN_USER=${SMT_ADMIN_USER}"
+            echo "SMT_ADMIN_PASSWORD=${SMT_ADMIN_PASSWORD}"
+            echo "SKYLEAD_KEY=${SKYLEAD_KEY}"
           } > /var/www/laura-dashboard/api/.env
 
       - name: Install API dependencies
