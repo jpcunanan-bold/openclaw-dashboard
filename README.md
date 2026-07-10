@@ -98,3 +98,5 @@ Steady-state agent cost: **$75–125/month** (Routine ~$10-15, User ~$50-90, Dev
 ## License
 
 Proprietary — Bold Business internal use only.
+
+<!-- Dex agent access verified: 2026-07-10T20:37Z -->
