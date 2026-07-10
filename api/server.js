@@ -5085,14 +5085,19 @@ app.get('/api/skylead/campaign-names', async (req, res) => {
   }
 });
 
-// ── Campaign CRUD (sandbox manual add/edit/delete) ──
+// ── Campaign CRUD (sandbox manual add/edit/delete) — uses sales.dashboard_campaigns ──
+// Manually-added rows use negative campaign_id to avoid conflicting with Skylead positive IDs.
+
+/** POST /api/sales-dashboard/campaigns */
 app.post('/api/sales-dashboard/campaigns', async (req, res) => {
   try {
     const { campaign_name, account_id, activity, target_icp, channel,
             connections_requested, connection_requests_accepted, connection_replies, emails_sent, created_at } = req.body;
     if (!campaign_name || !account_id) return res.status(400).json({ error: 'campaign_name and account_id are required' });
-    // Generate a unique negative campaign_id for manually-created campaigns to avoid Skylead ID conflicts
-    const idRes = await smtAdminPool.query(`SELECT COALESCE(MIN(campaign_id),0)-1 AS next_id FROM sales.dashboard_campaigns WHERE campaign_id < 0`);
+    // Negative IDs for manual rows — never conflict with Skylead positive IDs
+    const idRes = await smtAdminPool.query(
+      `SELECT COALESCE(MIN(campaign_id), 0) - 1 AS next_id FROM sales.dashboard_campaigns WHERE campaign_id < 0`
+    );
     const newId = Number(idRes.rows[0].next_id) || -1;
     const result = await smtAdminPool.query(`
       INSERT INTO sales.dashboard_campaigns
@@ -5105,13 +5110,14 @@ app.post('/api/sales-dashboard/campaigns', async (req, res) => {
        connections_requested||0, connection_requests_accepted||0, connection_replies||0,
        emails_sent||0, created_at||new Date().toISOString().split('T')[0]]
     );
-    res.status(201).json(result.rows[0]);
+    res.status(201).json({ ...result.rows[0], ok: true });
   } catch (e) {
     console.error('POST /api/sales-dashboard/campaigns error:', e.message);
     res.status(500).json({ error: e.message });
   }
 });
 
+/** PATCH /api/sales-dashboard/campaigns/:id */
 app.patch('/api/sales-dashboard/campaigns/:id', async (req, res) => {
   try {
     const { campaign_name, account_id, activity, target_icp, channel,
@@ -5119,16 +5125,16 @@ app.patch('/api/sales-dashboard/campaigns/:id', async (req, res) => {
             connection_replies, emails_sent, created_at } = req.body;
     const result = await smtAdminPool.query(`
       UPDATE sales.dashboard_campaigns SET
-        campaign_name              = $1,
-        account_id                 = $2,
-        activity                   = $3,
-        target_icp                 = $4,
-        channel                    = $5,
-        connections_requested      = $6,
+        campaign_name                = $1,
+        account_id                   = $2,
+        activity                     = $3,
+        target_icp                   = $4,
+        channel                      = $5,
+        connections_requested        = $6,
         connection_requests_accepted = $7,
-        connection_replies         = $8,
-        emails_sent                = $9,
-        created_at                 = $10::date
+        connection_replies           = $8,
+        emails_sent                  = $9,
+        created_at                   = $10::date
       WHERE campaign_id = $11 RETURNING *`,
       [campaign_name, account_id, activity||null,
        target_icp||null, channel||'LinkedIn + Email',
@@ -5136,7 +5142,7 @@ app.patch('/api/sales-dashboard/campaigns/:id', async (req, res) => {
        connection_replies||0, emails_sent||0,
        created_at||new Date().toISOString().split('T')[0], req.params.id]
     );
-    if (result.rows.length === 0) return res.status(404).json({ error: 'Campaign not found' });
+    if (!result.rows.length) return res.status(404).json({ error: 'Campaign not found' });
     res.json(result.rows[0]);
   } catch (e) {
     console.error('PATCH /api/sales-dashboard/campaigns error:', e.message);
@@ -5144,6 +5150,7 @@ app.patch('/api/sales-dashboard/campaigns/:id', async (req, res) => {
   }
 });
 
+/** DELETE /api/sales-dashboard/campaigns/:id */
 app.delete('/api/sales-dashboard/campaigns/:id', async (req, res) => {
   try {
     await smtAdminPool.query('DELETE FROM sales.dashboard_campaigns WHERE campaign_id = $1', [req.params.id]);
@@ -5254,81 +5261,181 @@ app.delete('/api/user-tasks/:id', async (req, res) => {
 
 // ── Campaign Briefs (rich brief content stored as jsonb) ──
 
-/** GET /api/campaign-briefs — fetch all user-created campaign briefs */
+/** GET /api/campaign-briefs — fetch all user-created campaign briefs (ordered) */
+// ── Campaign Briefs — now using dedicated sales.campaign_briefs table ──
+// Completely separate from sales.dashboard_campaigns (Skylead performance data)
+
+/** GET /api/campaign-briefs */
 app.get('/api/campaign-briefs', async (req, res) => {
   try {
     const { rows } = await smtAdminPool.query(
-      `SELECT campaign_id, campaign_name, account_id, activity, target_icp, channel, brief_json, created_at
-       FROM sales.dashboard_campaigns
-       WHERE is_brief = true
-       ORDER BY campaign_id DESC`
+      `SELECT id, title, subtitle, assignee, account_id, channel, activity,
+              color, sort_order, brief_json, created_at
+       FROM sales.campaign_briefs
+       WHERE is_deleted = false OR is_deleted IS NULL
+       ORDER BY sort_order ASC NULLS LAST, id ASC`
     );
-    res.json({ ok: true, briefs: rows });
+    // Normalize shape so frontend receives consistent field names
+    const briefs = rows.map(r => ({
+      campaign_id:   r.id,
+      campaign_name: r.title,
+      account_id:    r.account_id,
+      activity:      r.activity,
+      target_icp:    r.subtitle,
+      channel:       r.channel,
+      brief_json:    r.brief_json,
+      created_at:    r.created_at,
+      sort_order:    r.sort_order,
+      assignee:      r.assignee,
+    }));
+    res.json({ ok: true, briefs });
   } catch (e) {
     console.error('GET /api/campaign-briefs error:', e.message);
     res.status(500).json({ ok: false, briefs: [] });
   }
 });
 
-/** POST /api/campaign-briefs — create a new campaign brief */
+/** POST /api/campaign-briefs */
 app.post('/api/campaign-briefs', async (req, res) => {
   try {
-    const { campaign_name, account_id, activity, target_icp, channel, brief_json } = req.body;
+    const { campaign_name, account_id, activity, target_icp, channel, brief_json, assignee } = req.body;
     if (!campaign_name) return res.status(400).json({ error: 'campaign_name is required' });
-    const idRes = await smtAdminPool.query(
-      `SELECT COALESCE(MIN(campaign_id),0)-1 AS next_id FROM sales.dashboard_campaigns WHERE campaign_id < 0`
+    const sortRes = await smtAdminPool.query(
+      `SELECT COALESCE(MAX(sort_order), 0) + 1 AS next_sort FROM sales.campaign_briefs WHERE is_deleted = false OR is_deleted IS NULL`
     );
-    const newId = Number(idRes.rows[0].next_id) || -1;
+    const sortOrder = Number(sortRes.rows[0].next_sort) || 1;
+    const bj = brief_json || {};
     const result = await smtAdminPool.query(
-      `INSERT INTO sales.dashboard_campaigns
-         (campaign_id, campaign_name, account_id, activity, target_icp, channel, brief_json, is_brief, created_at)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,true,CURRENT_DATE) RETURNING *`,
-      [newId, campaign_name, account_id || 32891, activity || null,
-       target_icp || null, channel || 'LinkedIn + Email',
+      `INSERT INTO sales.campaign_briefs
+         (title, subtitle, assignee, account_id, channel, activity, color, sort_order, brief_json, created_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,CURRENT_DATE) RETURNING *`,
+      [campaign_name, target_icp || bj.sub || null, assignee || bj.sdr || 'Laura',
+       account_id || 32891, channel || 'LinkedIn + Email', activity || null,
+       bj.color || null, sortOrder,
        brief_json ? JSON.stringify(brief_json) : null]
     );
-    res.status(201).json({ ok: true, brief: result.rows[0] });
+    const r = result.rows[0];
+    res.status(201).json({ ok: true, brief: {
+      campaign_id: r.id, campaign_name: r.title, account_id: r.account_id,
+      target_icp: r.subtitle, channel: r.channel, activity: r.activity,
+      brief_json: r.brief_json, created_at: r.created_at,
+      sort_order: r.sort_order, assignee: r.assignee,
+    }});
   } catch (e) {
     console.error('POST /api/campaign-briefs error:', e.message);
     res.status(500).json({ ok: false, error: e.message });
   }
 });
 
-/** PATCH /api/campaign-briefs/:id — update a campaign brief */
+/** PATCH /api/campaign-briefs/:id */
 app.patch('/api/campaign-briefs/:id', async (req, res) => {
   try {
-    const { campaign_name, account_id, activity, target_icp, channel, brief_json } = req.body;
+    const { campaign_name, account_id, activity, target_icp, channel, brief_json, assignee } = req.body;
     const result = await smtAdminPool.query(
-      `UPDATE sales.dashboard_campaigns SET
-         campaign_name = COALESCE($1, campaign_name),
-         account_id    = COALESCE($2, account_id),
-         activity      = COALESCE($3, activity),
-         target_icp    = COALESCE($4, target_icp),
-         channel       = COALESCE($5, channel),
-         brief_json    = COALESCE($6, brief_json)
-       WHERE campaign_id = $7 AND is_brief = true RETURNING *`,
+      `UPDATE sales.campaign_briefs SET
+         title      = COALESCE($1, title),
+         account_id = COALESCE($2, account_id),
+         activity   = COALESCE($3, activity),
+         subtitle   = COALESCE($4, subtitle),
+         channel    = COALESCE($5, channel),
+         brief_json = COALESCE($6, brief_json),
+         assignee   = COALESCE($7, assignee),
+         updated_at = NOW()
+       WHERE id = $8 RETURNING *`,
       [campaign_name || null, account_id || null, activity || null,
        target_icp || null, channel || null,
-       brief_json ? JSON.stringify(brief_json) : null, req.params.id]
+       brief_json ? JSON.stringify(brief_json) : null,
+       assignee !== undefined ? assignee : null, req.params.id]
     );
     if (!result.rows.length) return res.status(404).json({ error: 'Brief not found' });
-    res.json({ ok: true, brief: result.rows[0] });
+    const r = result.rows[0];
+    res.json({ ok: true, brief: {
+      campaign_id: r.id, campaign_name: r.title, account_id: r.account_id,
+      target_icp: r.subtitle, channel: r.channel, activity: r.activity,
+      brief_json: r.brief_json, created_at: r.created_at,
+      sort_order: r.sort_order, assignee: r.assignee,
+    }});
   } catch (e) {
     console.error('PATCH /api/campaign-briefs error:', e.message);
     res.status(500).json({ ok: false, error: e.message });
   }
 });
 
-/** DELETE /api/campaign-briefs/:id — delete a campaign brief */
+/** POST /api/campaign-briefs/reorder — bulk sort_order update */
+app.post('/api/campaign-briefs/reorder', async (req, res) => {
+  try {
+    const { order } = req.body; // [{id, sort_order}]
+    if (!Array.isArray(order)) return res.status(400).json({ error: 'order array required' });
+    const client = await smtAdminPool.connect();
+    try {
+      await client.query('BEGIN');
+      for (const item of order) {
+        await client.query(
+          `UPDATE sales.campaign_briefs SET sort_order = $1, updated_at = NOW() WHERE id = $2`,
+          [item.sort_order, item.id]
+        );
+      }
+      await client.query('COMMIT');
+    } catch (err) {
+      await client.query('ROLLBACK'); throw err;
+    } finally { client.release(); }
+    res.json({ ok: true });
+  } catch (e) {
+    console.error('POST /api/campaign-briefs/reorder error:', e.message);
+    res.status(500).json({ ok: false, error: e.message });
+  }
+});
+
+/** POST /api/campaign-briefs/seed-builtin — upsert hardcoded campaigns by title (idempotent) */
+app.post('/api/campaign-briefs/seed-builtin', async (req, res) => {
+  try {
+    const { campaigns } = req.body;
+    if (!Array.isArray(campaigns)) return res.status(400).json({ error: 'campaigns array required' });
+    // Only insert titles that don't already exist (title uniqueness check)
+    const { rows: existing } = await smtAdminPool.query(
+      `SELECT title FROM sales.campaign_briefs WHERE is_deleted = false OR is_deleted IS NULL`
+    );
+    const existingTitles = new Set(existing.map(r => r.title));
+    const toInsert = campaigns.filter(c => !existingTitles.has(c.title));
+    if (!toInsert.length) return res.json({ ok: true, inserted: 0, skipped: campaigns.length });
+    const client = await smtAdminPool.connect();
+    let inserted = 0;
+    try {
+      await client.query('BEGIN');
+      for (const c of toInsert) {
+        await client.query(
+          `INSERT INTO sales.campaign_briefs
+             (title, subtitle, assignee, account_id, channel, sort_order, color, brief_json, created_at)
+           VALUES ($1,$2,$3,$4,'LinkedIn + Email',$5,$6,$7,CURRENT_DATE)`,
+          [c.title, c.sub || null, c.assignee || c.sdr || 'Laura',
+           c.account_id || 32891, c.sort_order || null, c.color || null,
+           JSON.stringify({ color: c.color, sdr: c.sdr || c.assignee })]
+        );
+        inserted++;
+      }
+      await client.query('COMMIT');
+    } catch (err) {
+      await client.query('ROLLBACK'); throw err;
+    } finally { client.release(); }
+    res.json({ ok: true, inserted, skipped: campaigns.length - inserted });
+  } catch (e) {
+    console.error('POST /api/campaign-briefs/seed-builtin error:', e.message);
+    res.status(500).json({ ok: false, error: e.message });
+  }
+});
+
+/** DELETE /api/campaign-briefs/:id — soft-delete */
 app.delete('/api/campaign-briefs/:id', async (req, res) => {
   try {
+    const id = Number(req.params.id);
+    if (isNaN(id)) return res.status(400).json({ error: 'Invalid id' });
     await smtAdminPool.query(
-      `DELETE FROM sales.dashboard_campaigns WHERE campaign_id = $1 AND is_brief = true`,
-      [req.params.id]
+      `UPDATE sales.campaign_briefs SET is_deleted = true, updated_at = NOW() WHERE id = $1`,
+      [id]
     );
     res.json({ ok: true });
   } catch (e) {
-    console.error('DELETE /api/campaign-briefs error:', e.message);
+    console.error('DELETE /api/campaign-briefs/:id error:', e.message);
     res.status(500).json({ ok: false, error: e.message });
   }
 });

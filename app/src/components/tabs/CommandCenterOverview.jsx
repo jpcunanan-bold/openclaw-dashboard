@@ -22,6 +22,7 @@ const STYLES = `
 .cc-root { min-height:100vh; background:linear-gradient(180deg,#05123F 0%,#020A28 100%); color:#EAF0FF; font-family:'Inter',system-ui,sans-serif; }
 .cc-sect-label { font:600 11px/1 'Inter',sans-serif; letter-spacing:.12em; text-transform:uppercase; color:#06E5EC; margin-bottom:12px; }
 .cc-sect-label-purple { font:600 11px/1 'Inter',sans-serif; letter-spacing:.12em; text-transform:uppercase; color:#A5B4FC; margin-bottom:12px; }
+.brief-card:hover .brief-card-delete { opacity:1 !important; }
 `;
 
 // ─── Agent metadata ───────────────────────────────────────────────────────────
@@ -387,9 +388,9 @@ function TaskListSection({authHeaders}){
       {/* Task cards */}
       <div style={{background:'rgba(255,255,255,.025)',border:'1px solid rgba(255,255,255,.08)',borderRadius:12,overflow:'hidden'}}>
         {/* Table header */}
-        <div style={{display:'grid',gridTemplateColumns:'32px 1fr 100px 100px 110px 120px 80px',
+        <div style={{display:'grid',gridTemplateColumns:'32px 1fr 90px 90px 100px 100px 130px',
           padding:'10px 16px',borderBottom:'1px solid rgba(255,255,255,.08)',background:'rgba(2,8,32,.3)'}}>
-          {['','Task','Type','Horizon','Assigned to','Due','Status'].map((h,i)=>(
+          {['','Task / Description','Type','Horizon','Assigned to','Due','Status'].map((h,i)=>(
             <span key={i} style={{font:'600 10px Inter,sans-serif',letterSpacing:'.06em',textTransform:'uppercase',color:'#7E8DB5'}}>{h}</span>
           ))}
         </div>
@@ -407,7 +408,7 @@ function TaskListSection({authHeaders}){
             : pagedTasks.map(t=>{
                 const sc=STATUS_CFG[t.status]||STATUS_CFG.pending;
                 return (
-                  <div key={t.id} style={{display:'grid',gridTemplateColumns:'32px 1fr 100px 100px 110px 120px 80px',
+                  <div key={t.id} style={{display:'grid',gridTemplateColumns:'32px 1fr 90px 90px 100px 100px 130px',
                     alignItems:'center',padding:'11px 16px',
                     borderBottom:'1px solid rgba(255,255,255,.05)',
                     opacity:t.status==='dismissed'?.5:1,
@@ -421,11 +422,18 @@ function TaskListSection({authHeaders}){
                         {t.status==='done'&&<svg width="9" height="9" viewBox="0 0 12 12"><polyline points="2,6 5,9 10,3" stroke="#000" strokeWidth="2" fill="none" strokeLinecap="round"/></svg>}
                       </span>
                     </span>
-                    {/* Description */}
-                    <span style={{font:'13px Inter,sans-serif',color:t.status==='done'?'#7E8DB5':'#EAF0FF',
-                      textDecoration:t.status==='done'?'line-through':'none',
-                      overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',paddingRight:12}}
-                      title={t.description}>{t.description}</span>
+                    {/* Description + details */}
+                    <div style={{minWidth:0,paddingRight:12}}>
+                      <div style={{font:'13px Inter,sans-serif',color:t.status==='done'?'#7E8DB5':'#EAF0FF',
+                        textDecoration:t.status==='done'?'line-through':'none',
+                        overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}
+                        title={t.description}>{t.description}</div>
+                      {t.details&&(
+                        <div style={{font:'11px/1.4 Inter,sans-serif',color:'#7E8DB5',
+                          marginTop:2,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}
+                          title={t.details}>{t.details}</div>
+                      )}
+                    </div>
                     {/* Type */}
                     <span style={{font:'11px Inter,sans-serif',color:'#9FB0D8'}}>{t.task_type||'—'}</span>
                     {/* Horizon */}
@@ -435,7 +443,7 @@ function TaskListSection({authHeaders}){
                     {/* Due */}
                     <span style={{font:'11px Inter,sans-serif',color:t.due_date_suggestion?'#F5B945':'#7E8DB5'}}>{t.due_date_suggestion||'—'}</span>
                     {/* Status + actions */}
-                    <span style={{display:'flex',alignItems:'center',gap:6}}>
+                    <span style={{display:'flex',alignItems:'center',gap:6,overflow:'visible'}}>
                       <span style={{font:'700 10px Inter,sans-serif',padding:'2px 8px',borderRadius:20,
                         color:sc.color,background:sc.bg,textTransform:'uppercase',letterSpacing:'.04em',whiteSpace:'nowrap'}}>
                         {sc.label}
@@ -590,16 +598,23 @@ function SalesTab({modalAgent,setModalAgent}) {
   const SB_PER_PAGE=10;
   const [campIdx,setCampIdx]=useState(0);
   const [campEdits,setCampEdits]=useState({});   // overrides keyed by campIdx
-  const [customCampaigns,setCustomCampaigns]=useState([]); // user-created briefs — loaded from DB
+  const [customCampaigns,setCustomCampaigns]=useState([]); // ALL briefs loaded from DB (built-ins + user-created)
   const [briefsLoading,setBriefsLoading]=useState(true); // loading state for DB briefs
-  const [deletedCampIndexes,setDeletedCampIndexes]=useState(new Set()); // soft-deleted built-in indexes (session only)
+  const [briefsSeeded,setBriefsSeeded]=useState(false); // whether built-ins have been seeded to DB
+  const [deletedCampIndexes,setDeletedCampIndexes]=useState(new Set()); // kept for legacy compat — no longer primary
   const [briefEditOpen,setBriefEditOpen]=useState(false);
   const [briefNewOpen,setBriefNewOpen]=useState(false);
+  // Drag-to-reorder state for campaign brief cards
+  const [dragIdx,setDragIdx]=useState(null);
+  const [dragOverIdx,setDragOverIdx]=useState(null);
+  const [reorderMode,setReorderMode]=useState(false);
+  const [briefToDelete,setBriefToDelete]=useState(null); // {_gi, _dbId, title} — drives confirm modal
   const [exportOpen,setExportOpen]=useState(false);
   const [seqOpen,setSeqOpen]=useState(null); // index of expanded sequence step
   const [sbReload,setSbReload]=useState(0);
   const [campModal,setCampModal]=useState(null);
   const [campSaving,setCampSaving]=useState(false);
+  const [campError,setCampError]=useState('');
   const [campDeleting,setCampDeleting]=useState(null);
   const [sbCallModal,setSbCallModal]=useState(false); // standalone add-call-log from sandbox
   const [sbCallForm,setSbCallForm]=useState({
@@ -640,8 +655,12 @@ function SalesTab({modalAgent,setModalAgent}) {
   const {data:sbData,loading:sbLoad}=useSandbox(spEffectivePeriod,spEffectiveStart,spEffectiveEnd,sbReload);
   const {data:followUps,loading:followUpsLoad}=useFollowUps();
 
-  // Load custom campaign briefs from DB on mount
-  useEffect(()=>{
+  // Seed built-in CAMPAIGNS to DB once (so they can be reordered/deleted persistently)
+  // then load all briefs (built-ins + user-created) from DB
+  const CAMP_COLORS_REF=['#06E5EC','#4D8DFF','#8B7CF6','#F5B945','#f97316','#f43f5e','#a78bfa','#3B82F6','#2DD4BF','#ec4899'];
+  const SDR_ACCOUNT_MAP={'Laura':32891,'Darren':32893};
+
+  const loadBriefs=()=>{
     setBriefsLoading(true);
     fetch('/api/campaign-briefs',{headers:authHeaders()})
       .then(r=>r.ok?r.json():null)
@@ -650,28 +669,54 @@ function SalesTab({modalAgent,setModalAgent}) {
         const loaded=j.briefs.map((b,i)=>{
           const brief=b.brief_json||{};
           return {
-            _dbId: b.campaign_id,
-            num:   CAMPAIGNS.length+i+1,
-            sdr:   brief.sdr||'Laura',
-            title: b.campaign_name,
-            sub:   b.target_icp||brief.sub||'',
-            color: brief.color||CAMP_COLORS[i%CAMP_COLORS.length],
+            _dbId:     b.campaign_id,
+            num:       i+1, // will be renumbered by display position
+            sdr:       b.assignee||brief.sdr||'Laura',
+            assignee:  b.assignee||brief.sdr||'Laura',
+            title:     b.campaign_name,
+            sub:       b.target_icp||brief.sub||'',
+            color:     brief.color||CAMP_COLORS_REF[i%CAMP_COLORS_REF.length],
+            sort_order:b.sort_order,
             ...brief,
           };
         });
         setCustomCampaigns(loaded);
-        // Populate campEdits for each loaded brief
         setCampEdits(prev=>{
           const next={...prev};
-          loaded.forEach((c,i)=>{
-            const gi=CAMPAIGNS.length+i;
-            if(!next[gi]) next[gi]=c;
-          });
+          loaded.forEach((c,i)=>{ if(!next[i]) next[i]=c; });
           return next;
         });
       })
       .catch(()=>{})
       .finally(()=>setBriefsLoading(false));
+  };
+
+  useEffect(()=>{
+    // First: seed built-in campaigns to DB if not yet done (check via localStorage flag)
+    const SEED_KEY='bb_briefs_seeded_v4'; // v4 = new sales.campaign_briefs table
+    const alreadySeeded=localStorage.getItem(SEED_KEY)==='1';
+    if(!alreadySeeded){
+      const seedPayload=CAMPAIGNS.map((c,i)=>({
+        title:      c.title,
+        sub:        c.sub,
+        sdr:        c.sdr,
+        assignee:   c.sdr,
+        color:      c.color,
+        account_id: SDR_ACCOUNT_MAP[c.sdr]||32891,
+        sort_order: i+1,
+      }));
+      fetch('/api/campaign-briefs/seed-builtin',{
+        method:'POST',
+        headers:{...authHeaders(),'Content-Type':'application/json'},
+        body:JSON.stringify({campaigns:seedPayload}),
+      }).then(r=>r.ok?r.json():null).then(j=>{
+        if(j?.ok){ localStorage.setItem(SEED_KEY,'1'); setBriefsSeeded(true); }
+        loadBriefs();
+      }).catch(()=>loadBriefs());
+    } else {
+      setBriefsSeeded(true);
+      loadBriefs();
+    }
   },[]);
 
   // Reset pages when filters change
@@ -703,7 +748,7 @@ function SalesTab({modalAgent,setModalAgent}) {
   });
 
   const handleSaveCamp=async(e)=>{
-    e.preventDefault(); setCampSaving(true);
+    e.preventDefault(); setCampSaving(true); setCampError('');
     try{
       const {mode,campaign_id,form}=campModal;
       const body={...form,
@@ -721,7 +766,16 @@ function SalesTab({modalAgent,setModalAgent}) {
         headers:{...authHeaders(),'Content-Type':'application/json'},
         body:JSON.stringify(body),
       });
-      if(res.ok){ setCampModal(null); setCampNameOpen(false); setCampNameQ(''); setSbOpen(null); setSbReload(k=>k+1); }
+      if(res.ok){
+        // Switch to 'all' so the new/edited campaign is always visible regardless of its launch date
+        setPeriod('all'); setSpStart(null); setSpEnd(null); setSpPhase('start');
+        setCampModal(null); setCampNameOpen(false); setCampNameQ(''); setSbOpen(null); setSbReload(k=>k+1);
+      } else {
+        const errData=await res.json().catch(()=>({}));
+        setCampError(errData.error||`Save failed (HTTP ${res.status}). Please try again.`);
+      }
+    }catch(err){
+      setCampError(err.message||'Network error. Please check your connection and try again.');
     }finally{setCampSaving(false);}
   };
 
@@ -1066,8 +1120,10 @@ function SalesTab({modalAgent,setModalAgent}) {
      hook:'24x7/365 NOC requires minimum 6–8 FTEs just to cover basic shifts — before PTO, sick leave, holidays, turnover. Most regional ISPs don’t have that bench. NOC turnover is brutal due to rotating shifts and holiday coverage.',
      valueProp:'Pre-vetted, carrier-grade NOC engineers — SolarWinds/Nagios/PRTG/Spectrum/ServiceNow — deployable in 1–2 weeks. Shift-flexible: night shift, weekend, holiday coverage. Telecom stack depth: fiber, DWDM, broadband access (GPON/DOCSIS), routing/switching.'}
   ];
-  const _allCamps=[...CAMPAIGNS,...customCampaigns];
-  const campBase=_allCamps[campIdx]||CAMPAIGNS[0];
+  // All campaigns now come from DB (customCampaigns holds both built-ins and user-created)
+  // Fall back to hardcoded CAMPAIGNS only while DB load is in progress
+  const _allCamps=customCampaigns.length>0?customCampaigns:[...CAMPAIGNS];
+  const campBase=_allCamps[campIdx]||_allCamps[0]||CAMPAIGNS[0];
   const campOverride=campEdits[campIdx]||{};
   const camp={...campBase,...campOverride};
   const DEFAULT_SEQUENCE=[
@@ -1087,9 +1143,14 @@ function SalesTab({modalAgent,setModalAgent}) {
   const CAMP_COLORS=['#06E5EC','#4D8DFF','#8B7CF6','#F5B945','#f97316','#f43f5e','#a78bfa','#3B82F6','#2DD4BF','#ec4899'];
   const allCampaigns=_allCamps;
   // Filtered list for display (by SDR selector); maps display index -> global index
+  // Renumber cards sequentially within the filtered view
   const filteredCamps=(person==='All'?allCampaigns.map((c,i)=>({...c,_gi:i}))
-    :allCampaigns.map((c,i)=>({...c,_gi:i})).filter(c=>c.sdr===person||(c.sdr===undefined&&person==='Laura')))
-    .filter(c=>!deletedCampIndexes.has(c._gi));
+    :allCampaigns.map((c,i)=>({...c,_gi:i})).filter(c=>{
+      const sdrVal=c.sdr||c.assignee;
+      return sdrVal===person||(sdrVal===undefined&&person==='Laura');
+    }))
+    .filter(c=>!deletedCampIndexes.has(c._gi))
+    .map((c,displayIdx)=>({...c,num:displayIdx+1}));
 
   // SDR rows - real data only, no placeholder fallback
   const sdrRows=sdr?.agents||[];
@@ -1534,24 +1595,21 @@ function SalesTab({modalAgent,setModalAgent}) {
               icp,sequence:form.sequence,
             };
             setCampEdits(prev=>({...prev,[campIdx]:updatedContent}));
-            // If this is a custom (DB-backed) campaign, persist the edit
-            const isCustom=campIdx>=CAMPAIGNS.length;
-            if(isCustom){
-              const customOffset=campIdx-CAMPAIGNS.length;
-              const dbId=customCampaigns[customOffset]?._dbId;
-              if(dbId){
-                await fetch(`/api/campaign-briefs/${dbId}`,{
-                  method:'PATCH',
-                  headers:{...authHeaders(),'Content-Type':'application/json'},
-                  body:JSON.stringify({
-                    campaign_name: form.title,
-                    target_icp:   form.sub,
-                    brief_json:   {...updatedContent, color:_allCamps[campIdx]?.color, sdr:_allCamps[campIdx]?.sdr||'Laura'},
-                  }),
-                }).catch(()=>{});
-                // Update local customCampaigns title/sub too
-                setCustomCampaigns(prev=>prev.map((c,i)=>i===customOffset?{...c,title:form.title,sub:form.sub,...updatedContent}:c));
-              }
+            // All campaigns are now DB-backed — always persist the edit
+            const dbId=customCampaigns[campIdx]?._dbId;
+            if(dbId){
+              await fetch(`/api/campaign-briefs/${dbId}`,{
+                method:'PATCH',
+                headers:{...authHeaders(),'Content-Type':'application/json'},
+                body:JSON.stringify({
+                  campaign_name: form.title,
+                  target_icp:   form.sub,
+                  assignee:     _allCamps[campIdx]?.assignee||_allCamps[campIdx]?.sdr||'Laura',
+                  brief_json:   {...updatedContent, color:_allCamps[campIdx]?.color, sdr:_allCamps[campIdx]?.sdr||'Laura'},
+                }),
+              }).catch(()=>{});
+              // Update local state
+              setCustomCampaigns(prev=>prev.map((c,i)=>i===campIdx?{...c,title:form.title,sub:form.sub,...updatedContent}:c));
             }
             setBriefEditOpen(false);
             setSaving(false);
@@ -1700,8 +1758,9 @@ function SalesTab({modalAgent,setModalAgent}) {
         const NewBriefForm=()=>{
           const nextNum=allCampaigns.length+1;
           const nextColor=CAMP_COLORS[allCampaigns.length%CAMP_COLORS.length];
+          const SDR_OPTIONS=['Laura','Darren','Abhinanda','Lenore','George','Bob','Cathy','Mariana'];
           const [form,setForm]=useState({
-            title:'',sub:'',hook:'',valueProp:'',
+            title:'',sub:'',hook:'',valueProp:'',assignee:'Laura',
             personas:'',signals:'',
             icp:'Industry: \nCompany Size: \nGeography: \nTech Stack: \nRevenue: \nTrigger: Currently hiring',
             sequence:DEFAULT_SEQUENCE.map(s=>({...s})),
@@ -1717,16 +1776,19 @@ function SalesTab({modalAgent,setModalAgent}) {
           const field=(label,node)=>(<div style={{display:'flex',flexDirection:'column',gap:0}}><label style={lbl}>{label}</label>{node}</div>);
           const STEP_COLORS=['#06E5EC','#5AC8FA','#2DD4BF','#F5B945'];
           const curStep=form.sequence[seqTab]||{};
+          const SDR_ACC={'Laura':32891,'Darren':32893,'Abhinanda':32887,'Lenore':32871,'George':32894,'Bob':33347,'Cathy':33361,'Mariana':33364};
           const [saving,setSaving]=useState(false);
+          const [saveErr,setSaveErr]=useState('');
           const save=async()=>{
             if(!form.title.trim()) return;
-            setSaving(true);
+            setSaving(true); setSaveErr('');
             const icp=(form.icp||'').split('\n').filter(Boolean).map(line=>{
               const idx=line.indexOf(':'); if(idx<0) return {label:line,value:''};
               return {label:line.slice(0,idx).trim(),value:line.slice(idx+1).trim()};
             });
+            const chosenColor=CAMP_COLORS_REF[allCampaigns.length%CAMP_COLORS_REF.length];
             const briefContent={
-              sdr:'Laura', color:nextColor,
+              sdr:form.assignee||'Laura', color:chosenColor,
               title:form.title,sub:form.sub,hook:form.hook,valueProp:form.valueProp,
               personas:form.personas.split('\n').filter(Boolean),
               signals:form.signals.split('\n').filter(Boolean),
@@ -1738,25 +1800,35 @@ function SalesTab({modalAgent,setModalAgent}) {
                 headers:{...authHeaders(),'Content-Type':'application/json'},
                 body:JSON.stringify({
                   campaign_name: form.title,
+                  account_id:   SDR_ACC[form.assignee]||32891,
                   target_icp:   form.sub,
                   channel:      'LinkedIn + Email',
+                  assignee:     form.assignee||'Laura',
                   brief_json:   briefContent,
                 }),
               });
               const j=await res.json();
               if(j.ok){
                 const newCamp={
-                  _dbId: j.brief.campaign_id,
-                  num:nextNum, title:form.title, sub:form.sub, color:nextColor, sdr:'Laura',
+                  _dbId:     j.brief.campaign_id,
+                  num:       nextNum,
+                  title:     form.title,
+                  sub:       form.sub,
+                  color:     chosenColor,
+                  sdr:       form.assignee||'Laura',
+                  assignee:  form.assignee||'Laura',
+                  sort_order:j.brief.sort_order,
                   ...briefContent,
                 };
-                const newIdx=allCampaigns.length;
                 setCustomCampaigns(prev=>[...prev,newCamp]);
-                setCampEdits(prev=>({...prev,[newIdx]:briefContent}));
-                setCampIdx(newIdx);
+                setCampEdits(prev=>({...prev,[allCampaigns.length]:briefContent}));
+                setCampIdx(allCampaigns.length);
                 setBriefNewOpen(false);
+              } else {
+                setSaveErr(j.error||'Save failed. Please try again.');
               }
-            }finally{ setSaving(false); }
+            }catch(err){ setSaveErr(err.message||'Network error.'); }
+            finally{ setSaving(false); }
           };
           return (
             <div style={OVL} onClick={()=>setBriefNewOpen(false)}>
@@ -1794,8 +1866,15 @@ function SalesTab({modalAgent,setModalAgent}) {
                   {tab==='brief'&&(
                     <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:20}}>
                       <div style={{display:'flex',flexDirection:'column',gap:16}}>
-                        {field('Campaign title',
-                          <input value={form.title} onChange={e=>setForm(f=>({...f,title:e.target.value}))} style={inp} placeholder="e.g. CET Designer / Space Planner"/>)}
+                        {/* Assignee + title row */}
+                        <div style={{display:'grid',gridTemplateColumns:'1fr 2fr',gap:12,alignItems:'end'}}>
+                          {field('Assignee (SDR)',
+                            <select value={form.assignee} onChange={e=>setForm(f=>({...f,assignee:e.target.value}))} style={{...inp,resize:'none',background:'#0d1a42'}}>
+                              {SDR_OPTIONS.map(s=><option key={s} value={s} style={{background:'#0d1a42'}}>{s}</option>)}
+                            </select>)}
+                          {field('Campaign title',
+                            <input value={form.title} onChange={e=>setForm(f=>({...f,title:e.target.value}))} style={inp} placeholder="e.g. CET Designer / Space Planner"/>)}
+                        </div>
                         {field('Subtitle / segment',
                           <input value={form.sub} onChange={e=>setForm(f=>({...f,sub:e.target.value}))} style={inp} placeholder="e.g. AEC · 50-500 employees · US"/>)}
                         {field('ICP fields',
@@ -1856,9 +1935,12 @@ function SalesTab({modalAgent,setModalAgent}) {
                 {/* Footer */}
                 <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',
                   padding:'16px 28px',borderTop:'1px solid rgba(255,255,255,.07)',flexShrink:0}}>
-                  <span style={{font:'12px Inter,sans-serif',color:'#4a5568'}}>New brief will be added to the campaign selector</span>
+                  <div style={{display:'flex',flexDirection:'column',gap:6}}>
+                    <span style={{font:'12px Inter,sans-serif',color:'#4a5568'}}>Assigned to <strong style={{color:CAMP_COLORS_REF[allCampaigns.length%CAMP_COLORS_REF.length]}}>{form.assignee||'Laura'}</strong> · will appear in the campaign selector</span>
+                    {saveErr&&<span style={{color:'#F2667A',font:'12px Inter,sans-serif'}}>{saveErr}</span>}
+                  </div>
                   <div style={{display:'flex',gap:10}}>
-                    <button onClick={()=>setBriefNewOpen(false)}
+                    <button onClick={()=>{setBriefNewOpen(false);setSaveErr('');}} 
                       style={{padding:'9px 20px',borderRadius:8,border:'1px solid rgba(255,255,255,.1)',
                         background:'none',color:'#9FB0D8',font:'600 13px Inter,sans-serif',cursor:'pointer'}}>Cancel</button>
                     <button onClick={save} disabled={!form.title.trim()||saving}
@@ -2117,7 +2199,7 @@ function SalesTab({modalAgent,setModalAgent}) {
               <div style={{font:'700 17px Inter,sans-serif',color:'#fff'}}>
                 {campModal.mode==='edit'?'Edit Campaign':'Add Campaign'}
               </div>
-              <button style={XBTN} onClick={()=>{setCampModal(null);setCampNameOpen(false);setCampNameQ('');}}>×</button>
+              <button style={XBTN} onClick={()=>{setCampModal(null);setCampNameOpen(false);setCampNameQ('');setCampError('');}}>×</button>
             </div>
             <div style={{overflowY:'auto',flex:1,padding:'20px 24px'}}>
               <form onSubmit={handleSaveCamp}>
@@ -2237,7 +2319,7 @@ function SalesTab({modalAgent,setModalAgent}) {
                   </div>
                 </div>
                 <div style={{display:'flex',justifyContent:'flex-end',gap:10,marginTop:20}}>
-                  <button type="button" onClick={()=>{setCampModal(null);setCampNameOpen(false);setCampNameQ('');}}
+                  <button type="button" onClick={()=>{setCampModal(null);setCampNameOpen(false);setCampNameQ('');setCampError('');}}
                     style={{padding:'9px 20px',borderRadius:8,border:'1px solid rgba(255,255,255,.15)',background:'none',
                       color:'#9FB0D8',font:'600 13px Inter,sans-serif',cursor:'pointer'}}>
                     Cancel
@@ -2246,6 +2328,7 @@ function SalesTab({modalAgent,setModalAgent}) {
                     style={{padding:'9px 26px',borderRadius:8,border:'none',
                       background:'linear-gradient(135deg,#4446DB,#6366F1)',
                       color:'#fff',font:'700 13px Inter,sans-serif',cursor:'pointer',opacity:campSaving?.6:1}}>
+                    {campError&&<div style={{color:'#F2667A',font:'12px Inter,sans-serif',marginBottom:12,padding:'8px 10px',background:'rgba(242,102,122,.1)',borderRadius:6,border:'1px solid rgba(242,102,122,.25)'}}>{campError}</div>}
                     {campSaving?'Saving...':(campModal.mode==='edit'?'Save Changes':'Add Campaign')}
                   </button>
                 </div>
@@ -3055,13 +3138,14 @@ function SalesTab({modalAgent,setModalAgent}) {
       {/* ── Campaign Brief ── */}
       <div className="cc-sect-label">Campaign brief</div>
 
-      {/* Campaign selector */}
+{/* Campaign selector */}
       <div style={{background:'rgba(255,255,255,.03)',border:'1px solid rgba(255,255,255,.08)',borderRadius:12,padding:'18px 20px',marginBottom:14}}>
         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:12,flexWrap:'wrap',marginBottom:16}}>
           <div style={{font:'700 13px Inter,sans-serif',letterSpacing:'.09em',textTransform:'uppercase',color:'#9FB0D8'}}>
             {person==='All'?'All Campaigns':person==='Laura'?'Bold Business — Laura':'Mercury Z — Darren'}
+            {reorderMode&&<span style={{marginLeft:10,font:'500 11px Inter,sans-serif',color:'#F5B945',textTransform:'none',letterSpacing:'normal'}}>‹ drag cards to reorder ›</span>}
           </div>
-          <div style={{display:'flex',gap:7,flexWrap:'wrap'}}>
+          <div style={{display:'flex',gap:7,flexWrap:'wrap',alignItems:'center'}}>
             {PEOPLE.map(p=>{
               const active=person===p;
               return <button key={p} onClick={()=>setPerson(p)} style={{
@@ -3073,21 +3157,92 @@ function SalesTab({modalAgent,setModalAgent}) {
                 {p}
               </button>;
             })}
+            <button onClick={()=>setReorderMode(m=>!m)} style={{
+              padding:'4px 10px',borderRadius:6,cursor:'pointer',
+              border:`1px solid ${reorderMode?'rgba(245,185,69,.5)':'rgba(255,255,255,.12)'}`,
+              background:reorderMode?'rgba(245,185,69,.1)':'transparent',
+              font:'600 10px Inter,sans-serif',
+              color:reorderMode?'#F5B945':'#7E8DB5',transition:'all .15s'}}>
+              {reorderMode?'Done':'⠿ Reorder'}
+            </button>
           </div>
         </div>
         <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:12}}>
-          {filteredCamps.map((c)=>{
+          {filteredCamps.map((c,di)=>{
             const active=campIdx===c._gi;
-            return <div key={c._gi} onClick={()=>setCampIdx(c._gi)} style={{
-              padding:'12px 14px',borderRadius:10,cursor:'pointer',
-              background:active?`${c.color}12`:'rgba(255,255,255,.025)',
-              border:`1px solid ${active?c.color+'55':'rgba(255,255,255,.08)'}`,transition:'all .15s'}}>
-              <div style={{font:'700 13px/1.35 Inter,sans-serif',color:active?c.color:'#EAF0FF',marginBottom:4}}>{c.num}. {c.title}</div>
-              <div style={{font:'11px/1.5 Inter,sans-serif',color:active?c.color+'cc':'#9FB0D8'}}>{c.sub}</div>
+            const isDragging=dragIdx===di;
+            const isDragOver=dragOverIdx===di&&dragIdx!==di;
+            return <div key={c._gi}
+              draggable={reorderMode}
+              onDragStart={reorderMode?(e)=>{ e.dataTransfer.effectAllowed='move'; setDragIdx(di); }:undefined}
+              onDragEnter={reorderMode?()=>setDragOverIdx(di):undefined}
+              onDragOver={reorderMode?(e)=>{ e.preventDefault(); e.dataTransfer.dropEffect='move'; }:undefined}
+              onDragLeave={reorderMode?()=>setDragOverIdx(null):undefined}
+              onDrop={reorderMode?async(e)=>{
+                e.preventDefault();
+                if(dragIdx===null||dragIdx===di){ setDragIdx(null); setDragOverIdx(null); return; }
+                const fromGi=filteredCamps[dragIdx]?._gi;
+                const toGi=filteredCamps[di]?._gi;
+                if(fromGi===undefined||toGi===undefined){ setDragIdx(null); setDragOverIdx(null); return; }
+                const newAll=[...customCampaigns];
+                const [moved]=newAll.splice(fromGi,1);
+                newAll.splice(toGi,0,moved);
+                const renumbered=newAll.map((c,i)=>({...c,num:i+1,sort_order:i+1}));
+                setCustomCampaigns(renumbered);
+                if(campIdx===fromGi) setCampIdx(toGi);
+                else if(fromGi<toGi&&campIdx>fromGi&&campIdx<=toGi) setCampIdx(campIdx-1);
+                else if(fromGi>toGi&&campIdx<fromGi&&campIdx>=toGi) setCampIdx(campIdx+1);
+                setDragIdx(null); setDragOverIdx(null);
+                const orderPayload=renumbered.map((c,i)=>({id:c._dbId,sort_order:i+1})).filter(x=>x.id!=null);
+                fetch('/api/campaign-briefs/reorder',{
+                  method:'POST',
+                  headers:{...authHeaders(),'Content-Type':'application/json'},
+                  body:JSON.stringify({order:orderPayload}),
+                }).catch(()=>{});
+              }:undefined}
+              onDragEnd={reorderMode?()=>{ setDragIdx(null); setDragOverIdx(null); }:undefined}
+              onClick={!reorderMode?()=>setCampIdx(c._gi):undefined}
+              className="brief-card"
+              style={{
+                position:'relative',
+                padding:'12px 14px',borderRadius:10,
+                cursor:reorderMode?'grab':'pointer',
+                background:isDragOver?`${c.color}22`:active?`${c.color}12`:'rgba(255,255,255,.025)',
+                border:`1px solid ${isDragOver?c.color:active?c.color+'55':'rgba(255,255,255,.08)'}`,
+                transition:'all .15s',opacity:isDragging?0.4:1,
+                transform:isDragOver?'scale(1.02)':'none',
+                userSelect:'none'}}>
+              {/* Delete button — circle ×, top-right, hover-only */}
+              {!reorderMode&&(
+                <button
+                  onClick={e=>{ e.stopPropagation(); setBriefToDelete({_gi:c._gi,_dbId:c._dbId,title:c.title}); }}
+                  title="Delete brief"
+                  className="brief-card-delete"
+                  style={{
+                    position:'absolute',top:7,right:7,
+                    width:18,height:18,borderRadius:'50%',
+                    border:'1px solid rgba(242,102,122,.5)',
+                    background:'rgba(13,26,66,.9)',
+                    color:'#F2667A',cursor:'pointer',
+                    fontSize:12,lineHeight:'16px',padding:0,
+                    display:'flex',alignItems:'center',justifyContent:'center',
+                    opacity:0,transition:'opacity .15s',flexShrink:0,
+                    backdropFilter:'blur(4px)',
+                  }}
+                >×</button>
+              )}
+              <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:5}}>
+                <span style={{font:'700 10px Inter,sans-serif',padding:'2px 7px',borderRadius:20,
+                  background:`${c.color}18`,color:c.color,textTransform:'uppercase',letterSpacing:'.04em'}}>
+                  {c.num}. {c.sdr||c.assignee||'Laura'}
+                </span>
+                {reorderMode&&<span style={{color:'#7E8DB5',fontSize:14,lineHeight:1,cursor:'grab'}}>::</span>}
+              </div>
+              <div style={{font:'700 13px/1.35 Inter,sans-serif',color:active?c.color:'#EAF0FF',marginBottom:2}}>{c.title}</div>
+              <div style={{font:'11px/1.5 Inter,sans-serif',color:active?c.color+'cc':'#9FB0D8',overflow:'hidden',display:'-webkit-box',WebkitLineClamp:2,WebkitBoxOrient:'vertical'}}>{c.sub}</div>
             </div>;
           })}
-          {/* Add new brief tile */}
-          <div onClick={()=>setBriefNewOpen(true)} style={{
+          {!reorderMode&&<div onClick={()=>setBriefNewOpen(true)} style={{
             padding:'12px 14px',borderRadius:10,cursor:'pointer',
             background:'rgba(255,255,255,.015)',
             border:'1px dashed rgba(255,255,255,.15)',transition:'all .15s',
@@ -3097,7 +3252,7 @@ function SalesTab({modalAgent,setModalAgent}) {
           >
             <span style={{font:'22px Inter,sans-serif',color:'rgba(255,255,255,.25)',lineHeight:1}}>+</span>
             <span style={{font:'600 11px Inter,sans-serif',color:'rgba(255,255,255,.3)'}}>New brief</span>
-          </div>
+          </div>}
         </div>
       </div>
 
@@ -3105,33 +3260,54 @@ function SalesTab({modalAgent,setModalAgent}) {
       <div style={{display:'flex',justifyContent:'flex-end',gap:8,marginBottom:12}}>
         <span onClick={()=>setBriefEditOpen(true)} style={{font:'600 10px Inter,sans-serif',color:'#9FB0D8',padding:'5px 11px',
           border:'1px solid rgba(255,255,255,.12)',borderRadius:8,cursor:'pointer'}}>✎ Edit</span>
-        {['⠿ Reorder','⎙ Print'].map(b=>(
-          <span key={b} style={{font:'600 10px Inter,sans-serif',color:'#9FB0D8',padding:'5px 11px',
-            border:'1px solid rgba(255,255,255,.12)',borderRadius:8,cursor:'pointer'}}>{b}</span>
-        ))}
         <span onClick={()=>setExportOpen(true)} style={{font:'600 10px Inter,sans-serif',
           color:'#06E5EC',padding:'5px 11px',
           border:'1px solid rgba(6,229,236,.35)',borderRadius:8,cursor:'pointer',
-          background:'rgba(6,229,236,.07)'}}>⤓ Export</span>
-        <span onClick={async()=>{
-          const campName=camp.title||_allCamps[campIdx]?.title||`Campaign ${campIdx+1}`;
-          if(!window.confirm(`Delete "${campName}"? This cannot be undone.`)) return;
-          const isCustom=campIdx>=CAMPAIGNS.length;
-          // Navigate away first
-          const allIdxs=_allCamps.map((_,i)=>i).filter(i=>!deletedCampIndexes.has(i)&&i!==campIdx);
-          setCampIdx(allIdxs.length>0?allIdxs[0]:0);
-          if(isCustom){
-            const customOffset=campIdx-CAMPAIGNS.length;
-            const dbId=customCampaigns[customOffset]?._dbId;
-            setCustomCampaigns(prev=>prev.filter((_,i)=>i!==customOffset));
-            if(dbId) await fetch(`/api/campaign-briefs/${dbId}`,{method:'DELETE',headers:authHeaders()});
-          } else {
-            setDeletedCampIndexes(prev=>new Set([...prev,campIdx]));
-          }
-        }} style={{font:'600 10px Inter,sans-serif',color:'#F2667A',padding:'5px 11px',
-          border:'1px solid rgba(242,102,122,.35)',borderRadius:8,cursor:'pointer',
-          background:'rgba(242,102,122,.07)'}}>✕ Delete</span>
+          background:'rgba(6,229,236,.07)'}}>&#x2913; Export</span>
       </div>
+
+      {/* ═ DELETE BRIEF CONFIRM MODAL ═ */}
+      {briefToDelete&&(
+        <div style={OVL} onClick={()=>setBriefToDelete(null)}>
+          <div style={{background:'#0d1a42',border:'1px solid rgba(242,102,122,.3)',borderRadius:14,
+            padding:'32px 28px',maxWidth:420,width:'100%',boxShadow:'0 24px 80px rgba(0,0,0,.7)'}}
+            onClick={e=>e.stopPropagation()}>
+            {/* Icon */}
+            <div style={{width:44,height:44,borderRadius:'50%',background:'rgba(242,102,122,.12)',
+              border:'1px solid rgba(242,102,122,.3)',display:'flex',alignItems:'center',
+              justifyContent:'center',marginBottom:16,fontSize:20}}>&#x26A0;&#xFE0F;</div>
+            <div style={{font:'700 16px Inter,sans-serif',color:'#fff',marginBottom:8}}>Delete campaign brief?</div>
+            <div style={{font:'13px/1.6 Inter,sans-serif',color:'#9FB0D8',marginBottom:24}}>
+              <strong style={{color:'#EAF0FF'}}>{briefToDelete.title}</strong> will be permanently removed.
+              This cannot be undone.
+            </div>
+            <div style={{display:'flex',gap:10,justifyContent:'flex-end'}}>
+              <button onClick={()=>setBriefToDelete(null)}
+                style={{padding:'9px 20px',borderRadius:8,border:'1px solid rgba(255,255,255,.15)',
+                  background:'none',color:'#9FB0D8',font:'600 13px Inter,sans-serif',cursor:'pointer'}}>
+                Cancel
+              </button>
+              <button onClick={async()=>{
+                const {_gi,_dbId,title}=briefToDelete;
+                setBriefToDelete(null);
+                // Navigate away if deleting the active card
+                if(campIdx===_gi){
+                  const allIdxs=_allCamps.map((_,i)=>i).filter(i=>i!==_gi);
+                  setCampIdx(allIdxs.length>0?allIdxs[0]:0);
+                }
+                // Remove from local state
+                setCustomCampaigns(prev=>prev.filter((_,i)=>i!==_gi));
+                // Persist to DB
+                if(_dbId) await fetch(`/api/campaign-briefs/${_dbId}`,{method:'DELETE',headers:authHeaders()}).catch(()=>{});
+              }}
+                style={{padding:'9px 24px',borderRadius:8,border:'none',
+                  background:'#F2667A',color:'#fff',font:'700 13px Inter,sans-serif',cursor:'pointer'}}>
+                Yes, delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Brief detail card */}
       <div style={{position:'relative',background:'rgba(255,255,255,.03)',border:'1px solid rgba(255,255,255,.08)',
