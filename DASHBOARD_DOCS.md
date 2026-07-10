@@ -571,31 +571,45 @@ GET /api/skylead/meetings-breakdown?period=30d
 
 ---
 
-## 6. How to Connect an OpenClaw Agent to This Dashboard
+## 6. Agent Access Levels — Three Ways to Connect
 
-### Step 1 — Store the agent secret
-Add to the agent's `.secrets.md` or environment:
+There are three distinct levels of access you can give another agent.
+Choose based on what they actually need to do.
+
+---
+
+### Level 1 — Data Access Only (read/write dashboard data via API)
+**What they can do:** Read and write all dashboard data — campaigns, briefs, tasks, activities, call records, contacts.
+**What they cannot do:** Edit source code files, rebuild the frontend, restart the API.
+**Good for:** Agents on a different machine/EC2 that just need to interact with data.
+
+**Setup — give the agent these two values:**
 ```
 LAURA_DASHBOARD_SECRET=391e1c99222c1bb4c06197bd2ff4a69a22412a11f38d2dac
 LAURA_DASHBOARD_URL=https://openclaw.boldbusiness.com/api
 ```
 
-### Step 2 — Make API calls
-The agent can call any endpoint using `web_fetch` or `exec curl`:
+Store them in the agent's `.secrets.md`:
+```markdown
+## Laura Dashboard
+LAURA_DASHBOARD_URL=https://openclaw.boldbusiness.com/api
+LAURA_DASHBOARD_SECRET=391e1c99222c1bb4c06197bd2ff4a69a22412a11f38d2dac
+```
 
+**How to call the API:**
 ```bash
-# Example: get campaign briefs
+# GET — read campaign briefs
 curl -H "x-agent-secret: 391e1c99222c1bb4c06197bd2ff4a69a22412a11f38d2dac" \
      https://openclaw.boldbusiness.com/api/campaign-briefs
 
-# Example: create a task
+# POST — create a task
 curl -X POST \
      -H "x-agent-secret: 391e1c99222c1bb4c06197bd2ff4a69a22412a11f38d2dac" \
      -H "Content-Type: application/json" \
      -d '{"description":"Research BEAD leads","status":"pending","details":"Focus on Texas ISPs"}' \
      https://openclaw.boldbusiness.com/api/user-tasks
 
-# Example: log an activity
+# POST — log an activity
 curl -X POST \
      -H "x-agent-secret: 391e1c99222c1bb4c06197bd2ff4a69a22412a11f38d2dac" \
      -H "Content-Type: application/json" \
@@ -603,24 +617,106 @@ curl -X POST \
      https://openclaw.boldbusiness.com/api/activities
 ```
 
-### Step 3 — What the agent can do
-With the secret header, an agent can:
-- ✅ Read all campaign performance data
-- ✅ Add / edit / delete manually-added sandbox campaigns
-- ✅ Read, create, edit, delete campaign briefs (including full content)
-- ✅ Create, update, delete tasks in the task list
-- ✅ Log activities to the activity feed
-- ✅ Update agent task board (Laura/Darren)
-- ✅ Log call records
-- ✅ Trigger a Skylead sync
-- ✅ Read contacts, blacklist contacts
-- ✅ Read cost/ROI data
+**Full list of what Level 1 can do:**
+| Action | Endpoint |
+|---|---|
+| Read campaign performance | GET /api/skylead/sandbox |
+| Add manual sandbox campaign | POST /api/sales-dashboard/campaigns |
+| Edit/delete sandbox campaign | PATCH/DELETE /api/sales-dashboard/campaigns/:id |
+| Read campaign briefs | GET /api/campaign-briefs |
+| Create/edit/delete briefs | POST/PATCH/DELETE /api/campaign-briefs/:id |
+| Reorder briefs | POST /api/campaign-briefs/reorder |
+| Read/create/edit/delete tasks | GET/POST/PATCH/DELETE /api/user-tasks/:id |
+| Log activity | POST /api/activities |
+| Read activities | GET /api/pg/activities |
+| Log call record | POST /api/sales-dashboard/call-records |
+| Read contacts | GET /api/contacts |
+| Blacklist contact | PUT /api/contacts/:id/blacklist |
+| Trigger Skylead sync | POST /api/skylead/trigger-sync |
+| Read cost/ROI data | GET /api/cost/history |
 
-### Step 4 — What the agent CANNOT do via the API
-- ❌ Change Google Sheets data directly (use `gog` CLI instead)
-- ❌ Send outreach — that still requires operator approval (TOOLS.md send gate)
-- ❌ Enroll contacts in Skylead sequences directly
-- ❌ Access HubSpot CRM write operations (read-only via this API)
+**What Level 1 cannot do:**
+- ❌ Edit source code files
+- ❌ Rebuild the frontend (`npm run build`)
+- ❌ Restart the API server
+- ❌ Change Google Sheets data (use `gog` CLI on the EC2 instead)
+- ❌ Send outreach (requires operator approval per TOOLS.md)
+- ❌ Write directly to the database (must go through the API)
+
+---
+
+### Level 2 — Code Access (edit files + rebuild via this EC2)
+**What they can do:** Everything in Level 1 PLUS edit source files, rebuild frontend, restart services.
+**Requirement:** The agent must run on **this same EC2 instance** (as a second OpenClaw agent on the same machine), OR you give them SSH access.
+**Good for:** An agent you want to maintain/extend the dashboard itself.
+
+**Option A — Add as a second agent on this EC2**
+
+Add the agent to `/home/ubuntu/.openclaw/openclaw.json` under `agents.list`:
+```json
+{
+  "id": "your-agent-id",
+  "name": "Agent Name",
+  "workspace": "/home/ubuntu/.openclaw/agents/your-agent/workspace"
+}
+```
+
+That agent then has full `exec`, `read`, `write`, `edit` tool access to the same filesystem, including:
+```
+/var/www/laura-dashboard/     ← dashboard source
+/var/www/laura-dashboard/api/.env  ← all credentials
+```
+
+And can run:
+```bash
+# Edit source files
+edit /var/www/laura-dashboard/app/src/components/tabs/CommandCenterOverview.jsx
+
+# Rebuild frontend
+cd /var/www/laura-dashboard/app && npm run build
+cp /var/www/laura-dashboard/app/dist/index.html /var/www/laura-dashboard/index.html
+
+# Restart API
+sudo systemctl restart laura-dashboard-api
+```
+
+**Option B — SSH access from a remote agent**
+
+Generate an SSH key for the agent and add the public key to this EC2:
+```bash
+# On this EC2 — add the agent's public key
+echo "ssh-rsa AAAA... agent-name" >> /home/ubuntu/.ssh/authorized_keys
+```
+
+The remote agent then connects via:
+```bash
+ssh ubuntu@openclaw.boldbusiness.com "cd /var/www/laura-dashboard && git pull && npm run build"
+```
+
+---
+
+### Level 3 — Own Fork (full independent copy via GitHub)
+**What they can do:** Everything — their own copy of the dashboard on their own EC2, connected to their own database.
+**Good for:** A completely separate agent/team that wants their own dashboard instance.
+**How:** Fork the repo at `https://github.com/BoldBusiness/laura-dashboard` and follow `docs/FORK_SETUP.md`.
+
+They need:
+1. Their own EC2
+2. Their own PostgreSQL DB (or use the shared `smt_db` with their own schema)
+3. Their own GitHub Secrets set (all values in `docs/FORK_SETUP.md`)
+4. Their own `AGENT_SECRET` generated fresh: `openssl rand -hex 20`
+
+---
+
+### Which level should you choose?
+
+| Scenario | Level |
+|---|---|
+| Agent needs to read/write data, runs on different machine | **1** |
+| Agent needs to maintain/extend this dashboard's code | **2** |
+| Agent/team wants their own independent dashboard | **3** |
+| Agent just needs to log activities or check campaign data | **1** |
+| Agent needs to add new tabs or change the UI | **2 or 3** |
 
 ---
 
@@ -687,3 +783,62 @@ With the secret header, an agent can:
 5. **Activity logging is mandatory** — after any meaningful action, POST to `/api/activities` so it shows in the dashboard feed
 6. **Soft deletes on briefs** — deleted briefs set `is_deleted = true`, they don't actually disappear from the DB
 7. **Negative campaign IDs** — manually-added sandbox campaigns always get negative `campaign_id` values; Skylead campaigns always have positive IDs
+
+---
+
+## 10. Direct Database Access (Level 2+ agents on this EC2)
+
+If the agent runs on this EC2 and needs to query the DB directly (bypassing the API), use these connection strings. All credentials are in `/var/www/laura-dashboard/api/.env`.
+
+### smt_db — campaigns, briefs, tasks (primary dashboard DB)
+```bash
+# Read-write (recruiter schema)
+psql "host=smt-db.c5vzhv0mqgjy.us-east-1.rds.amazonaws.com port=5432 dbname=smt_db user=lola_readwrite password=lolapassword sslmode=require"
+
+# Admin (sales schema — campaigns, briefs, call records)
+psql "host=smt-db.c5vzhv0mqgjy.us-east-1.rds.amazonaws.com port=5432 dbname=smt_db user=postgres password=FeCvAStpTtNcrtQfqGeW sslmode=require"
+```
+
+### bb_agents — multi-agent shared DB (activities, tasks, cost snapshots)
+```bash
+psql "host=bb-agents-shared-db.cpsqyxgezuwr.us-east-2.rds.amazonaws.com port=5432 dbname=bb_agents user=agent_writer password=<BB_AGENTS_PASSWORD> sslmode=require"
+```
+
+### Key schemas and tables to know
+```sql
+-- Campaign performance (Skylead sync + manual adds)
+SELECT * FROM sales.dashboard_campaigns WHERE campaign_id < 0;  -- manual only
+SELECT * FROM sales.dashboard_campaigns WHERE campaign_id > 0;  -- Skylead only
+
+-- Campaign briefs (planning content)
+SELECT id, title, assignee, sort_order FROM sales.campaign_briefs WHERE is_deleted = false;
+
+-- Call records
+SELECT * FROM sales.dashboard_call_records ORDER BY created_at DESC LIMIT 20;
+
+-- User tasks
+SELECT t.* FROM users.user_tasks t JOIN users.users u ON t.user_id = u.id WHERE u.email = 'adeb@boldbusiness.com';
+
+-- Laura activities
+SELECT * FROM laura.activities ORDER BY created_at DESC LIMIT 20;
+
+-- Laura task board
+SELECT * FROM laura.tasks WHERE status != 'done' ORDER BY created_at DESC;
+```
+
+### Using the Python scripts (on this EC2)
+The dashboard has ready-made scripts for common DB operations:
+```bash
+# Log an activity
+python3 /home/ubuntu/.openclaw/workspace/scripts/log_activity.py \
+  --title "Task completed" \
+  --category admin \
+  --requested-by Abhinanda \
+  --time-saved 10
+
+# Check task board
+python3 /home/ubuntu/.openclaw/workspace/scripts/step_zero.py
+
+# Log a Darren task
+python3 /home/ubuntu/.openclaw/workspace/scripts/log_darren_task.py
+```
