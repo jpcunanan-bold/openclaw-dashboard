@@ -1737,12 +1737,17 @@ async function callLauraFallback(sessionId, taskRef, userMessage, agentName = 'l
 
 /**
  * callLauraInline — main chat handler.
- * 1. Check sheet update intent (fast-path, no AI needed)
- * 2. Try full OpenClaw gateway (all tools, full memory, Sonnet model)
- * 3. Fall back to lightweight Haiku if gateway is down
+ * 1. Check dashboard action intent (fast-path: campaign briefs, tasks, calls)
+ * 2. Check sheet update intent (fast-path, no AI needed)
+ * 3. Try full OpenClaw gateway (all tools, full memory, Sonnet model)
+ * 4. Fall back to lightweight Haiku if gateway is down
  */
 async function callLauraInline(sessionId, taskRef, taskContext, userMessage, agentName = 'laura') {
   try {
+    // ── Dashboard Action Intent (fast path — CRUD on dashboard data) ──────────
+    const dashHandled = await handleDashboardIntent(userMessage, sessionId, taskRef, agentName, pgPool);
+    if (dashHandled !== null) return;
+
     // ── Sheet Update Intent (fast path — skip AI entirely) ─────────────────
     if (agentName !== 'darren') {
       const intentHandled = await handleSheetUpdateIntent(userMessage, sessionId, taskRef, agentName, pgPool);
@@ -6637,6 +6642,201 @@ const INTENT_TAB_CFG = {
   'BIM Modelers':            { nameCol: 'D', companyCol: 'A', headerRows: 1, fields: { response_status:'M', response_date:'L', call_scheduled:'N', touch1:'J' } },  // J=Status col (I=Date Sent)
   'Sales Coordinators / PMs':{ nameCol: 'D', companyCol: 'A', headerRows: 1, fields: { response_status:'K', call_scheduled:'L', touch1:'I', touch2:'J' } },
 };
+
+// ── Dashboard Action Intent Handler ────────────────────────────────────────
+// Handles natural-language commands to create/update/delete dashboard data:
+// campaign briefs, call records, tasks — without going through the AI gateway.
+
+function parseDashboardIntent(msg) {
+  const m = msg.trim();
+  const lo = m.toLowerCase();
+
+  // ── CAMPAIGN BRIEFS ────────────────────────────────────────────────────────
+  // Add brief: "add campaign brief <title>" / "create a new brief called <title>"
+  let r = m.match(/^(?:add|create|new)\s+(?:a\s+)?(?:campaign\s+)?brief(?:\s+called|\s+named|:)?\s+(.+)$/i);
+  if (r) return { action: 'brief_add', title: r[1].trim() };
+
+  // Delete brief: "delete brief <title>" / "remove campaign brief <title>"
+  r = m.match(/^(?:delete|remove)\s+(?:campaign\s+)?brief\s+(.+)$/i);
+  if (r) return { action: 'brief_delete', title: r[1].trim() };
+
+  // Update brief title: "rename brief <old> to <new>"
+  r = m.match(/^rename\s+(?:campaign\s+)?brief\s+(.+?)\s+to\s+(.+)$/i);
+  if (r) return { action: 'brief_rename', oldTitle: r[1].trim(), newTitle: r[2].trim() };
+
+  // Update brief field: "set brief <title> assignee to Laura"
+  r = m.match(/^(?:set|update)\s+(?:campaign\s+)?brief\s+(.+?)\s+(assignee|channel|activity|icp|subtitle)\s+to\s+(.+)$/i);
+  if (r) return { action: 'brief_update_field', title: r[1].trim(), field: r[2].toLowerCase(), value: r[3].trim() };
+
+  // List briefs
+  if (/^(?:list|show)\s+(?:all\s+)?(?:campaign\s+)?briefs?$/.test(lo))
+    return { action: 'brief_list' };
+
+  // ── TASKS ─────────────────────────────────────────────────────────────────
+  // Add task: "add task <description>" / "create task: <desc>"
+  r = m.match(/^(?:add|create|new)\s+(?:a\s+)?task:?\s+(.+)$/i);
+  if (r) return { action: 'task_add', description: r[1].trim() };
+
+  // Update task status: "mark task <id> as done" / "update task <id> status to pending"
+  r = m.match(/^(?:mark|update|set)\s+task\s+(\d+)\s+(?:as\s+|status\s+to\s+)(.+)$/i);
+  if (r) return { action: 'task_update', id: r[1], status: r[2].trim().toLowerCase() };
+
+  // Delete task: "delete task <id>"
+  r = m.match(/^(?:delete|remove)\s+task\s+(\d+)$/i);
+  if (r) return { action: 'task_delete', id: r[1] };
+
+  // List tasks
+  if (/^(?:list|show)\s+(?:all\s+)?(?:open\s+|pending\s+)?tasks?$/.test(lo))
+    return { action: 'task_list' };
+
+  // ── CALL RECORDS ──────────────────────────────────────────────────────────
+  // Log call: "log call with <name> at <company> outcome <result>"
+  r = m.match(/^log\s+(?:a\s+)?call\s+with\s+(.+?)(?:\s+at\s+(.+?))?(?:\s+outcome\s+(.+))?$/i);
+  if (r) return { action: 'call_add', contact: r[1].trim(), company: (r[2]||'').trim(), outcome: (r[3]||'').trim() };
+
+  return null;
+}
+
+async function handleDashboardIntent(userMessage, sessionId, taskRef, agentName, pgPool) {
+  const intent = parseDashboardIntent(userMessage);
+  if (!intent) return null;
+
+  let replyText = '';
+  try {
+    // ── CAMPAIGN BRIEFS ──────────────────────────────────────────────────────
+    if (intent.action === 'brief_add') {
+      const sortRes = await smtAdminPool.query(
+        `SELECT COALESCE(MAX(sort_order),0)+1 AS next FROM sales.campaign_briefs WHERE is_deleted=false OR is_deleted IS NULL`
+      );
+      const sortOrder = Number(sortRes.rows[0].next) || 1;
+      const assignee = agentName === 'darren' ? 'Darren' : 'Laura';
+      const account_id = agentName === 'darren' ? 32893 : 32891;
+      const res = await smtAdminPool.query(
+        `INSERT INTO sales.campaign_briefs (title, assignee, account_id, channel, sort_order, created_at)
+         VALUES ($1,$2,$3,'LinkedIn + Email',$4,CURRENT_DATE) RETURNING id, title`,
+        [intent.title, assignee, account_id, sortOrder]
+      );
+      replyText = `✅ Campaign brief "${res.rows[0].title}" added (id=${res.rows[0].id}, assigned to ${assignee}). Refresh the Campaign Brief section to see it.`;
+    }
+
+    else if (intent.action === 'brief_delete') {
+      const res = await smtAdminPool.query(
+        `UPDATE sales.campaign_briefs SET is_deleted=true, updated_at=NOW()
+         WHERE LOWER(title) LIKE $1 AND (is_deleted=false OR is_deleted IS NULL)
+         RETURNING id, title`,
+        [`%${intent.title.toLowerCase()}%`]
+      );
+      if (!res.rows.length) replyText = `❌ No active brief found matching "${intent.title}". Check the exact title.`;
+      else if (res.rows.length === 1) replyText = `✅ Deleted brief "${res.rows[0].title}".`;
+      else replyText = `✅ Deleted ${res.rows.length} briefs matching "${intent.title}": ${res.rows.map(r=>r.title).join(', ')}.`;
+    }
+
+    else if (intent.action === 'brief_rename') {
+      const res = await smtAdminPool.query(
+        `UPDATE sales.campaign_briefs SET title=$1, updated_at=NOW()
+         WHERE LOWER(title) LIKE $2 AND (is_deleted=false OR is_deleted IS NULL)
+         RETURNING id, title`,
+        [intent.newTitle, `%${intent.oldTitle.toLowerCase()}%`]
+      );
+      if (!res.rows.length) replyText = `❌ No brief found matching "${intent.oldTitle}".`;
+      else replyText = `✅ Renamed to "${intent.newTitle}" (id=${res.rows[0].id}).`;
+    }
+
+    else if (intent.action === 'brief_update_field') {
+      const colMap = { assignee:'assignee', channel:'channel', activity:'activity', icp:'subtitle', subtitle:'subtitle' };
+      const col = colMap[intent.field];
+      if (!col) { replyText = `❌ Unknown field "${intent.field}". Options: assignee, channel, activity, icp.`; }
+      else {
+        const res = await smtAdminPool.query(
+          `UPDATE sales.campaign_briefs SET ${col}=$1, updated_at=NOW()
+           WHERE LOWER(title) LIKE $2 AND (is_deleted=false OR is_deleted IS NULL)
+           RETURNING id, title`,
+          [intent.value, `%${intent.title.toLowerCase()}%`]
+        );
+        if (!res.rows.length) replyText = `❌ No brief found matching "${intent.title}".`;
+        else replyText = `✅ Updated ${intent.field} → "${intent.value}" on "${res.rows[0].title}".`;
+      }
+    }
+
+    else if (intent.action === 'brief_list') {
+      const res = await smtAdminPool.query(
+        `SELECT id, title, assignee, channel FROM sales.campaign_briefs
+         WHERE is_deleted=false OR is_deleted IS NULL ORDER BY sort_order ASC NULLS LAST, id ASC LIMIT 30`
+      );
+      if (!res.rows.length) replyText = 'No campaign briefs found.';
+      else replyText = `**Campaign Briefs (${res.rows.length})**\n` +
+        res.rows.map((r,i) => `${i+1}. ${r.title} · ${r.assignee||'?'}`).join('\n');
+    }
+
+    // ── TASKS ────────────────────────────────────────────────────────────────
+    else if (intent.action === 'task_add') {
+      const res = await pgPool.query(
+        `INSERT INTO user_tasks (description, status, task_type, horizon, accountable_person)
+         VALUES ($1,'pending','Next Action','Ground',$2) RETURNING id, description`,
+        [intent.description, agentName === 'darren' ? 'Darren' : 'Laura']
+      );
+      replyText = `✅ Task #${res.rows[0].id} created: "${res.rows[0].description}".`;
+    }
+
+    else if (intent.action === 'task_update') {
+      const validStatuses = ['pending','captured','done','dismissed'];
+      const status = validStatuses.find(s => intent.status.includes(s)) || intent.status;
+      const res = await pgPool.query(
+        `UPDATE user_tasks SET status=$1, updated_at=NOW() WHERE id=$2 RETURNING id, description, status`,
+        [status, intent.id]
+      );
+      if (!res.rows.length) replyText = `❌ Task #${intent.id} not found.`;
+      else replyText = `✅ Task #${res.rows[0].id} "${res.rows[0].description}" → ${res.rows[0].status}.`;
+    }
+
+    else if (intent.action === 'task_delete') {
+      const res = await pgPool.query(
+        `DELETE FROM user_tasks WHERE id=$1 RETURNING id, description`, [intent.id]
+      );
+      if (!res.rows.length) replyText = `❌ Task #${intent.id} not found.`;
+      else replyText = `✅ Deleted task #${res.rows[0].id} "${res.rows[0].description}".`;
+    }
+
+    else if (intent.action === 'task_list') {
+      const res = await pgPool.query(
+        `SELECT id, description, status, horizon FROM user_tasks
+         WHERE status NOT IN ('done','dismissed') ORDER BY id DESC LIMIT 20`
+      );
+      if (!res.rows.length) replyText = 'No open tasks found.';
+      else replyText = `**Open Tasks (${res.rows.length})**\n` +
+        res.rows.map(r => `#${r.id} [${r.status}] ${r.description}`).join('\n');
+    }
+
+    // ── CALL RECORDS ─────────────────────────────────────────────────────────
+    else if (intent.action === 'call_add') {
+      const res = await smtAdminPool.query(
+        `INSERT INTO sales.dashboard_call_records
+           (contact_name, contact_company, campaign_name, account_id, call_date, outcome, notes)
+         VALUES ($1,$2,$3,$4,CURRENT_DATE,$5,'Logged via chat') RETURNING id`,
+        [intent.contact, intent.company||null, taskRef||null,
+         agentName==='darren'?32893:32891, intent.outcome||'completed']
+      );
+      replyText = `✅ Call logged (id=${res.rows[0].id}) — ${intent.contact}${intent.company?' at '+intent.company:''}, outcome: ${intent.outcome||'completed'}.`;
+    }
+
+  } catch (e) {
+    console.error('[dashboard-intent] error:', e.message);
+    replyText = `❌ Action failed: ${e.message}`;
+  }
+
+  // Store reply in chat
+  await pgPool.query(
+    `INSERT INTO dashboard_chat (session_id, sender, task_ref, message) VALUES ($1,$2,$3,$4)`,
+    [sessionId, agentName||'laura', taskRef||null, replyText]
+  ).catch(() => {});
+  await pgPool.query(
+    `UPDATE chat_sessions SET updated_at=NOW(), message_count=message_count+1, last_message=$1 WHERE id=$2`,
+    [replyText.slice(0,120), sessionId]
+  ).catch(() => {});
+
+  return replyText;
+}
+// ── End Dashboard Intent Handler ─────────────────────────────────────────────
 
 const INTENT_FIELD_ALIASES = {
   'reply status':'response_status','response status':'response_status','status':'response_status',
