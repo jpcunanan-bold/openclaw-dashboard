@@ -5390,45 +5390,6 @@ app.post('/api/campaign-briefs/reorder', async (req, res) => {
   }
 });
 
-/** POST /api/campaign-briefs/seed-builtin — upsert hardcoded campaigns by title (idempotent) */
-app.post('/api/campaign-briefs/seed-builtin', async (req, res) => {
-  try {
-    const { campaigns } = req.body;
-    if (!Array.isArray(campaigns)) return res.status(400).json({ error: 'campaigns array required' });
-    // Only insert titles that don't already exist (title uniqueness check)
-    // Check ALL rows (including soft-deleted) so previously-deleted briefs are never re-seeded
-    const { rows: existing } = await smtAdminPool.query(
-      `SELECT title FROM sales.campaign_briefs`
-    );
-    const existingTitles = new Set(existing.map(r => r.title));
-    const toInsert = campaigns.filter(c => !existingTitles.has(c.title));
-    if (!toInsert.length) return res.json({ ok: true, inserted: 0, skipped: campaigns.length });
-    const client = await smtAdminPool.connect();
-    let inserted = 0;
-    try {
-      await client.query('BEGIN');
-      for (const c of toInsert) {
-        await client.query(
-          `INSERT INTO sales.campaign_briefs
-             (title, subtitle, assignee, account_id, channel, sort_order, color, brief_json, created_at)
-           VALUES ($1,$2,$3,$4,'LinkedIn + Email',$5,$6,$7,CURRENT_DATE)`,
-          [c.title, c.sub || null, c.assignee || c.sdr || 'Laura',
-           c.account_id || 32891, c.sort_order || null, c.color || null,
-           JSON.stringify({ color: c.color, sdr: c.sdr || c.assignee })]
-        );
-        inserted++;
-      }
-      await client.query('COMMIT');
-    } catch (err) {
-      await client.query('ROLLBACK'); throw err;
-    } finally { client.release(); }
-    res.json({ ok: true, inserted, skipped: campaigns.length - inserted });
-  } catch (e) {
-    console.error('POST /api/campaign-briefs/seed-builtin error:', e.message);
-    res.status(500).json({ ok: false, error: e.message });
-  }
-});
-
 /** DELETE /api/campaign-briefs/:id — soft-delete */
 app.delete('/api/campaign-briefs/:id', async (req, res) => {
   try {

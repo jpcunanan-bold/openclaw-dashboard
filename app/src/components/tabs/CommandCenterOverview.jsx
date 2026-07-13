@@ -655,10 +655,7 @@ function SalesTab({modalAgent,setModalAgent}) {
   const {data:sbData,loading:sbLoad}=useSandbox(spEffectivePeriod,spEffectiveStart,spEffectiveEnd,sbReload);
   const {data:followUps,loading:followUpsLoad}=useFollowUps();
 
-  // Seed built-in CAMPAIGNS to DB once (so they can be reordered/deleted persistently)
-  // then load all briefs (built-ins + user-created) from DB
   const CAMP_COLORS_REF=['#06E5EC','#4D8DFF','#8B7CF6','#F5B945','#f97316','#f43f5e','#a78bfa','#3B82F6','#2DD4BF','#ec4899'];
-  const SDR_ACCOUNT_MAP={'Laura':32891,'Darren':32893};
 
   const loadBriefs=()=>{
     setBriefsLoading(true);
@@ -692,27 +689,9 @@ function SalesTab({modalAgent,setModalAgent}) {
   };
 
   useEffect(()=>{
-    // Seed built-in campaigns to DB — server is idempotent (skips existing titles including
-    // soft-deleted ones), so it is safe to call on every mount. No localStorage needed.
-    {
-      const seedPayload=CAMPAIGNS.map((c,i)=>({
-        title:      c.title,
-        sub:        c.sub,
-        sdr:        c.sdr,
-        assignee:   c.sdr,
-        color:      c.color,
-        account_id: SDR_ACCOUNT_MAP[c.sdr]||32891,
-        sort_order: i+1,
-      }));
-      fetch('/api/campaign-briefs/seed-builtin',{
-        method:'POST',
-        headers:{...authHeaders(),'Content-Type':'application/json'},
-        body:JSON.stringify({campaigns:seedPayload}),
-      }).then(r=>r.ok?r.json():null).then(()=>{
-        setBriefsSeeded(true);
-        loadBriefs();
-      }).catch(()=>{ setBriefsSeeded(true); loadBriefs(); });
-    }
+    // Load briefs directly from DB — no seeding, DB is source of truth
+    setBriefsSeeded(true);
+    loadBriefs();
   },[]);
 
   // Reset pages when filters change
