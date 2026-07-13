@@ -4995,20 +4995,14 @@ app.get('/api/hubspot/followups', async (req, res) => {
       return tb - ta;
     });
 
-    const P1_STAGES = new Set(['appointmentscheduled','presentationscheduled','decisionmakerboughtin',
-      'contractsent','118109858','118108929','118109859','118109860','118109861']);
-    const p1 = active.filter(d => P1_STAGES.has(d.properties?.dealstage));
-    let p2 = active.filter(d => d.properties?.dealstage === 'qualifiedtobuy'
-      && d.properties?.notes_next_activity_date);
-    if (p2.length < 3) {
-      const extra = active.filter(d => d.properties?.dealstage === 'qualifiedtobuy'
-        && !p2.includes(d));
-      p2 = [...p2, ...extra];
-    }
+    // p1 = all active deals (Deal Follow-up)
+    // p2 = all active deals that have a follow-up date set (Task List Follow-up)
+    const p1 = active;
+    const p2 = active.filter(d => d.properties?.notes_next_activity_date);
 
-    // Collect contact IDs
+    // Collect contact IDs from all deals
     const contactIds = new Set();
-    [...p1, ...p2].forEach(d =>
+    active.forEach(d =>
       (d.associations?.contacts?.results || []).forEach(a => contactIds.add(a.id))
     );
 
