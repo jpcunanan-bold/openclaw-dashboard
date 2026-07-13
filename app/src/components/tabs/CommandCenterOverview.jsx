@@ -3421,31 +3421,79 @@ function SalesTab({modalAgent,setModalAgent}) {
       <TaskListSection authHeaders={authHeaders}/>
 
       {/* ── Email Domains ── */}
-      <div className="cc-sect-label" style={{marginTop:32}}>Email sending domains</div>
-      <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(220px,1fr))',gap:14,marginBottom:32}}>
-        {[
-          {domain:'mzintl.com',      label:'Mercury Z International', color:'#06E5EC'},
-          {domain:'mzglobal.net',    label:'Mercury Z Global',        color:'#4D8DFF'},
-        ].map(({domain,label,color})=>(
-          <div key={domain} style={{
-            background:'rgba(255,255,255,.03)',
-            border:`1px solid ${color}33`,
-            borderRadius:12,
-            padding:'18px 20px',
-            position:'relative',
-            overflow:'hidden',
-          }}>
-            {/* accent bar */}
-            <div style={{position:'absolute',top:0,left:0,right:0,height:3,background:color}}/>
-            <div style={{font:'600 10px Inter,sans-serif',letterSpacing:'.1em',textTransform:'uppercase',color:'#7E8DB5',marginBottom:8}}>{label}</div>
-            <div style={{font:'700 16px Inter,sans-serif',color,fontFamily:'monospace',letterSpacing:'.02em'}}>{domain}</div>
-            <div style={{marginTop:10,display:'flex',alignItems:'center',gap:6}}>
-              <span style={{width:7,height:7,borderRadius:'50%',background:'#2DD4BF',display:'inline-block'}}/>
-              <span style={{font:'11px Inter,sans-serif',color:'#2DD4BF'}}>Active</span>
+      {(()=>{
+        const COMPANIES=[
+          {
+            name:'Mercury Z',
+            color:'#06E5EC',
+            bg:'rgba(6,229,236,.08)',
+            border:'rgba(6,229,236,.25)',
+            domains:[
+              {domain:'mzintl.com',  label:'Mercury Z International'},
+              {domain:'mzglobal.net',label:'Mercury Z Global'},
+            ],
+          },
+          {
+            name:'Bold Business',
+            color:'#8B7CF6',
+            bg:'rgba(139,124,246,.08)',
+            border:'rgba(139,124,246,.25)',
+            domains:[
+              {domain:'boldbusiness.com',label:'Bold Business'},
+            ],
+          },
+        ];
+        const [openCo,setOpenCo]=useState(null);
+        return (
+          <>
+            <div className="cc-sect-label" style={{marginTop:32}}>Email sending domains</div>
+            <div style={{display:'grid',gridTemplateColumns:'repeat(2,1fr)',gap:14,marginBottom:32}}>
+              {COMPANIES.map(co=>{
+                const isOpen=openCo===co.name;
+                return (
+                  <div key={co.name}
+                    onClick={()=>setOpenCo(isOpen?null:co.name)}
+                    style={{background:isOpen?co.bg:'rgba(255,255,255,.03)',border:`1px solid ${isOpen?co.border:'rgba(255,255,255,.08)'}`,
+                      borderRadius:12,padding:'18px 20px',position:'relative',overflow:'hidden',
+                      cursor:'pointer',transition:'all .18s'}}
+                    onMouseEnter={e=>{e.currentTarget.style.transform='translateY(-1px)';e.currentTarget.style.boxShadow=`0 4px 20px ${co.color}22`;}}
+                    onMouseLeave={e=>{e.currentTarget.style.transform='';e.currentTarget.style.boxShadow='';}}>
+                    {/* accent bar */}
+                    <div style={{position:'absolute',top:0,left:0,right:0,height:3,background:co.color}}/>
+                    {/* header */}
+                    <div style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+                      <div>
+                        <div style={{font:'700 15px Inter,sans-serif',color:co.color,marginBottom:4}}>{co.name}</div>
+                        <div style={{font:'11px Inter,sans-serif',color:'#7E8DB5'}}>{co.domains.length} domain{co.domains.length!==1?'s':''}</div>
+                      </div>
+                      <span style={{color:'#7E8DB5',fontSize:12,transition:'transform .18s',
+                        display:'inline-block',transform:isOpen?'rotate(180deg)':'rotate(0deg)'}}>▼</span>
+                    </div>
+                    {/* expanded domain list */}
+                    {isOpen&&(
+                      <div style={{marginTop:14,display:'flex',flexDirection:'column',gap:10}}>
+                        {co.domains.map(d=>(
+                          <div key={d.domain} style={{background:'rgba(255,255,255,.04)',borderRadius:8,
+                            padding:'12px 14px',border:'1px solid rgba(255,255,255,.07)'}}>
+                            <div style={{font:'600 9px Inter,sans-serif',letterSpacing:'.1em',textTransform:'uppercase',
+                              color:'#7E8DB5',marginBottom:5}}>{d.label}</div>
+                            <div style={{font:'700 15px Inter,sans-serif',color:co.color,fontFamily:'monospace'}}>{d.domain}</div>
+                            <div style={{marginTop:7,display:'flex',alignItems:'center',gap:6}}>
+                              <span style={{width:7,height:7,borderRadius:'50%',background:'#2DD4BF',display:'inline-block'}}/>
+                              <span style={{font:'11px Inter,sans-serif',color:'#2DD4BF'}}>Active</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
-          </div>
-        ))}
-      </div>
+          </>
+        );
+      })()}
+
     </div>
   );
 }
