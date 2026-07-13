@@ -5095,7 +5095,7 @@ app.get('/api/skylead/campaign-names', async (req, res) => {
 });
 
 // ── Campaign CRUD (sandbox manual add/edit/delete) — uses sales.dashboard_campaigns ──
-// Manually-added rows use negative campaign_id to avoid conflicting with Skylead positive IDs.
+// Manually-added rows use a dedicated sequence (sales.manual_campaign_id_seq, starts at 1,000,000,000).
 
 /** POST /api/sales-dashboard/campaigns */
 app.post('/api/sales-dashboard/campaigns', async (req, res) => {
@@ -5103,11 +5103,9 @@ app.post('/api/sales-dashboard/campaigns', async (req, res) => {
     const { campaign_name, account_id, activity, target_icp, channel,
             connections_requested, connection_requests_accepted, connection_replies, emails_sent, created_at } = req.body;
     if (!campaign_name || !account_id) return res.status(400).json({ error: 'campaign_name and account_id are required' });
-    // Negative IDs for manual rows — never conflict with Skylead positive IDs
-    const idRes = await smtAdminPool.query(
-      `SELECT COALESCE(MIN(campaign_id), 0) - 1 AS next_id FROM sales.dashboard_campaigns WHERE campaign_id < 0`
-    );
-    const newId = Number(idRes.rows[0].next_id) || -1;
+    // Use a dedicated sequence starting at 1,000,000,000 — well above any Skylead ID (~400k range)
+    const idRes = await smtAdminPool.query(`SELECT nextval('sales.manual_campaign_id_seq') AS next_id`);
+    const newId = Number(idRes.rows[0].next_id);
     const result = await smtAdminPool.query(`
       INSERT INTO sales.dashboard_campaigns
         (campaign_id, campaign_name, account_id, activity, target_icp, channel,
