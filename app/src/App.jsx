@@ -225,7 +225,14 @@ function AuthenticatedApp() {
         >
           {/* Overview top-tab — Command Center redesign */}
           {topTab === 'overview' && !overviewSub && (
-            <CommandCenterOverview />
+            <CommandCenterOverview
+              onNavigate={(tab, sub) => {
+                setTopTab(tab);
+                if (tab === 'recruiting') setRecruitingSub(sub || 'zara');
+                if (tab === 'zara')    setZaraSub(sub || 'candidates');
+                if (tab === 'camilla') setCamillaSub(sub || 'candidates');
+              }}
+            />
           )}
           {topTab === 'overview' && overviewSub === 'contacts' && <ContactsTab />}
           {topTab === 'overview' && overviewSub === 'blacklist' && <BlacklistTab />}
