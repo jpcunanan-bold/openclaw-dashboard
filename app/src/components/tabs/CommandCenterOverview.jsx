@@ -1640,11 +1640,8 @@ function SalesTab({modalAgent,setModalAgent}) {
                         {field('Subtitle / segment',
                           <input value={form.sub} onChange={e=>setForm(f=>({...f,sub:e.target.value}))} style={inp} placeholder="AEC · 50-500 employees · US"/>)}
                         {field('Assignee (SDR)',
-                          <select value={form.assignee} onChange={e=>setForm(f=>({...f,assignee:e.target.value}))}
-                            style={{width:'100%',boxSizing:'border-box',background:'#1a2448',border:'1px solid rgba(255,255,255,.2)',
-                              borderRadius:8,color:'#EAF0FF',font:'13px/1.6 Inter,sans-serif',
-                              padding:'9px 13px',outline:'none',cursor:'pointer',appearance:'auto'}}>
-                            {EDIT_SDR_OPTIONS.map(o=><option key={o} value={o}>{o}</option>)}
+                          <select value={form.assignee} onChange={e=>setForm(f=>({...f,assignee:e.target.value}))} style={{...inp,resize:'none',background:'#0d1a42'}}>
+                            {EDIT_SDR_OPTIONS.map(o=><option key={o} value={o} style={{background:'#0d1a42'}}>{o}</option>)}
                           </select>)}
                         {field('ICP fields',
                           <div>
