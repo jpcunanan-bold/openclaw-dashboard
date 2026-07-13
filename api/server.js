@@ -4997,12 +4997,12 @@ app.get('/api/hubspot/followups', async (req, res) => {
 
     const P1_STAGES = new Set(['appointmentscheduled','presentationscheduled','decisionmakerboughtin',
       'contractsent','118109858','118108929','118109859','118109860','118109861']);
-    const p1 = active.filter(d => P1_STAGES.has(d.properties?.dealstage)).slice(0, 6);
+    const p1 = active.filter(d => P1_STAGES.has(d.properties?.dealstage));
     let p2 = active.filter(d => d.properties?.dealstage === 'qualifiedtobuy'
-      && d.properties?.notes_next_activity_date).slice(0, 8);
+      && d.properties?.notes_next_activity_date);
     if (p2.length < 3) {
       const extra = active.filter(d => d.properties?.dealstage === 'qualifiedtobuy'
-        && !p2.includes(d)).slice(0, 8 - p2.length);
+        && !p2.includes(d));
       p2 = [...p2, ...extra];
     }
 
@@ -5015,7 +5015,7 @@ app.get('/api/hubspot/followups', async (req, res) => {
     const contacts = {};
     if (contactIds.size > 0) {
       const resp = await hsPost('/crm/v3/objects/contacts/batch/read', {
-        inputs: [...contactIds].slice(0, 100).map(id => ({ id })),
+        inputs: [...contactIds].slice(0, 500).map(id => ({ id })),
         properties: ['firstname','lastname','email','company','jobtitle'],
       });
       (resp.results || []).forEach(c => {
