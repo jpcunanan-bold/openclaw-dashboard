@@ -2631,7 +2631,10 @@ function SalesTab({modalAgent,setModalAgent}) {
                     <div style={{display:'grid',gridTemplateColumns:'2fr 1.7fr 1.1fr 1fr .9fr 90px',
                         alignItems:'center',padding:'13px 16px',
                         background:open?'rgba(6,229,236,.06)':'transparent',transition:'background .12s'}}>
-                      <span onClick={()=>setSbOpen(open?null:i)} style={{font:'600 15px Inter,sans-serif',color:'#EAF0FF',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',cursor:'pointer'}}>{c.name}</span>
+                      <span onClick={()=>setSbOpen(open?null:i)} style={{font:'600 15px Inter,sans-serif',color:'#EAF0FF',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',cursor:'pointer',display:'flex',alignItems:'center',gap:6}}>
+                        {c.name}
+                        {c.is_manual&&<span style={{fontSize:9,fontWeight:700,letterSpacing:'.06em',textTransform:'uppercase',padding:'2px 6px',borderRadius:4,background:'rgba(139,124,246,.2)',color:'#8B7CF6',flexShrink:0,border:'1px solid rgba(139,124,246,.3)'}}>Manual</span>}
+                      </span>
                       <span onClick={()=>setSbOpen(open?null:i)} style={{font:'13px Inter,sans-serif',color:'#9FB0D8',cursor:'pointer',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}} title={c.target_icp||'—'}>{c.target_icp||<span style={{color:'#4a5568',fontStyle:'italic'}}>—</span>}</span>
                       <span onClick={()=>setSbOpen(open?null:i)} style={{font:'13px Inter,sans-serif',color:'#EAF0FF',cursor:'pointer'}}>{c.channel||'LinkedIn + Email'}</span>
                       <span onClick={()=>setSbOpen(open?null:i)} style={{font:'700 14px Inter,sans-serif',fontFamily:'monospace',color:mc,cursor:'pointer'}}>{c.key_metric}</span>

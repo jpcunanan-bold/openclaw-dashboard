@@ -4816,6 +4816,7 @@ app.get('/api/skylead/sandbox', async (req, res) => {
         ds.account_name,
         ds.account_id,
         MIN(dc.campaign_id)                   AS campaign_id,
+        BOOL_OR(dc.is_manual)                 AS is_manual,
         MIN(dc.activity)                      AS activity,
         MIN(dc.target_icp)                    AS target_icp,
         MIN(dc.channel)                       AS channel,
@@ -4852,6 +4853,7 @@ app.get('/api/skylead/sandbox', async (req, res) => {
           name: key,
           target_icp: r.target_icp || '',
           channel: r.channel || 'LinkedIn + Email',
+          is_manual: r.is_manual || false,
           agents: [],
           totals: { cr_sent: 0, cr_accepted: 0, replies: 0, calls: 0, actual_meetings: 0, emails: 0, li_out: 0, campaigns: 0 },
         };
@@ -5110,8 +5112,8 @@ app.post('/api/sales-dashboard/campaigns', async (req, res) => {
       INSERT INTO sales.dashboard_campaigns
         (campaign_id, campaign_name, account_id, activity, target_icp, channel,
          connections_requested, connection_requests_accepted, connection_replies,
-         emails_sent, created_at)
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11::date) RETURNING *`,
+         emails_sent, created_at, is_manual)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11::date,TRUE) RETURNING *`,
       [newId, campaign_name, account_id, activity||null,
        target_icp||null, channel||'LinkedIn + Email',
        connections_requested||0, connection_requests_accepted||0, connection_replies||0,
