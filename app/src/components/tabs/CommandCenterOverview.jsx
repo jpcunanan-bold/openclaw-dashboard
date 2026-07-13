@@ -3021,19 +3021,12 @@ function SalesTab({modalAgent,setModalAgent}) {
             style={{background:'rgba(255,255,255,.035)',border:`1px solid ${ag.cardBorder}`,borderRadius:12,padding:14,cursor:'pointer',transition:'all .18s'}}
             onMouseEnter={e=>{e.currentTarget.style.transform='translateY(-1px)';e.currentTarget.style.boxShadow=`0 4px 20px ${ag.color}22`;}}
             onMouseLeave={e=>{e.currentTarget.style.transform='';e.currentTarget.style.boxShadow='';}}>
-            <div style={{display:'flex',alignItems:'center',gap:9,marginBottom:10}}>
+            <div style={{display:'flex',alignItems:'center',gap:9}}>
               <div style={{width:34,height:34,borderRadius:'50%',display:'flex',alignItems:'center',justifyContent:'center',font:'800 15px Inter,sans-serif',color:ag.color,background:ag.bg,border:`2px solid ${ag.border}`}}>{ag.initial}</div>
               <div style={{flex:1}}>
                 <div style={{font:'700 16px Inter,sans-serif',color:'#fff'}}>{ag.label}</div>
-                <div style={{font:'14px Inter,sans-serif',color:'#7E8DB5'}}>{ag.role}</div>
               </div>
               <span style={{width:7,height:7,borderRadius:'50%',background:ag.status==='active'?'#2DD4BF':'#F5B945',boxShadow:`0 0 8px ${ag.status==='active'?'#2DD4BF':'#F5B945'}`}}/>
-            </div>
-            <div style={{font:'15px Inter,sans-serif',color:'#9FB0D8',marginBottom:8}}>
-              {ag.id==='laura'?'CET Designer pipeline':ag.id==='darren'?'SAP ERP follow-ups':ag.id==='zara'?'RCM Specialist sourcing':'Idle · FP&A queued'}
-            </div>
-            <div style={{height:5,background:'rgba(255,255,255,.07)',borderRadius:3,overflow:'hidden'}}>
-              <div style={{height:'100%',width:ag.width,background:ag.grad,borderRadius:3}}/>
             </div>
           </div>
         ))}
@@ -3487,17 +3480,12 @@ function RecruitingTab({ setModalAgent }) {
             style={{background:'rgba(255,255,255,.035)',border:`1px solid ${ag.cardBorder}`,borderRadius:12,padding:14,cursor:'pointer',transition:'all .18s'}}
             onMouseEnter={e=>{e.currentTarget.style.transform='translateY(-1px)';e.currentTarget.style.boxShadow=`0 4px 20px ${ag.color}22`;}}
             onMouseLeave={e=>{e.currentTarget.style.transform='';e.currentTarget.style.boxShadow='';}}>
-            <div style={{display:'flex',alignItems:'center',gap:9,marginBottom:10}}>
+            <div style={{display:'flex',alignItems:'center',gap:9}}>
               <div style={{width:34,height:34,borderRadius:'50%',display:'flex',alignItems:'center',justifyContent:'center',font:'800 15px Inter,sans-serif',color:ag.color,background:ag.bg,border:`2px solid ${ag.border}`}}>{ag.initial}</div>
               <div style={{flex:1}}>
                 <div style={{font:'700 16px Inter,sans-serif',color:'#fff'}}>{ag.label}</div>
-                <div style={{font:'14px Inter,sans-serif',color:'#7E8DB5'}}>{ag.role}</div>
               </div>
               <span style={{width:7,height:7,borderRadius:'50%',background:ag.status==='active'?'#2DD4BF':'#F5B945',boxShadow:`0 0 8px ${ag.status==='active'?'#2DD4BF':'#F5B945'}`}}/>
-            </div>
-            <div style={{font:'15px Inter,sans-serif',color:'#9FB0D8',marginBottom:8}}>{ag.task}</div>
-            <div style={{height:5,background:'rgba(255,255,255,.07)',borderRadius:3,overflow:'hidden'}}>
-              <div style={{height:'100%',width:ag.width,background:ag.grad,borderRadius:3}}/>
             </div>
           </div>
         ))}
