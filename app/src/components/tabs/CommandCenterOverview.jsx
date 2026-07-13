@@ -1533,8 +1533,11 @@ function SalesTab({modalAgent,setModalAgent}) {
         // local form state handled via a child component to avoid re-render issues
         const BriefEditForm=()=>{
           const defSeq=merged.sequence||DEFAULT_SEQUENCE;
+          const EDIT_SDR_OPTIONS=['Laura','Darren','Abhinanda','Lenore','George','Bob','Cathy','Mariana'];
+          const EDIT_SDR_ACC={'Laura':32891,'Darren':32893,'Abhinanda':32887,'Lenore':32871,'George':32894,'Bob':33347,'Cathy':33361,'Mariana':33364};
           const [form,setForm]=useState({
             title:merged.title||'', sub:merged.sub||'',
+            assignee:_allCamps[campIdx]?.assignee||_allCamps[campIdx]?.sdr||'Laura',
             hook:merged.hook||'', valueProp:merged.valueProp||'',
             personas:(merged.personas||[]).join('\n'),
             signals:(merged.signals||[]).join('\n'),
@@ -1580,12 +1583,13 @@ function SalesTab({modalAgent,setModalAgent}) {
                 body:JSON.stringify({
                   campaign_name: form.title,
                   target_icp:   form.sub,
-                  assignee:     _allCamps[campIdx]?.assignee||_allCamps[campIdx]?.sdr||'Laura',
-                  brief_json:   {...updatedContent, color:_allCamps[campIdx]?.color, sdr:_allCamps[campIdx]?.sdr||'Laura'},
+                  assignee:     form.assignee,
+                  account_id:   EDIT_SDR_ACC[form.assignee]||32891,
+                  brief_json:   {...updatedContent, color:_allCamps[campIdx]?.color, sdr:form.assignee},
                 }),
               }).catch(()=>{});
               // Update local state
-              setCustomCampaigns(prev=>prev.map((c,i)=>i===campIdx?{...c,title:form.title,sub:form.sub,...updatedContent}:c));
+              setCustomCampaigns(prev=>prev.map((c,i)=>i===campIdx?{...c,title:form.title,sub:form.sub,assignee:form.assignee,sdr:form.assignee,...updatedContent}:c));
             }
             setBriefEditOpen(false);
             setSaving(false);
@@ -1635,6 +1639,10 @@ function SalesTab({modalAgent,setModalAgent}) {
                           <input value={form.title} onChange={e=>setForm(f=>({...f,title:e.target.value}))} style={inp} placeholder="Campaign title"/>)}
                         {field('Subtitle / segment',
                           <input value={form.sub} onChange={e=>setForm(f=>({...f,sub:e.target.value}))} style={inp} placeholder="AEC · 50-500 employees · US"/>)}
+                        {field('Assignee (SDR)',
+                          <select value={form.assignee} onChange={e=>setForm(f=>({...f,assignee:e.target.value}))} style={{...inp,resize:'none',cursor:'pointer'}}>
+                            {EDIT_SDR_OPTIONS.map(o=><option key={o} value={o} style={{background:'#080f2a'}}>{o}</option>)}
+                          </select>)}
                         {field('ICP fields',
                           <div>
                             <div style={{font:'11px Inter,sans-serif',color:'#4a5568',marginBottom:6}}>One per line · format: Label: Value</div>
