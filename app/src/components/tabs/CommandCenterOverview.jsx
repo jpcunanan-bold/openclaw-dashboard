@@ -595,6 +595,9 @@ function SalesTab({modalAgent,setModalAgent}) {
   const [sbSearch,setSbSearch]=useState('');
   const SDR_PER_PAGE=10;
   const SB_PER_PAGE=10;
+  const FU_PER_PAGE=10;
+  const [p1Page,setP1Page]=useState(0);
+  const [p2Page,setP2Page]=useState(0);
   const [campIdx,setCampIdx]=useState(0);
   const [campEdits,setCampEdits]=useState({});   // overrides keyed by campIdx
   const [customCampaigns,setCustomCampaigns]=useState([]); // ALL briefs loaded from DB (built-ins + user-created)
@@ -3035,7 +3038,7 @@ function SalesTab({modalAgent,setModalAgent}) {
       {/* 7 ── Follow-Up Command Center ── */}
       <div className="cc-sect-label">Follow-Up Command Center</div>
 
-      <div style={{font:'700 15px Inter,sans-serif',letterSpacing:'.02em',color:'#06E5EC',marginBottom:10}}>Priority 1 - Tagged Follow Up</div>
+      <div style={{font:'700 15px Inter,sans-serif',letterSpacing:'.02em',color:'#06E5EC',marginBottom:10}}>Deal Follow-up</div>
       <div style={{background:'rgba(255,255,255,.025)',border:'1px solid rgba(255,255,255,.08)',borderRadius:12,overflow:'hidden',marginBottom:22}}>
         <div style={{display:'grid',gridTemplateColumns:'1.1fr 1.4fr 1fr 1.8fr 1.1fr',padding:'11px 16px',borderBottom:'1px solid rgba(255,255,255,.08)',background:'rgba(2,8,32,.3)'}}>
           {['Contact','Deal','Deal stage','Note','Last updated'].map(h=>(
@@ -3050,7 +3053,7 @@ function SalesTab({modalAgent,setModalAgent}) {
         {!followUpsLoad&&(followUps?.priority1||[]).length===0&&(
           <div style={{padding:28,textAlign:'center',font:'13px Inter,sans-serif',color:'#7E8DB5'}}>No tagged follow-ups found in HubSpot.</div>
         )}
-        {!followUpsLoad&&(followUps?.priority1||[]).map((r,i,a)=>(
+        {!followUpsLoad&&(followUps?.priority1||[]).slice(p1Page*FU_PER_PAGE,(p1Page+1)*FU_PER_PAGE).map((r,i,a)=>(
           <div key={i} style={{display:'grid',gridTemplateColumns:'1.1fr 1.4fr 1fr 1.8fr 1.1fr',alignItems:'center',padding:'13px 16px',
             borderBottom:i<a.length-1?'1px solid rgba(255,255,255,.05)':'none'}}>
             <span style={{font:'600 14px Inter,sans-serif',color:'#EAF0FF'}}>{r.name}</span>
@@ -3069,9 +3072,12 @@ function SalesTab({modalAgent,setModalAgent}) {
             <span style={{font:'13px Inter,sans-serif',color:'#9FB0D8'}}>{r.last_modified}</span>
           </div>
         ))}
+        {!followUpsLoad&&(followUps?.priority1||[]).length>FU_PER_PAGE&&(
+          <div style={{padding:'8px 16px'}}><Pager page={p1Page} setPage={setP1Page} total={(followUps?.priority1||[]).length} perPage={FU_PER_PAGE}/></div>
+        )}
       </div>
 
-      <div style={{font:'700 15px Inter,sans-serif',letterSpacing:'.02em',color:'#06E5EC',marginBottom:10}}>Priority 2 - Active Deals Needing Follow Up</div>
+      <div style={{font:'700 15px Inter,sans-serif',letterSpacing:'.02em',color:'#06E5EC',marginBottom:10}}>Task List Follow-up</div>
       <div style={{background:'rgba(255,255,255,.025)',border:'1px solid rgba(255,255,255,.08)',borderRadius:12,overflow:'hidden',marginBottom:26}}>
         <div style={{display:'grid',gridTemplateColumns:'1.2fr 1.6fr 1.1fr 2.1fr',padding:'11px 16px',borderBottom:'1px solid rgba(255,255,255,.08)',background:'rgba(2,8,32,.3)'}}>
           {['Contact','Deal','Follow-up date','Note'].map(h=>(
@@ -3086,7 +3092,7 @@ function SalesTab({modalAgent,setModalAgent}) {
         {!followUpsLoad&&(followUps?.priority2||[]).length===0&&(
           <div style={{padding:28,textAlign:'center',font:'13px Inter,sans-serif',color:'#7E8DB5'}}>No active deals needing follow-up found.</div>
         )}
-        {!followUpsLoad&&(followUps?.priority2||[]).map((r,i,a)=>(
+        {!followUpsLoad&&(followUps?.priority2||[]).slice(p2Page*FU_PER_PAGE,(p2Page+1)*FU_PER_PAGE).map((r,i,a)=>(
           <div key={i} style={{display:'grid',gridTemplateColumns:'1.2fr 1.6fr 1.1fr 2.1fr',alignItems:'center',padding:'14px 16px',
             borderBottom:i<a.length-1?'1px solid rgba(255,255,255,.05)':'none'}}>
             <span style={{font:'600 14px Inter,sans-serif',color:'#EAF0FF'}}>{r.name}</span>
@@ -3101,6 +3107,9 @@ function SalesTab({modalAgent,setModalAgent}) {
             <span style={{font:'13px/1.5 Inter,sans-serif',color:'#9FB0D8'}}>{r.note}</span>
           </div>
         ))}
+        {!followUpsLoad&&(followUps?.priority2||[]).length>FU_PER_PAGE&&(
+          <div style={{padding:'8px 16px'}}><Pager page={p2Page} setPage={setP2Page} total={(followUps?.priority2||[]).length} perPage={FU_PER_PAGE}/></div>
+        )}
       </div>
 
 
