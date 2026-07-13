@@ -3466,7 +3466,7 @@ const REC_CAMPS=[
   {date:'Jun 28',campaign:'ERP Consultant Search',     account:'Mercury Z',   rec:'Marco D.',  recColor:'#F5B945',cr:54, email:187,inmail:33},
 ];
 
-function RecruitingTab({ onNavigate }) {
+function RecruitingTab({ setModalAgent }) {
   const [filter,setFilter]=useState('Weekly');
   const recGridCols='1fr 1.1fr 1fr 1.1fr .95fr 1.1fr .95fr 1.2fr';
   const hdr9={font:'600 9px Inter,sans-serif',letterSpacing:'.05em',textTransform:'uppercase',color:'#7E8DB5'};
@@ -3483,7 +3483,7 @@ function RecruitingTab({ onNavigate }) {
       <div className="cc-sect-label">Agent fleet · live status</div>
       <div style={{display:'grid',gridTemplateColumns:'repeat(2,1fr)',gap:12,marginBottom:26}}>
         {REC_AGENTS.map(ag=>(
-          <div key={ag.id} onClick={()=>onNavigate&&onNavigate('recruiting',ag.id)}
+          <div key={ag.id} onClick={()=>setModalAgent(ag)}
             style={{background:'rgba(255,255,255,.035)',border:`1px solid ${ag.cardBorder}`,borderRadius:12,padding:14,cursor:'pointer',transition:'all .18s'}}
             onMouseEnter={e=>{e.currentTarget.style.transform='translateY(-1px)';e.currentTarget.style.boxShadow=`0 4px 20px ${ag.color}22`;}}
             onMouseLeave={e=>{e.currentTarget.style.transform='';e.currentTarget.style.boxShadow='';}}>
@@ -3816,7 +3816,7 @@ function Pager({page,setPage,total,perPage}){
   );
 }
 
-export default function CommandCenterOverview({ onNavigate }) {
+export default function CommandCenterOverview() {
   const [mode,setMode]=useState('sales');
   const [modalAgent,setModalAgent]=useState(null);
 
@@ -3850,7 +3850,7 @@ export default function CommandCenterOverview({ onNavigate }) {
         </div>
 
         {mode==='sales'    && <SalesTab modalAgent={modalAgent} setModalAgent={setModalAgent}/>}
-        {mode==='recruiting'&& <RecruitingTab onNavigate={onNavigate}/>}
+        {mode==='recruiting'&& <RecruitingTab setModalAgent={setModalAgent}/>}
       </div>
 
       {/* Agent modal */}
