@@ -5396,8 +5396,9 @@ app.post('/api/campaign-briefs/seed-builtin', async (req, res) => {
     const { campaigns } = req.body;
     if (!Array.isArray(campaigns)) return res.status(400).json({ error: 'campaigns array required' });
     // Only insert titles that don't already exist (title uniqueness check)
+    // Check ALL rows (including soft-deleted) so previously-deleted briefs are never re-seeded
     const { rows: existing } = await smtAdminPool.query(
-      `SELECT title FROM sales.campaign_briefs WHERE is_deleted = false OR is_deleted IS NULL`
+      `SELECT title FROM sales.campaign_briefs`
     );
     const existingTitles = new Set(existing.map(r => r.title));
     const toInsert = campaigns.filter(c => !existingTitles.has(c.title));

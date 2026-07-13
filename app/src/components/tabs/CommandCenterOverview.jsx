@@ -692,10 +692,9 @@ function SalesTab({modalAgent,setModalAgent}) {
   };
 
   useEffect(()=>{
-    // First: seed built-in campaigns to DB if not yet done (check via localStorage flag)
-    const SEED_KEY='bb_briefs_seeded_v4'; // v4 = new sales.campaign_briefs table
-    const alreadySeeded=localStorage.getItem(SEED_KEY)==='1';
-    if(!alreadySeeded){
+    // Seed built-in campaigns to DB — server is idempotent (skips existing titles including
+    // soft-deleted ones), so it is safe to call on every mount. No localStorage needed.
+    {
       const seedPayload=CAMPAIGNS.map((c,i)=>({
         title:      c.title,
         sub:        c.sub,
@@ -709,13 +708,10 @@ function SalesTab({modalAgent,setModalAgent}) {
         method:'POST',
         headers:{...authHeaders(),'Content-Type':'application/json'},
         body:JSON.stringify({campaigns:seedPayload}),
-      }).then(r=>r.ok?r.json():null).then(j=>{
-        if(j?.ok){ localStorage.setItem(SEED_KEY,'1'); setBriefsSeeded(true); }
+      }).then(r=>r.ok?r.json():null).then(()=>{
+        setBriefsSeeded(true);
         loadBriefs();
-      }).catch(()=>loadBriefs());
-    } else {
-      setBriefsSeeded(true);
-      loadBriefs();
+      }).catch(()=>{ setBriefsSeeded(true); loadBriefs(); });
     }
   },[]);
 
