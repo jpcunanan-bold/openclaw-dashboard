@@ -32,7 +32,7 @@ function renderMarkdown(text) {
 
 /* ─── Page-aware suggestion pills ────────────────────────────────────────── */
 const SUGGESTIONS = {
-  default:        ['What is the status?', 'What should I do next?', 'Any blockers?'],
+  default:        ['List briefs', 'List tasks', 'What should I do next?'],
   DWDM_TASKS:     ['How many touches sent?', 'Who replied?', 'What is Touch 2 status?', 'Next best action?'],
   BEAD:           ['Top BEAD prospects?', 'Which states to prioritize?', 'BEAD hiring signals?'],
   'BEAD Winner':  ['Enrichment status?', 'Emails verified?', 'Who to contact first?'],
@@ -42,12 +42,12 @@ const SUGGESTIONS = {
   DWDM:           ['Companies with no touch?', 'Tier 1 companies?', 'SMTP verified count?'],
   CET:            ['Companies hiring CET?', 'Reply rate?', 'Who responded?'],
   Estimators:     ['Active sequences?', 'Who to follow up?', 'Estimator opportunities?'],
-  laura_dashboard:['Lead gen summary?', 'Pipeline health?', 'Top actions today?'],
+  laura_dashboard:['List briefs', 'List tasks', 'Top actions today?'],
   darren_dashboard:['DWDM campaign status?', 'BEAD pipeline?', 'DC outreach progress?'],
-  overview:       ['Combined pipeline stats?', 'Cost breakdown?', 'Top wins this week?'],
+  overview:       ['List briefs', 'Combined pipeline stats?', 'Top wins this week?'],
   analytics:      ['Cost trend this week?', 'Most active agent?', 'Token efficiency?'],
   costs:          ['Highest cost session?', 'Cost vs output?', 'Budget status?'],
-  tasks:          ['Pending tasks?', 'Overdue items?', 'What to prioritize?'],
+  tasks:          ['List tasks', 'Add task: <description>', 'What to prioritize?'],
 };
 
 function getSuggestions(taskRef) {
@@ -643,7 +643,7 @@ export default function AgentChat({ taskRef, taskContext, isOpen, onToggle, defa
               value={input}
               onChange={e => setInput(e.target.value)}
               onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }}}
-              placeholder={activeTaskRef ? `Ask ${chatAgent === 'darren' ? 'Darren' : 'Laura'}…` : 'Open a task to start chatting…'}
+              placeholder={activeTaskRef ? `Ask or command ${chatAgent === 'darren' ? 'Darren' : 'Laura'} — e.g. "add brief CET Designers" or "list tasks"…` : 'Open a task to start chatting…'}
               disabled={sending || !activeTaskRef}
               style={{
                 flex: 1, background: 'rgba(255,255,255,0.07)',
