@@ -1635,14 +1635,17 @@ function SalesTab({modalAgent,setModalAgent}) {
                     <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:20}}>
                       {/* Left col */}
                       <div style={{display:'flex',flexDirection:'column',gap:16}}>
-                        {field('Campaign title',
-                          <input value={form.title} onChange={e=>setForm(f=>({...f,title:e.target.value}))} style={inp} placeholder="Campaign title"/>)}
+                        {/* Assignee + title row — same layout as New Brief form */}
+                        <div style={{display:'grid',gridTemplateColumns:'1fr 2fr',gap:12,alignItems:'end'}}>
+                          {field('Assignee (SDR)',
+                            <select value={form.assignee} onChange={e=>setForm(f=>({...f,assignee:e.target.value}))} style={{...inp,resize:'none',background:'#0d1a42'}}>
+                              {EDIT_SDR_OPTIONS.map(o=><option key={o} value={o} style={{background:'#0d1a42'}}>{o}</option>)}
+                            </select>)}
+                          {field('Campaign title',
+                            <input value={form.title} onChange={e=>setForm(f=>({...f,title:e.target.value}))} style={inp} placeholder="Campaign title"/>)}
+                        </div>
                         {field('Subtitle / segment',
                           <input value={form.sub} onChange={e=>setForm(f=>({...f,sub:e.target.value}))} style={inp} placeholder="AEC · 50-500 employees · US"/>)}
-                        {field('Assignee (SDR)',
-                          <select value={form.assignee} onChange={e=>setForm(f=>({...f,assignee:e.target.value}))} style={{...inp,resize:'none',background:'#0d1a42'}}>
-                            {EDIT_SDR_OPTIONS.map(o=><option key={o} value={o} style={{background:'#0d1a42'}}>{o}</option>)}
-                          </select>)}
                         {field('ICP fields',
                           <div>
                             <div style={{font:'11px Inter,sans-serif',color:'#4a5568',marginBottom:6}}>One per line · format: Label: Value</div>
