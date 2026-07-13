@@ -161,8 +161,8 @@ function AuthenticatedApp() {
   const [lauraSub, setLauraSub]   = useState('pipeline');
   const [darrenSub, setDarrenSub] = useState('dwdm');
   const [recruitingSub, setRecruitingSub] = useState('zara');
-  const [zaraSub, setZaraSub]     = useState('dashboard');
-  const [camillaSub, setCamillaSub] = useState('dashboard');
+  const [zaraSub, setZaraSub]     = useState('candidates');
+  const [camillaSub, setCamillaSub] = useState('candidates');
   const [lolaSub,    setLolaSub]   = useState('dashboard');
   const [avaSub,     setAvaSub]    = useState('dashboard');
   const [brioSub,    setBrioSub]   = useState('dashboard');
@@ -275,13 +275,11 @@ function AuthenticatedApp() {
           {topTab === 'darren' && darrenSub === 'analytics' && <AnalyticsTab agentFilter="darren" />}
 
           {/* ── Recruiting tab — Zara (Healthcare) + Camilla (Finance) ── */}
-          {topTab === 'recruiting' && recruitingSub === 'zara'    && zaraSub === 'dashboard'    && <DashboardTab data={data} agentFilter="zara" />}
           {topTab === 'recruiting' && recruitingSub === 'zara'    && zaraSub === 'roi'          && <RoiTab agentName="zara" />}
           {topTab === 'recruiting' && recruitingSub === 'zara'    && zaraSub === 'activities'   && <ZaraActivitiesTab />}
           {topTab === 'recruiting' && recruitingSub === 'zara'    && zaraSub === 'candidates'   && <ZaraCandidatesTab />}
           {topTab === 'recruiting' && recruitingSub === 'zara'    && zaraSub === 'tasks'        && <AgentTasksTab agentName="zara" />}
           {topTab === 'recruiting' && recruitingSub === 'zara'    && zaraSub === 'costs'        && <CostTab agentName="zara" />}
-          {topTab === 'recruiting' && recruitingSub === 'camilla' && camillaSub === 'dashboard' && <DashboardTab data={data} agentFilter="camilla" />}
           {topTab === 'recruiting' && recruitingSub === 'camilla' && camillaSub === 'roi'       && <RoiTab agentName="camilla" />}
           {topTab === 'recruiting' && recruitingSub === 'camilla' && camillaSub === 'activities'&& <CamillaActivitiesTab />}
           {topTab === 'recruiting' && recruitingSub === 'camilla' && camillaSub === 'candidates'&& <CamillaCandidatesTab />}
@@ -289,7 +287,6 @@ function AuthenticatedApp() {
           {topTab === 'recruiting' && recruitingSub === 'camilla' && camillaSub === 'costs'     && <CostTab agentName="camilla" />}
 
           {/* Zara direct tab (kept for backward compat) */}
-          {topTab === 'zara' && zaraSub === 'dashboard'  && <DashboardTab data={data} agentFilter="zara" />}
           {topTab === 'zara' && zaraSub === 'roi'        && <RoiTab agentName="zara" />}
           {topTab === 'zara' && zaraSub === 'activities'   && <ZaraActivitiesTab />}
           {topTab === 'zara' && zaraSub === 'candidates'   && <ZaraCandidatesTab />}
@@ -297,7 +294,6 @@ function AuthenticatedApp() {
           {topTab === 'zara' && zaraSub === 'costs'      && <CostTab agentName="zara" />}
 
           {/* Camilla direct tab (kept for backward compat) */}
-          {topTab === 'camilla' && camillaSub === 'dashboard'  && <DashboardTab data={data} agentFilter="camilla" />}
           {topTab === 'camilla' && camillaSub === 'roi'        && <RoiTab agentName="camilla" />}
           {topTab === 'camilla' && camillaSub === 'activities'   && <CamillaActivitiesTab />}
           {topTab === 'camilla' && camillaSub === 'candidates'   && <CamillaCandidatesTab />}
