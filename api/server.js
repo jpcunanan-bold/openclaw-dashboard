@@ -4995,10 +4995,14 @@ app.get('/api/hubspot/followups', async (req, res) => {
       return tb - ta;
     });
 
-    // p1 = all active deals (Deal Follow-up)
-    // p2 = all active deals that have a follow-up date set (Task List Follow-up)
+    // p1 = all active deals sorted by last modified (Deal Follow-up)
+    // p2 = all active deals sorted by follow-up date first, then last modified (Task List Follow-up)
     const p1 = active;
-    const p2 = active.filter(d => d.properties?.notes_next_activity_date);
+    const p2 = [...active].sort((a, b) => {
+      const aDate = a.properties?.notes_next_activity_date || a.properties?.hs_lastmodifieddate || 0;
+      const bDate = b.properties?.notes_next_activity_date || b.properties?.hs_lastmodifieddate || 0;
+      return new Date(bDate).getTime() - new Date(aDate).getTime();
+    });
 
     // Collect contact IDs from all deals
     const contactIds = new Set();
