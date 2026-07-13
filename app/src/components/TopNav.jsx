@@ -9,6 +9,7 @@ const AGENTS = [
   { id: 'overview', label: 'Overview', color: '#7C3AED', avatar: '/app/avatars/overview.png',  initial: '⚡' },
   { id: 'laura',    label: 'Laura',    color: '#06E5EC', avatar: '/app/avatars/laura.png',     initial: 'L' },
   { id: 'darren',   label: 'Darren',   color: '#34d399', avatar: '/app/avatars/darren.png',    initial: 'D' },
+  { id: 'recruiting', label: 'Recruiting', color: '#f43f5e', avatar: null, initial: '🎯' },
   { id: 'zara',     label: 'Zara',     color: '#f43f5e', avatar: '/app/avatars/zara.png',      initial: 'Z' },
   { id: 'camilla',  label: 'Camilla',  color: '#eab308', avatar: '/app/avatars/camilla.jpg',   initial: 'C' },
   { id: 'lola',     label: 'Lola',     color: '#a78bfa', avatar: '/app/avatars/lola.png',      initial: 'Lo' },
@@ -54,6 +55,10 @@ const SUB_TABS = {
     { id: 'activities',     label: 'Activities' },
     { id: 'tasks',          label: 'Tasks' },
     { id: 'costs',          label: 'Costs' },
+  ],
+  recruiting: [
+    { id: 'zara',     label: '🟥 Zara (Healthcare)' },
+    { id: 'camilla',  label: '🟡 Camilla (Finance)' },
   ],
   zara: [
     { id: 'dashboard',   label: 'Dashboard' },
@@ -153,21 +158,22 @@ function AgentPill({ agent, active, onClick, counts }) {
 
 export default function TopNav({
   topTab, setTopTab,
-  lauraSub,    setLauraSub,
-  darrenSub,   setDarrenSub,
-  zaraSub,     setZaraSub,
-  camillaSub,  setCamillaSub,
-  lolaSub,     setLolaSub,
-  avaSub,      setAvaSub,
-  brioSub,     setBrioSub,
-  overviewSub, setOverviewSub,
+  lauraSub,      setLauraSub,
+  darrenSub,     setDarrenSub,
+  recruitingSub, setRecruitingSub,
+  zaraSub,       setZaraSub,
+  camillaSub,    setCamillaSub,
+  lolaSub,       setLolaSub,
+  avaSub,        setAvaSub,
+  brioSub,       setBrioSub,
+  overviewSub,   setOverviewSub,
   counts,
 }) {
   const activeAgent = AGENTS.find(a => a.id === topTab) || AGENTS[0];
   const activeColor = activeAgent.color;
 
-  const activeSub = { overview: overviewSub, laura: lauraSub, darren: darrenSub, zara: zaraSub, camilla: camillaSub, lola: lolaSub, ava: avaSub, brio: brioSub }[topTab];
-  const setActiveSub = { overview: setOverviewSub, laura: setLauraSub, darren: setDarrenSub, zara: setZaraSub, camilla: setCamillaSub, lola: setLolaSub, ava: setAvaSub, brio: setBrioSub }[topTab];
+  const activeSub = { overview: overviewSub, laura: lauraSub, darren: darrenSub, recruiting: recruitingSub, zara: zaraSub, camilla: camillaSub, lola: lolaSub, ava: avaSub, brio: brioSub }[topTab];
+  const setActiveSub = { overview: setOverviewSub, laura: setLauraSub, darren: setDarrenSub, recruiting: setRecruitingSub, zara: setZaraSub, camilla: setCamillaSub, lola: setLolaSub, ava: setAvaSub, brio: setBrioSub }[topTab];
 
   const subs = SUB_TABS[topTab] || [];
 
@@ -201,6 +207,7 @@ export default function TopNav({
         <div style={{
           display: 'flex', gap: 0, overflowX: 'auto', padding: '0 28px',
           scrollbarWidth: 'none',
+          borderBottom: topTab === 'recruiting' ? '1px solid rgba(255,255,255,0.04)' : 'none',
         }}>
           {subs.map(sub => {
             const active = activeSub === sub.id;
@@ -223,6 +230,31 @@ export default function TopNav({
           })}
         </div>
       )}
+
+      {/* ── Recruiting secondary sub-tab row (agent-specific tabs) ── */}
+      {topTab === 'recruiting' && (() => {
+        const agentSubs   = SUB_TABS[recruitingSub] || [];
+        const agentColor2 = recruitingSub === 'zara' ? '#f43f5e' : '#eab308';
+        const agentSub    = recruitingSub === 'zara' ? zaraSub    : camillaSub;
+        const setAgentSub = recruitingSub === 'zara' ? setZaraSub : setCamillaSub;
+        return agentSubs.length > 0 && (
+          <div style={{ display: 'flex', gap: 0, overflowX: 'auto', padding: '0 28px', scrollbarWidth: 'none' }}>
+            {agentSubs.map(sub => {
+              const active = agentSub === sub.id;
+              return (
+                <button key={String(sub.id)} onClick={() => setAgentSub(sub.id)} style={{
+                  padding: '6px 14px', border: 'none', cursor: 'pointer',
+                  background: active ? `${agentColor2}10` : 'transparent',
+                  fontSize: 10, fontWeight: active ? 700 : 400,
+                  color: active ? agentColor2 : 'var(--text-muted)',
+                  borderBottom: active ? `2px solid ${agentColor2}80` : '2px solid transparent',
+                  transition: 'all 0.15s', whiteSpace: 'nowrap',
+                }}>{sub.label}</button>
+              );
+            })}
+          </div>
+        );
+      })()}
     </div>
   );
 }

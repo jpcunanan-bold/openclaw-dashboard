@@ -26,11 +26,10 @@ const STYLES = `
 `;
 
 // ─── Agent metadata ───────────────────────────────────────────────────────────
+// Sales agents only — Zara and Camilla live in the Recruiting tab
 const AGENTS = [
   { id:'laura',   label:'Laura',   initial:'L',  role:'BB · Sales Outreach',  color:'#06E5EC', bg:'rgba(6,229,236,.16)',  border:'rgba(6,229,236,.5)',   grad:'linear-gradient(90deg,#003BDF,#06E5EC)', width:'72%', cardBorder:'rgba(6,229,236,.25)', status:'active'  },
   { id:'darren',  label:'Darren',  initial:'D',  role:'MZ · SDR',             color:'#4D8DFF', bg:'rgba(77,141,255,.16)', border:'rgba(77,141,255,.5)',  grad:'linear-gradient(90deg,#003BDF,#4D8DFF)', width:'58%', cardBorder:'rgba(255,255,255,.08)', status:'active'  },
-  { id:'zara',    label:'Zara',    initial:'Z',  role:'BB · Healthcare',       color:'#8B7CF6', bg:'rgba(139,124,246,.16)',border:'rgba(139,124,246,.5)', grad:'linear-gradient(90deg,#5e35b1,#8B7CF6)', width:'50%', cardBorder:'rgba(255,255,255,.08)', status:'active'  },
-  { id:'camilla', label:'Camilla', initial:'C',  role:'BB · Finance',          color:'#F5B945', bg:'rgba(245,185,69,.14)', border:'rgba(245,185,69,.45)', grad:'linear-gradient(90deg,#b08326,#F5B945)', width:'36%', cardBorder:'rgba(255,255,255,.08)', status:'idle'    },
 ];
 
 // ─── Utility ─────────────────────────────────────────────────────────────────
@@ -3016,7 +3015,7 @@ function SalesTab({modalAgent,setModalAgent}) {
 
       {/* 6 ── Agent fleet · live status ── */}
       <div className="cc-sect-label">Agent fleet · live status</div>
-      <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:12,marginBottom:26}}>
+      <div style={{display:'grid',gridTemplateColumns:'repeat(2,1fr)',gap:12,marginBottom:26}}>
         {AGENTS.map(ag=>(
           <div key={ag.id} onClick={()=>setModalAgent(ag)}
             style={{background:'rgba(255,255,255,.035)',border:`1px solid ${ag.cardBorder}`,borderRadius:12,padding:14,cursor:'pointer',transition:'all .18s'}}
