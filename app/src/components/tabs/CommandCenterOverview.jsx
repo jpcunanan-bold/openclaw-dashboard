@@ -3466,13 +3466,42 @@ const REC_CAMPS=[
   {date:'Jun 28',campaign:'ERP Consultant Search',     account:'Mercury Z',   rec:'Marco D.',  recColor:'#F5B945',cr:54, email:187,inmail:33},
 ];
 
-function RecruitingTab() {
+function RecruitingTab({ onNavigate }) {
   const [filter,setFilter]=useState('Weekly');
   const recGridCols='1fr 1.1fr 1fr 1.1fr .95fr 1.1fr .95fr 1.2fr';
   const hdr9={font:'600 9px Inter,sans-serif',letterSpacing:'.05em',textTransform:'uppercase',color:'#7E8DB5'};
 
+  const REC_AGENTS = [
+    { id:'zara',    label:'Zara',    initial:'Z', role:'BB · Healthcare', color:'#f43f5e', bg:'rgba(244,63,94,.16)',  border:'rgba(244,63,94,.5)',  grad:'linear-gradient(90deg,#9f1239,#f43f5e)', width:'55%', cardBorder:'rgba(244,63,94,.25)',  status:'active', task:'RCM Specialist sourcing' },
+    { id:'camilla', label:'Camilla', initial:'C', role:'BB · Finance',   color:'#eab308', bg:'rgba(234,179,8,.14)',  border:'rgba(234,179,8,.45)', grad:'linear-gradient(90deg,#92400e,#eab308)', width:'36%', cardBorder:'rgba(255,255,255,.08)', status:'idle',   task:'Idle · FP&A queued' },
+  ];
+
   return (
     <div style={{maxWidth:1380,margin:'0 auto',padding:'18px 24px 40px'}}>
+
+      {/* ── Recruiting Agent Fleet (same cards as Sales tab) ── */}
+      <div className="cc-sect-label">Agent fleet · live status</div>
+      <div style={{display:'grid',gridTemplateColumns:'repeat(2,1fr)',gap:12,marginBottom:26}}>
+        {REC_AGENTS.map(ag=>(
+          <div key={ag.id} onClick={()=>onNavigate&&onNavigate('recruiting',ag.id)}
+            style={{background:'rgba(255,255,255,.035)',border:`1px solid ${ag.cardBorder}`,borderRadius:12,padding:14,cursor:'pointer',transition:'all .18s'}}
+            onMouseEnter={e=>{e.currentTarget.style.transform='translateY(-1px)';e.currentTarget.style.boxShadow=`0 4px 20px ${ag.color}22`;}}
+            onMouseLeave={e=>{e.currentTarget.style.transform='';e.currentTarget.style.boxShadow='';}}>
+            <div style={{display:'flex',alignItems:'center',gap:9,marginBottom:10}}>
+              <div style={{width:34,height:34,borderRadius:'50%',display:'flex',alignItems:'center',justifyContent:'center',font:'800 15px Inter,sans-serif',color:ag.color,background:ag.bg,border:`2px solid ${ag.border}`}}>{ag.initial}</div>
+              <div style={{flex:1}}>
+                <div style={{font:'700 16px Inter,sans-serif',color:'#fff'}}>{ag.label}</div>
+                <div style={{font:'14px Inter,sans-serif',color:'#7E8DB5'}}>{ag.role}</div>
+              </div>
+              <span style={{width:7,height:7,borderRadius:'50%',background:ag.status==='active'?'#2DD4BF':'#F5B945',boxShadow:`0 0 8px ${ag.status==='active'?'#2DD4BF':'#F5B945'}`}}/>
+            </div>
+            <div style={{font:'15px Inter,sans-serif',color:'#9FB0D8',marginBottom:8}}>{ag.task}</div>
+            <div style={{height:5,background:'rgba(255,255,255,.07)',borderRadius:3,overflow:'hidden'}}>
+              <div style={{height:'100%',width:ag.width,background:ag.grad,borderRadius:3}}/>
+            </div>
+          </div>
+        ))}
+      </div>
       {/* KPI strip */}
       <div className="cc-sect-label-purple">Recruiting overview · last 7 days</div>
       <div style={{display:'grid',gridTemplateColumns:'repeat(6,1fr)',gap:12,marginBottom:26}}>
@@ -3787,7 +3816,7 @@ function Pager({page,setPage,total,perPage}){
   );
 }
 
-export default function CommandCenterOverview() {
+export default function CommandCenterOverview({ onNavigate }) {
   const [mode,setMode]=useState('sales');
   const [modalAgent,setModalAgent]=useState(null);
 
@@ -3821,7 +3850,7 @@ export default function CommandCenterOverview() {
         </div>
 
         {mode==='sales'    && <SalesTab modalAgent={modalAgent} setModalAgent={setModalAgent}/>}
-        {mode==='recruiting'&& <RecruitingTab/>}
+        {mode==='recruiting'&& <RecruitingTab onNavigate={onNavigate}/>}
       </div>
 
       {/* Agent modal */}
