@@ -61,14 +61,12 @@ const SUB_TABS = {
     { id: 'camilla',  label: '🟡 Camilla (Finance)' },
   ],
   zara: [
-    { id: 'dashboard',   label: 'Dashboard' },
     { id: 'candidates',  label: '🎯 MZ Candidates' },
     { id: 'activities',  label: 'Activities' },
     { id: 'tasks',       label: 'Tasks' },
     { id: 'costs',       label: 'Costs' },
   ],
   camilla: [
-    { id: 'dashboard',   label: 'Dashboard' },
     { id: 'candidates',  label: '🎯 BB Candidates' },
     { id: 'activities',  label: 'Activities' },
     { id: 'tasks',       label: 'Tasks' },
