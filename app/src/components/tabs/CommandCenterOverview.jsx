@@ -256,7 +256,7 @@ const CAMPAIGNS = [
   {num:7,sdr:'Darren',title:'DWDM / Optical Transport Engineer',sub:'Carriers, Hyperscale DCI, Fiber Operators · 400G/800G',color:'#f43f5e'},
   {num:8,sdr:'Darren',title:'NOC Engineer / Network Operations Center Analyst',sub:'Telecom Carriers, ISPs, Broadband Operators · 25–2,000',color:'#a78bfa'},
 ];
-const PEOPLE = ['All','Laura','Darren'];
+// PEOPLE is now dynamic — built from loaded briefs (see filteredCamps below)
 const SEQUENCE = [
   {n:'1',title:'LinkedIn CR + Note',meta:'Day 1',body:'Hiring signal opener - personalized to role.',color:'#06E5EC'},
   {n:'2',title:'Email - Value prop',meta:'Day 3',body:'60% cost reduction hook + case study link.',color:'#5AC8FA'},
@@ -1123,7 +1123,7 @@ function SalesTab({modalAgent,setModalAgent}) {
   const filteredCamps=(person==='All'?allCampaigns.map((c,i)=>({...c,_gi:i}))
     :allCampaigns.map((c,i)=>({...c,_gi:i})).filter(c=>{
       const sdrVal=c.sdr||c.assignee;
-      return sdrVal===person||(sdrVal===undefined&&person==='Laura');
+      return sdrVal===person;
     }))
     .filter(c=>!deletedCampIndexes.has(c._gi))
     .map((c,displayIdx)=>({...c,num:displayIdx+1}));
@@ -3120,11 +3120,11 @@ function SalesTab({modalAgent,setModalAgent}) {
       <div style={{background:'rgba(255,255,255,.03)',border:'1px solid rgba(255,255,255,.08)',borderRadius:12,padding:'18px 20px',marginBottom:14}}>
         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:12,flexWrap:'wrap',marginBottom:16}}>
           <div style={{font:'700 13px Inter,sans-serif',letterSpacing:'.09em',textTransform:'uppercase',color:'#9FB0D8'}}>
-            {person==='All'?'All Campaigns':person==='Laura'?'Bold Business — Laura':'Mercury Z — Darren'}
+            {person==='All'?'All Campaigns':`${person}'s Campaigns`}
             {reorderMode&&<span style={{marginLeft:10,font:'500 11px Inter,sans-serif',color:'#F5B945',textTransform:'none',letterSpacing:'normal'}}>‹ drag cards to reorder ›</span>}
           </div>
           <div style={{display:'flex',gap:7,flexWrap:'wrap',alignItems:'center'}}>
-            {PEOPLE.map(p=>{
+            {(['All',...Array.from(new Set(customCampaigns.map(c=>c.assignee||c.sdr).filter(Boolean))).sort()]).map(p=>{
               const active=person===p;
               return <button key={p} onClick={()=>setPerson(p)} style={{
                 padding:'5px 12px',borderRadius:20,cursor:'pointer',
