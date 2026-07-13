@@ -700,7 +700,7 @@ function SalesTab({modalAgent,setModalAgent}) {
   useEffect(()=>{ setSeqOpen(null); },[campIdx]);
   useEffect(()=>{
     // When person filter changes, jump to first campaign in that filter
-    const first=person==='All'?0:CAMPAIGNS.findIndex(c=>c.sdr===person);
+    const first=person==='All'?0:customCampaigns.findIndex(c=>(c.sdr||c.assignee)===person);
     setCampIdx(first>=0?first:0);
   },[person]);
 
@@ -1095,10 +1095,9 @@ function SalesTab({modalAgent,setModalAgent}) {
      hook:'24x7/365 NOC requires minimum 6–8 FTEs just to cover basic shifts — before PTO, sick leave, holidays, turnover. Most regional ISPs don’t have that bench. NOC turnover is brutal due to rotating shifts and holiday coverage.',
      valueProp:'Pre-vetted, carrier-grade NOC engineers — SolarWinds/Nagios/PRTG/Spectrum/ServiceNow — deployable in 1–2 weeks. Shift-flexible: night shift, weekend, holiday coverage. Telecom stack depth: fiber, DWDM, broadband access (GPON/DOCSIS), routing/switching.'}
   ];
-  // All campaigns now come from DB (customCampaigns holds both built-ins and user-created)
-  // Fall back to hardcoded CAMPAIGNS only while DB load is in progress
-  const _allCamps=customCampaigns.length>0?customCampaigns:[...CAMPAIGNS];
-  const campBase=_allCamps[campIdx]||_allCamps[0]||CAMPAIGNS[0];
+  // All campaigns come from DB only — never fall back to hardcoded list
+  const _allCamps=customCampaigns;
+  const campBase=_allCamps[campIdx]||_allCamps[0]||{};
   const campOverride=campEdits[campIdx]||{};
   const camp={...campBase,...campOverride};
   const DEFAULT_SEQUENCE=[
@@ -3270,10 +3269,9 @@ function SalesTab({modalAgent,setModalAgent}) {
                   const allIdxs=_allCamps.map((_,i)=>i).filter(i=>i!==_gi);
                   setCampIdx(allIdxs.length>0?allIdxs[0]:0);
                 }
-                // Remove from local state
-                setCustomCampaigns(prev=>prev.filter((_,i)=>i!==_gi));
-                // Persist to DB
+                // Persist to DB first, then reload from DB (never rely on local filter)
                 if(_dbId) await fetch(`/api/campaign-briefs/${_dbId}`,{method:'DELETE',headers:authHeaders()}).catch(()=>{});
+                loadBriefs();
               }}
                 style={{padding:'9px 24px',borderRadius:8,border:'none',
                   background:'#F2667A',color:'#fff',font:'700 13px Inter,sans-serif',cursor:'pointer'}}>
