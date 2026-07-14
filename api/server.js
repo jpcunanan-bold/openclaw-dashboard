@@ -4837,7 +4837,7 @@ app.get('/api/skylead/sandbox', async (req, res) => {
         ), 0)                                 AS actual_meetings
       FROM sales.dashboard_campaigns dc
       JOIN sales.dashboard_skylead_ids ds ON dc.account_id = ds.account_id
-      WHERE 1=1 ${whereClause}
+      WHERE (1=1 ${whereClause ? whereClause + ' OR dc.is_manual = TRUE' : ''})
       GROUP BY dc.campaign_name, ds.account_name, ds.account_id, dc.target_icp, dc.channel
       ORDER BY dc.campaign_name, ds.account_name
     `;
