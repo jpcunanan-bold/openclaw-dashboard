@@ -276,7 +276,7 @@ const STATUS_CFG={
 const TASK_TYPES=['Next Action','Project'];
 const HORIZONS=['Ground','Horizon 1','Horizon 2','Horizon 3','Horizon 4','Horizon 5'];
 
-const TASK_PER_PAGE=10;
+const TASK_PER_PAGE=5;
 function TaskListSection({authHeaders}){
   const [tasks,setTasks]=useState([]);
   const [loading,setLoading]=useState(true);
