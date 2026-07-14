@@ -5103,16 +5103,16 @@ app.post('/api/sales-dashboard/campaigns', async (req, res) => {
     const { campaign_name, account_id, activity, target_icp, channel,
             connections_requested, connection_requests_accepted, connection_replies, emails_sent, created_at } = req.body;
     if (!campaign_name || !account_id) return res.status(400).json({ error: 'campaign_name and account_id are required' });
-    // Use a dedicated sequence starting at 1,000,000,000 — well above any Skylead ID (~400k range)
-    const idRes = await smtAdminPool.query(`SELECT nextval('sales.manual_campaign_id_seq') AS next_id`);
-    const newId = Number(idRes.rows[0].next_id);
+    // Use a single atomic query: nextval() inline so sequence only advances if INSERT succeeds.
+    // Previously: two separate queries (nextval then INSERT) — if INSERT failed the sequence
+    // was already consumed and the row was silently lost.
     const result = await smtAdminPool.query(`
       INSERT INTO sales.dashboard_campaigns
         (campaign_id, campaign_name, account_id, activity, target_icp, channel,
          connections_requested, connection_requests_accepted, connection_replies,
          emails_sent, created_at, is_manual)
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11::date,TRUE) RETURNING *`,
-      [newId, campaign_name, account_id, activity||null,
+      VALUES (nextval('sales.manual_campaign_id_seq'),$1,$2,$3,$4,$5,$6,$7,$8,$9,$10::date,TRUE) RETURNING *`,
+      [campaign_name, account_id, activity||null,
        target_icp||null, channel||'LinkedIn + Email',
        connections_requested||0, connection_requests_accepted||0, connection_replies||0,
        emails_sent||0, created_at||new Date().toISOString().split('T')[0]]
