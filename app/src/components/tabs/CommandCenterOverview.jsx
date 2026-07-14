@@ -598,6 +598,8 @@ function SalesTab({modalAgent,setModalAgent}) {
   const FU_PER_PAGE=10;
   const [p1Page,setP1Page]=useState(0);
   const [p2Page,setP2Page]=useState(0);
+  const [fu1Search,setFu1Search]=useState('');
+  const [fu2Search,setFu2Search]=useState('');
   const [campIdx,setCampIdx]=useState(0);
   const [campEdits,setCampEdits]=useState({});   // overrides keyed by campIdx
   const [customCampaigns,setCustomCampaigns]=useState([]); // ALL briefs loaded from DB (built-ins + user-created)
@@ -3120,7 +3122,16 @@ function SalesTab({modalAgent,setModalAgent}) {
       {/* 7 ── Follow-Up Command Center ── */}
       <div className="cc-sect-label">Follow-Up Command Center</div>
 
-      <div style={{font:'700 15px Inter,sans-serif',letterSpacing:'.02em',color:'#06E5EC',marginBottom:10}}>Deal Follow-up</div>
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:10}}>
+        <div style={{font:'700 15px Inter,sans-serif',letterSpacing:'.02em',color:'#06E5EC'}}>Deal Follow-up</div>
+        <div style={{position:'relative'}}>
+          <svg style={{position:'absolute',left:9,top:'50%',transform:'translateY(-50%)',pointerEvents:'none'}} width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#7E8DB5" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input value={fu1Search} onChange={e=>{setFu1Search(e.target.value);setP1Page(0);}} placeholder="Search contacts, deals…"
+            style={{paddingLeft:30,paddingRight:fu1Search?24:10,height:32,borderRadius:8,border:'1px solid rgba(255,255,255,.15)',
+              background:'rgba(255,255,255,.05)',color:'#EAF0FF',font:'13px Inter,sans-serif',outline:'none',width:220}}/>
+          {fu1Search&&<span onClick={()=>{setFu1Search('');setP1Page(0);}} style={{position:'absolute',right:8,top:'50%',transform:'translateY(-50%)',color:'#7E8DB5',cursor:'pointer',fontSize:14}}>×</span>}
+        </div>
+      </div>
       <div style={{background:'rgba(255,255,255,.025)',border:'1px solid rgba(255,255,255,.08)',borderRadius:12,overflow:'hidden',marginBottom:22}}>
         <div style={{display:'grid',gridTemplateColumns:'1.1fr 1.4fr 1fr 1.8fr 1.1fr',padding:'11px 16px',borderBottom:'1px solid rgba(255,255,255,.08)',background:'rgba(2,8,32,.3)'}}>
           {['Contact','Deal','Deal stage','Note','Last updated'].map(h=>(
@@ -3132,10 +3143,16 @@ function SalesTab({modalAgent,setModalAgent}) {
             <div className="cc-skel" style={{height:18,width:'60%'}}/>
           </div>
         ))}
-        {!followUpsLoad&&(followUps?.priority1||[]).length===0&&(
-          <div style={{padding:28,textAlign:'center',font:'13px Inter,sans-serif',color:'#7E8DB5'}}>No tagged follow-ups found in HubSpot.</div>
-        )}
-        {!followUpsLoad&&(followUps?.priority1||[]).slice(p1Page*FU_PER_PAGE,(p1Page+1)*FU_PER_PAGE).map((r,i,a)=>(
+        {!followUpsLoad&&(()=>{
+          const q=fu1Search.toLowerCase();
+          const fu1Filtered=(followUps?.priority1||[]).filter(r=>!q||r.name?.toLowerCase().includes(q)||r.company?.toLowerCase().includes(q)||r.stage?.toLowerCase().includes(q)||r.note?.toLowerCase().includes(q));
+          if(fu1Filtered.length===0) return <div style={{padding:28,textAlign:'center',font:'13px Inter,sans-serif',color:'#7E8DB5'}}>{fu1Search?'No results found.':'No tagged follow-ups found in HubSpot.'}</div>;
+          return null;
+        })()}
+        {!followUpsLoad&&(()=>{
+          const q=fu1Search.toLowerCase();
+          const fu1Filtered=(followUps?.priority1||[]).filter(r=>!q||r.name?.toLowerCase().includes(q)||r.company?.toLowerCase().includes(q)||r.stage?.toLowerCase().includes(q)||r.note?.toLowerCase().includes(q));
+          return fu1Filtered.slice(p1Page*FU_PER_PAGE,(p1Page+1)*FU_PER_PAGE).map((r,i,a)=>(
           <div key={i} style={{display:'grid',gridTemplateColumns:'1.1fr 1.4fr 1fr 1.8fr 1.1fr',alignItems:'center',padding:'13px 16px',
             borderBottom:i<a.length-1?'1px solid rgba(255,255,255,.05)':'none'}}>
             <span style={{font:'600 14px Inter,sans-serif',color:'#EAF0FF'}}>{r.name}</span>
@@ -3153,13 +3170,24 @@ function SalesTab({modalAgent,setModalAgent}) {
             </span>
             <span style={{font:'13px Inter,sans-serif',color:'#9FB0D8'}}>{r.last_modified}</span>
           </div>
-        ))}
-        {!followUpsLoad&&(followUps?.priority1||[]).length>FU_PER_PAGE&&(
-          <div style={{padding:'8px 16px'}}><Pager page={p1Page} setPage={setP1Page} total={(followUps?.priority1||[]).length} perPage={FU_PER_PAGE}/></div>
-        )}
+        ))})()}
+        {!followUpsLoad&&(()=>{
+          const q=fu1Search.toLowerCase();
+          const fu1Filtered=(followUps?.priority1||[]).filter(r=>!q||r.name?.toLowerCase().includes(q)||r.company?.toLowerCase().includes(q)||r.stage?.toLowerCase().includes(q)||r.note?.toLowerCase().includes(q));
+          return fu1Filtered.length>FU_PER_PAGE?<div style={{padding:'8px 16px'}}><Pager page={p1Page} setPage={setP1Page} total={fu1Filtered.length} perPage={FU_PER_PAGE}/></div>:null;
+        })()}
       </div>
 
-      <div style={{font:'700 15px Inter,sans-serif',letterSpacing:'.02em',color:'#06E5EC',marginBottom:10}}>Task List Follow-up</div>
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:10}}>
+        <div style={{font:'700 15px Inter,sans-serif',letterSpacing:'.02em',color:'#06E5EC'}}>Task List Follow-up</div>
+        <div style={{position:'relative'}}>
+          <svg style={{position:'absolute',left:9,top:'50%',transform:'translateY(-50%)',pointerEvents:'none'}} width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#7E8DB5" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input value={fu2Search} onChange={e=>{setFu2Search(e.target.value);setP2Page(0);}} placeholder="Search contacts, deals…"
+            style={{paddingLeft:30,paddingRight:fu2Search?24:10,height:32,borderRadius:8,border:'1px solid rgba(255,255,255,.15)',
+              background:'rgba(255,255,255,.05)',color:'#EAF0FF',font:'13px Inter,sans-serif',outline:'none',width:220}}/>
+          {fu2Search&&<span onClick={()=>{setFu2Search('');setP2Page(0);}} style={{position:'absolute',right:8,top:'50%',transform:'translateY(-50%)',color:'#7E8DB5',cursor:'pointer',fontSize:14}}>×</span>}
+        </div>
+      </div>
       <div style={{background:'rgba(255,255,255,.025)',border:'1px solid rgba(255,255,255,.08)',borderRadius:12,overflow:'hidden',marginBottom:26}}>
         <div style={{display:'grid',gridTemplateColumns:'1.2fr 1.6fr 1.1fr 2.1fr',padding:'11px 16px',borderBottom:'1px solid rgba(255,255,255,.08)',background:'rgba(2,8,32,.3)'}}>
           {['Contact','Deal','Follow-up date','Note'].map(h=>(
@@ -3171,10 +3199,16 @@ function SalesTab({modalAgent,setModalAgent}) {
             <div className="cc-skel" style={{height:18,width:'70%'}}/>
           </div>
         ))}
-        {!followUpsLoad&&(followUps?.priority2||[]).length===0&&(
-          <div style={{padding:28,textAlign:'center',font:'13px Inter,sans-serif',color:'#7E8DB5'}}>No active deals needing follow-up found.</div>
-        )}
-        {!followUpsLoad&&(followUps?.priority2||[]).slice(p2Page*FU_PER_PAGE,(p2Page+1)*FU_PER_PAGE).map((r,i,a)=>(
+        {!followUpsLoad&&(()=>{
+          const q=fu2Search.toLowerCase();
+          const fu2Filtered=(followUps?.priority2||[]).filter(r=>!q||r.name?.toLowerCase().includes(q)||r.company?.toLowerCase().includes(q)||r.date?.toLowerCase().includes(q)||r.note?.toLowerCase().includes(q));
+          if(fu2Filtered.length===0) return <div style={{padding:28,textAlign:'center',font:'13px Inter,sans-serif',color:'#7E8DB5'}}>{fu2Search?'No results found.':'No active deals needing follow-up found.'}</div>;
+          return null;
+        })()}
+        {!followUpsLoad&&(()=>{
+          const q=fu2Search.toLowerCase();
+          const fu2Filtered=(followUps?.priority2||[]).filter(r=>!q||r.name?.toLowerCase().includes(q)||r.company?.toLowerCase().includes(q)||r.date?.toLowerCase().includes(q)||r.note?.toLowerCase().includes(q));
+          return fu2Filtered.slice(p2Page*FU_PER_PAGE,(p2Page+1)*FU_PER_PAGE).map((r,i,a)=>(
           <div key={i} style={{display:'grid',gridTemplateColumns:'1.2fr 1.6fr 1.1fr 2.1fr',alignItems:'center',padding:'14px 16px',
             borderBottom:i<a.length-1?'1px solid rgba(255,255,255,.05)':'none'}}>
             <span style={{font:'600 14px Inter,sans-serif',color:'#EAF0FF'}}>{r.name}</span>
@@ -3188,10 +3222,12 @@ function SalesTab({modalAgent,setModalAgent}) {
             <span style={{font:'13px/1 monospace',color:r.date&&r.date.includes('overdue')?'#F2667A':'#9FB0D8',whiteSpace:'nowrap'}}>{r.date||'-'}</span>
             <span style={{font:'13px/1.5 Inter,sans-serif',color:'#9FB0D8'}}>{r.note}</span>
           </div>
-        ))}
-        {!followUpsLoad&&(followUps?.priority2||[]).length>FU_PER_PAGE&&(
-          <div style={{padding:'8px 16px'}}><Pager page={p2Page} setPage={setP2Page} total={(followUps?.priority2||[]).length} perPage={FU_PER_PAGE}/></div>
-        )}
+        ))})()}
+        {!followUpsLoad&&(()=>{
+          const q=fu2Search.toLowerCase();
+          const fu2Filtered=(followUps?.priority2||[]).filter(r=>!q||r.name?.toLowerCase().includes(q)||r.company?.toLowerCase().includes(q)||r.date?.toLowerCase().includes(q)||r.note?.toLowerCase().includes(q));
+          return fu2Filtered.length>FU_PER_PAGE?<div style={{padding:'8px 16px'}}><Pager page={p2Page} setPage={setP2Page} total={fu2Filtered.length} perPage={FU_PER_PAGE}/></div>:null;
+        })()}
       </div>
 
 
