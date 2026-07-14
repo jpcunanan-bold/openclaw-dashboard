@@ -594,8 +594,8 @@ function SalesTab({modalAgent,setModalAgent}) {
   const [sbPage,setSbPage]=useState(0);
   const [sbSearch,setSbSearch]=useState('');
   const SDR_PER_PAGE=10;
-  const SB_PER_PAGE=10;
-  const FU_PER_PAGE=10;
+  const SB_PER_PAGE=5;
+  const FU_PER_PAGE=5;
   const [p1Page,setP1Page]=useState(0);
   const [p2Page,setP2Page]=useState(0);
   const [fu1Search,setFu1Search]=useState('');
