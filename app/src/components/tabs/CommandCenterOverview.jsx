@@ -676,6 +676,7 @@ function SalesTab({modalAgent,setModalAgent}) {
             sub:       b.target_icp||brief.sub||'',
             color:     brief.color||CAMP_COLORS_REF[i%CAMP_COLORS_REF.length],
             sort_order:b.sort_order,
+            hiring:    brief.hiring!==undefined ? brief.hiring : null,
             ...brief,
           };
         });
@@ -1570,6 +1571,7 @@ function SalesTab({modalAgent,setModalAgent}) {
             signals:(merged.signals||[]).join('\n'),
             icp:(merged.icp||[]).map(r=>`${r.label}: ${r.value}`).join('\n'),
             sequence:defSeq.map(s=>({...s})),
+            hiring:merged.hiring!==undefined ? merged.hiring : null,
           });
           const [tab,setTab]=useState('brief'); // 'brief' | 'sequence'
           const [seqTab,setSeqTab]=useState(0);
@@ -1599,6 +1601,7 @@ function SalesTab({modalAgent,setModalAgent}) {
               personas:form.personas.split('\n').filter(Boolean),
               signals:form.signals.split('\n').filter(Boolean),
               icp,sequence:form.sequence,
+              hiring:form.hiring,
             };
             setCampEdits(prev=>({...prev,[campIdx]:updatedContent}));
             // All campaigns are now DB-backed — always persist the edit
@@ -1616,7 +1619,7 @@ function SalesTab({modalAgent,setModalAgent}) {
                 }),
               }).catch(()=>{});
               // Update local state
-              setCustomCampaigns(prev=>prev.map((c,i)=>i===campIdx?{...c,title:form.title,sub:form.sub,assignee:form.assignee,sdr:form.assignee,...updatedContent}:c));
+              setCustomCampaigns(prev=>prev.map((c,i)=>i===campIdx?{...c,title:form.title,sub:form.sub,assignee:form.assignee,sdr:form.assignee,...updatedContent,hiring:form.hiring}:c));
             }
             setBriefEditOpen(false);
             setSaving(false);
@@ -1673,6 +1676,25 @@ function SalesTab({modalAgent,setModalAgent}) {
                         </div>
                         {field('Subtitle / segment',
                           <input value={form.sub} onChange={e=>setForm(f=>({...f,sub:e.target.value}))} style={inp} placeholder="AEC · 50-500 employees · US"/>)}
+                        {field('Hiring signal',
+                          <div style={{display:'flex',gap:8}}>
+                            {[{val:true,label:'Yes'},{val:false,label:'No'},{val:null,label:'N/A'}].map(opt=>(
+                              <button key={String(opt.val)} onClick={()=>setForm(f=>({...f,hiring:opt.val}))}
+                                type="button"
+                                style={{
+                                  padding:'6px 16px',borderRadius:20,cursor:'pointer',border:'none',
+                                  background:form.hiring===opt.val
+                                    ?(opt.val===true?'#22C55E':opt.val===false?'#EF4444':'rgba(255,255,255,.15)')
+                                    :'rgba(255,255,255,.06)',
+                                  color:form.hiring===opt.val
+                                    ?(opt.val===null?'#EAF0FF':'#000814')
+                                    :'#7E8DB5',
+                                  font:`${form.hiring===opt.val?700:400} 12px Inter,sans-serif`,
+                                  transition:'all .15s'}}>
+                                {opt.label}
+                              </button>
+                            ))}
+                          </div>)}
                         {field('ICP fields',
                           <div>
                             <div style={{font:'11px Inter,sans-serif',color:'#4a5568',marginBottom:6}}>One per line · format: Label: Value</div>
@@ -1778,6 +1800,7 @@ function SalesTab({modalAgent,setModalAgent}) {
             personas:'',signals:'',
             icp:'Industry: \nCompany Size: \nGeography: \nTech Stack: \nRevenue: \nTrigger: Currently hiring',
             sequence:DEFAULT_SEQUENCE.map(s=>({...s})),
+            hiring:null,
           });
           const [tab,setTab]=useState('brief');
           const [seqTab,setSeqTab]=useState(0);
@@ -1807,6 +1830,7 @@ function SalesTab({modalAgent,setModalAgent}) {
               personas:form.personas.split('\n').filter(Boolean),
               signals:form.signals.split('\n').filter(Boolean),
               icp, sequence:form.sequence,
+              hiring:form.hiring,
             };
             try{
               const res=await fetch('/api/campaign-briefs',{
@@ -1832,6 +1856,7 @@ function SalesTab({modalAgent,setModalAgent}) {
                   sdr:       form.assignee||'Laura',
                   assignee:  form.assignee||'Laura',
                   sort_order:j.brief.sort_order,
+                  hiring:    form.hiring,
                   ...briefContent,
                 };
                 setCustomCampaigns(prev=>[...prev,newCamp]);
@@ -1891,6 +1916,25 @@ function SalesTab({modalAgent,setModalAgent}) {
                         </div>
                         {field('Subtitle / segment',
                           <input value={form.sub} onChange={e=>setForm(f=>({...f,sub:e.target.value}))} style={inp} placeholder="e.g. AEC · 50-500 employees · US"/>)}
+                        {field('Hiring signal',
+                          <div style={{display:'flex',gap:8}}>
+                            {[{val:true,label:'Yes'},{val:false,label:'No'},{val:null,label:'N/A'}].map(opt=>(
+                              <button key={String(opt.val)} onClick={()=>setForm(f=>({...f,hiring:opt.val}))}
+                                type="button"
+                                style={{
+                                  padding:'6px 16px',borderRadius:20,cursor:'pointer',border:'none',
+                                  background:form.hiring===opt.val
+                                    ?(opt.val===true?'#22C55E':opt.val===false?'#EF4444':'rgba(255,255,255,.15)')
+                                    :'rgba(255,255,255,.06)',
+                                  color:form.hiring===opt.val
+                                    ?(opt.val===null?'#EAF0FF':'#000814')
+                                    :'#7E8DB5',
+                                  font:`${form.hiring===opt.val?700:400} 12px Inter,sans-serif`,
+                                  transition:'all .15s'}}>
+                                {opt.label}
+                              </button>
+                            ))}
+                          </div>)}
                         {field('ICP fields',
                           <div><div style={{font:'11px Inter,sans-serif',color:'#4a5568',marginBottom:6}}>One per line · Label: Value</div>
                             <textarea rows={7} value={form.icp} onChange={e=>setForm(f=>({...f,icp:e.target.value}))} style={fi}/></div>)}
@@ -3256,6 +3300,18 @@ function SalesTab({modalAgent,setModalAgent}) {
               </div>
               <div style={{font:'700 13px/1.35 Inter,sans-serif',color:active?c.color:'#EAF0FF',marginBottom:2}}>{c.title}</div>
               <div style={{font:'11px/1.5 Inter,sans-serif',color:active?c.color+'cc':'#9FB0D8',overflow:'hidden',display:'-webkit-box',WebkitLineClamp:2,WebkitBoxOrient:'vertical'}}>{c.sub}</div>
+              {c.hiring!==null&&c.hiring!==undefined&&(
+                <div style={{marginTop:5,display:'inline-flex',alignItems:'center',gap:4,
+                  padding:'2px 7px',borderRadius:20,
+                  background:c.hiring?'rgba(34,197,94,.12)':'rgba(239,68,68,.1)',
+                  border:`1px solid ${c.hiring?'rgba(34,197,94,.3)':'rgba(239,68,68,.25)'}`,
+                  font:'600 10px Inter,sans-serif',
+                  color:c.hiring?'#22C55E':'#EF4444',
+                  whiteSpace:'nowrap'}}>
+                  <span style={{fontSize:8}}>{c.hiring?'●':'○'}</span>
+                  Hiring: {c.hiring?'Yes':'No'}
+                </div>
+              )}
             </div>;
           })}
           {!reorderMode&&<div onClick={()=>setBriefNewOpen(true)} style={{
@@ -3446,6 +3502,181 @@ function SalesTab({modalAgent,setModalAgent}) {
 
       {/* ── Task List ── */}
       <TaskListSection authHeaders={authHeaders}/>
+
+      {/* ── Library ── */}
+      {(()=>{
+        const LIBRARY_KEY='cc_library_links_v1';
+        const loadLinks=()=>{ try{ return JSON.parse(localStorage.getItem(LIBRARY_KEY)||'[]'); }catch{ return []; } };
+        const [libLinks,setLibLinks]=useState(loadLinks);
+        const [libModal,setLibModal]=useState(false);
+        const [libForm,setLibForm]=useState({title:'',url:'',type:'sheet'});
+        const [libEdit,setLibEdit]=useState(null); // index being edited
+
+        const saveLinks=(next)=>{ setLibLinks(next); localStorage.setItem(LIBRARY_KEY,JSON.stringify(next)); };
+
+        const openAdd=()=>{ setLibForm({title:'',url:'',type:'sheet'}); setLibEdit(null); setLibModal(true); };
+        const openEdit=(i)=>{ setLibForm({...libLinks[i]}); setLibEdit(i); setLibModal(true); };
+        const deleteLink=(i)=>{ const next=[...libLinks]; next.splice(i,1); saveLinks(next); };
+        const handleLibSave=(e)=>{
+          e.preventDefault();
+          if(!libForm.title.trim()||!libForm.url.trim()) return;
+          const next=[...libLinks];
+          if(libEdit!==null) next[libEdit]={...libForm};
+          else next.push({...libForm});
+          saveLinks(next);
+          setLibModal(false);
+        };
+
+        const TYPE_META={
+          sheet: { label:'Spreadsheet', icon:(
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3" y="3" width="18" height="18" rx="2"/>
+              <line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/>
+              <line x1="9" y1="3" x2="9" y2="21"/><line x1="15" y1="3" x2="15" y2="21"/>
+            </svg>), color:'#34a853', bg:'rgba(52,168,83,.12)', border:'rgba(52,168,83,.25)' },
+          doc: { label:'Document', icon:(
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+              <polyline points="14 2 14 8 20 8"/>
+              <line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>
+              <polyline points="10 9 9 9 8 9"/>
+            </svg>), color:'#4285f4', bg:'rgba(66,133,244,.12)', border:'rgba(66,133,244,.25)' },
+          other: { label:'Link', icon:(
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
+              <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
+            </svg>), color:'#F5B945', bg:'rgba(245,185,69,.12)', border:'rgba(245,185,69,.25)' },
+        };
+
+        return (
+          <>
+            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:14,marginTop:32}}>
+              <div className="cc-sect-label" style={{marginBottom:0}}>Library</div>
+              <button onClick={openAdd}
+                style={{display:'inline-flex',alignItems:'center',gap:6,padding:'6px 14px',borderRadius:8,
+                  border:'1px solid rgba(6,229,236,.4)',background:'rgba(6,229,236,.08)',
+                  color:'#06E5EC',font:'600 12px Inter,sans-serif',cursor:'pointer',transition:'all .15s'}}
+                onMouseEnter={e=>e.currentTarget.style.background='rgba(6,229,236,.16)'}
+                onMouseLeave={e=>e.currentTarget.style.background='rgba(6,229,236,.08)'}>
+                <span style={{fontSize:16,lineHeight:1}}>+</span> Add link
+              </button>
+            </div>
+
+            {libLinks.length===0
+              ? <div style={{padding:'24px',textAlign:'center',background:'rgba(255,255,255,.02)',
+                  border:'1px dashed rgba(255,255,255,.1)',borderRadius:12,marginBottom:32,
+                  font:'13px Inter,sans-serif',color:'#4a5568'}}>
+                  No links yet — click <span style={{color:'#06E5EC'}}>+ Add link</span> to add a spreadsheet or doc
+                </div>
+              : <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(260px,1fr))',gap:12,marginBottom:32}}>
+                  {libLinks.map((lk,i)=>{
+                    const m=TYPE_META[lk.type]||TYPE_META.other;
+                    return (
+                      <div key={i} style={{background:'rgba(255,255,255,.03)',border:`1px solid ${m.border}`,
+                        borderRadius:12,padding:'14px 16px',display:'flex',flexDirection:'column',gap:10,
+                        position:'relative',transition:'all .15s'}}
+                        onMouseEnter={e=>{e.currentTarget.style.background=m.bg;e.currentTarget.style.transform='translateY(-1px)';}}
+                        onMouseLeave={e=>{e.currentTarget.style.background='rgba(255,255,255,.03)';e.currentTarget.style.transform='';}}
+                      >
+                        <div style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',gap:8}}>
+                          <div style={{display:'flex',alignItems:'center',gap:9}}>
+                            <span style={{color:m.color,flexShrink:0,display:'flex'}}>{m.icon}</span>
+                            <div>
+                              <div style={{font:'600 13px Inter,sans-serif',color:'#EAF0FF',lineHeight:1.3}}>{lk.title}</div>
+                              <div style={{font:'10px Inter,sans-serif',color:m.color,marginTop:2,textTransform:'uppercase',letterSpacing:'.06em'}}>{m.label}</div>
+                            </div>
+                          </div>
+                          <div style={{display:'flex',gap:4,flexShrink:0}}>
+                            <button onClick={()=>openEdit(i)} title="Edit"
+                              style={{width:24,height:24,borderRadius:6,border:'1px solid rgba(255,255,255,.1)',
+                                background:'rgba(255,255,255,.04)',color:'#7E8DB5',cursor:'pointer',
+                                display:'flex',alignItems:'center',justifyContent:'center',fontSize:11}}>✎</button>
+                            <button onClick={()=>deleteLink(i)} title="Remove"
+                              style={{width:24,height:24,borderRadius:6,border:'1px solid rgba(242,102,122,.2)',
+                                background:'rgba(242,102,122,.06)',color:'#F2667A',cursor:'pointer',
+                                display:'flex',alignItems:'center',justifyContent:'center',fontSize:13,lineHeight:1}}>×</button>
+                          </div>
+                        </div>
+                        <a href={lk.url} target="_blank" rel="noopener noreferrer"
+                          style={{font:'11px Inter,sans-serif',color:'#7E8DB5',textDecoration:'none',
+                            overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',
+                            display:'block',padding:'6px 10px',borderRadius:6,
+                            background:'rgba(255,255,255,.04)',border:'1px solid rgba(255,255,255,.06)',
+                            transition:'color .12s'}}
+                          onMouseEnter={e=>e.currentTarget.style.color=m.color}
+                          onMouseLeave={e=>e.currentTarget.style.color='#7E8DB5'}>
+                          ↗ Open link
+                        </a>
+                      </div>
+                    );
+                  })}
+                </div>
+            }
+
+            {/* Add / Edit modal */}
+            {libModal&&(
+              <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,.7)',zIndex:9000,
+                display:'flex',alignItems:'center',justifyContent:'center',padding:20}}
+                onClick={()=>setLibModal(false)}>
+                <div style={{background:'#080f2a',border:'1px solid rgba(255,255,255,.12)',
+                  borderRadius:16,padding:'28px 28px 24px',width:'100%',maxWidth:440,
+                  boxShadow:'0 40px 80px rgba(0,0,0,.6)'}}
+                  onClick={e=>e.stopPropagation()}>
+                  <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:20}}>
+                    <div style={{font:'700 16px Inter,sans-serif',color:'#fff'}}>
+                      {libEdit!==null?'Edit link':'Add link'}
+                    </div>
+                    <button onClick={()=>setLibModal(false)}
+                      style={{width:28,height:28,borderRadius:8,border:'1px solid rgba(255,255,255,.12)',
+                        background:'rgba(255,255,255,.06)',color:'#9FB0D8',cursor:'pointer',fontSize:16,lineHeight:1}}>×</button>
+                  </div>
+                  <form onSubmit={handleLibSave}>
+                    <div style={{display:'flex',flexDirection:'column',gap:14}}>
+                      <div style={{display:'flex',flexDirection:'column',gap:5}}>
+                        <label style={{font:'700 10px Inter,sans-serif',letterSpacing:'.07em',textTransform:'uppercase',color:'#7E8DB5'}}>Title *</label>
+                        <input required value={libForm.title} onChange={e=>setLibForm(f=>({...f,title:e.target.value}))}
+                          placeholder="e.g. CET Designers Tracker"
+                          style={{padding:'9px 12px',border:'1px solid rgba(255,255,255,.15)',borderRadius:8,
+                            font:'13px Inter,sans-serif',color:'#EAF0FF',background:'rgba(255,255,255,.05)',outline:'none'}}/>
+                      </div>
+                      <div style={{display:'flex',flexDirection:'column',gap:5}}>
+                        <label style={{font:'700 10px Inter,sans-serif',letterSpacing:'.07em',textTransform:'uppercase',color:'#7E8DB5'}}>URL *</label>
+                        <input required value={libForm.url} onChange={e=>setLibForm(f=>({...f,url:e.target.value}))}
+                          placeholder="https://docs.google.com/..."
+                          style={{padding:'9px 12px',border:'1px solid rgba(255,255,255,.15)',borderRadius:8,
+                            font:'13px Inter,sans-serif',color:'#EAF0FF',background:'rgba(255,255,255,.05)',outline:'none'}}/>
+                      </div>
+                      <div style={{display:'flex',flexDirection:'column',gap:5}}>
+                        <label style={{font:'700 10px Inter,sans-serif',letterSpacing:'.07em',textTransform:'uppercase',color:'#7E8DB5'}}>Type</label>
+                        <select value={libForm.type} onChange={e=>setLibForm(f=>({...f,type:e.target.value}))}
+                          style={{padding:'9px 12px',border:'1px solid rgba(255,255,255,.15)',borderRadius:8,
+                            font:'13px Inter,sans-serif',color:'#EAF0FF',background:'#0d1a42',outline:'none'}}>
+                          <option value="sheet" style={{background:'#0d1a42'}}>Spreadsheet</option>
+                          <option value="doc" style={{background:'#0d1a42'}}>Document</option>
+                          <option value="other" style={{background:'#0d1a42'}}>Other link</option>
+                        </select>
+                      </div>
+                    </div>
+                    <div style={{display:'flex',justifyContent:'flex-end',gap:10,marginTop:20}}>
+                      <button type="button" onClick={()=>setLibModal(false)}
+                        style={{padding:'9px 20px',borderRadius:8,border:'1px solid rgba(255,255,255,.15)',
+                          background:'none',color:'#9FB0D8',font:'600 13px Inter,sans-serif',cursor:'pointer'}}>
+                        Cancel
+                      </button>
+                      <button type="submit"
+                        style={{padding:'9px 26px',borderRadius:8,border:'none',
+                          background:'linear-gradient(135deg,#4446DB,#6366F1)',
+                          color:'#fff',font:'700 13px Inter,sans-serif',cursor:'pointer'}}>
+                        {libEdit!==null?'Save changes':'Add link'}
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+            )}
+          </>
+        );
+      })()}
 
       {/* ── Email Domains ── */}
       {(()=>{
