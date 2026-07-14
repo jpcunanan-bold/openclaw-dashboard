@@ -102,7 +102,7 @@ function useSandbox(period='all', startDate=null, endDate=null, reload=0) {
       .then(r=>r.ok?r.json():null)
       .then(j=>{ setData(j); setLoading(false); }).catch(()=>setLoading(false));
   },[period,startDate,endDate,reload]);
-  return {data,loading};
+  return {data,setData,loading};
 }
 function useFollowUps() {
   const [data,setData]=useState(null); const [loading,setLoading]=useState(true);
@@ -654,7 +654,7 @@ function SalesTab({modalAgent,setModalAgent}) {
   const {data:mtgBk,loading:mtgBkLoad}=useMeetingsBreakdown(spEffectivePeriod,spEffectiveStart,spEffectiveEnd);
   const {data:sdr,loading:sdrLoad}=useSdrPerf(sdrEffectivePeriod,sdrEffectiveStart,sdrEffectiveEnd);
   const {data:campRank,loading:campLoad}=useCampaignRank(spEffectivePeriod,spEffectiveStart,spEffectiveEnd);
-  const {data:sbData,loading:sbLoad}=useSandbox(spEffectivePeriod,spEffectiveStart,spEffectiveEnd,sbReload);
+  const {data:sbData,setData:setSbData,loading:sbLoad}=useSandbox(spEffectivePeriod,spEffectiveStart,spEffectiveEnd,sbReload);
   const {data:followUps,loading:followUpsLoad}=useFollowUps();
 
   const CAMP_COLORS_REF=['#06E5EC','#4D8DFF','#8B7CF6','#F5B945','#f97316','#f43f5e','#a78bfa','#3B82F6','#2DD4BF','#ec4899'];
@@ -744,9 +744,36 @@ function SalesTab({modalAgent,setModalAgent}) {
         body:JSON.stringify(body),
       });
       if(res.ok){
-        // Switch to 'all' so the new/edited campaign is always visible regardless of its launch date
-        setPeriod('all'); setSpStart(null); setSpEnd(null); setSpPhase('start');
-        setCampModal(null); setCampNameOpen(false); setCampNameQ(''); setSbOpen(null); setSbReload(k=>k+1);
+        const saved=await res.json().catch(()=>({}));
+        const {mode,campaign_id:editId,form}=campModal;
+        const SDR_NAMES={32887:'Abhinanda Deb',32871:'Lenore Kopko',32894:'George Georgiou',32891:'Laura Petersen',32893:'Darren Stuart',33364:'Mariana Lopez',33347:'Bob Toll'};
+        const aid=Number(form.account_id);
+        const agentName=SDR_NAMES[aid]||'Unknown';
+        if(mode==='add'){
+          // Inject new campaign directly into local state — no re-fetch needed.
+          // The row is already in the DB; re-fetching just risks it being filtered out by date.
+          const newCamp={
+            name:       form.campaign_name,
+            target_icp: form.target_icp||'',
+            channel:    form.channel||'LinkedIn + Email',
+            is_manual:  true,
+            reply_pct:  0,
+            key_metric: '0% reply rate',
+            agents:[{agent:agentName,account_id:aid,campaign_id:saved.campaign_id||editId,
+              activity:form.activity||'',cr_sent:Number(form.connections_requested)||0,
+              cr_accepted:Number(form.connection_requests_accepted)||0,
+              replies:Number(form.connection_replies)||0,emails:Number(form.emails_sent)||0,
+              li_out:0,calls:0,actual_meetings:0,campaigns:1,accept_pct:'—',reply_pct:'—'}],
+            totals:{cr_sent:Number(form.connections_requested)||0,cr_accepted:Number(form.connection_requests_accepted)||0,
+              replies:Number(form.connection_replies)||0,emails:Number(form.emails_sent)||0,
+              li_out:0,calls:0,actual_meetings:0,campaigns:1,accept_pct:'—',reply_pct:'—'},
+          };
+          setSbData(prev=>({ ...(prev||{}), campaigns:[newCamp,...((prev?.campaigns)||[])] }));
+        } else {
+          // Edit: just trigger a re-fetch so stats are accurate
+          setSbReload(k=>k+1);
+        }
+        setCampModal(null); setCampNameOpen(false); setCampNameQ(''); setSbOpen(null);
       } else {
         const errData=await res.json().catch(()=>({}));
         setCampError(errData.error||`Save failed (HTTP ${res.status}). Please try again.`);
