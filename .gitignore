@@ -6,6 +6,12 @@ api/node_modules/
 # Build output
 app/dist/
 
+# Root-level stale build artifacts (copied by deploy from app/dist)
+assets/
+*.js
+*.css
+*.map
+
 # Secrets — NEVER commit
 api/.env
 api-server/.env
