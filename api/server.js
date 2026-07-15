@@ -5824,6 +5824,100 @@ app.get('/api/skylead/lead-thread', async (req, res) => {
 });
 
 
+
+// ── Dashboard Tasks (sales.dashboard_tasks in smt_db) ────────────────────────
+// All tasks are visible to ALL logged-in users regardless of who created them.
+
+/** GET /api/dashboard-tasks */
+app.get('/api/dashboard-tasks', async (req, res) => {
+  try {
+    const { status } = req.query;
+    let where = '';
+    const params = [];
+    if (status && status !== 'all') { params.push(status); where = `WHERE t.status = $1`; }
+    const { rows } = await smtAdminPool.query(
+      `SELECT t.id, t.title, t.description, t.assigned_to, t.due_date, t.status,
+              t.created_at, t.updated_at,
+              u.name AS created_by_name,
+              COALESCE(
+                (SELECT json_agg(json_build_object('id', au.id, 'name', au.name, 'email', au.email))
+                 FROM users.users au WHERE au.id = ANY(COALESCE(t.assigned_to, ARRAY[]::integer[]))),
+                '[]'::json
+              ) AS assignees
+       FROM sales.dashboard_tasks t
+       LEFT JOIN users.users u ON u.id = t.created_by
+       ${where}
+       ORDER BY
+         CASE t.status WHEN 'pending' THEN 1 WHEN 'in_progress' THEN 2 WHEN 'done' THEN 3 ELSE 4 END,
+         t.due_date ASC NULLS LAST, t.created_at DESC`,
+      params
+    );
+    res.json({ ok: true, tasks: rows });
+  } catch (e) {
+    console.error('GET /api/dashboard-tasks error:', e.message);
+    res.status(500).json({ ok: false, tasks: [] });
+  }
+});
+
+/** POST /api/dashboard-tasks */
+app.post('/api/dashboard-tasks', async (req, res) => {
+  try {
+    const { title, description, assigned_to, due_date, status = 'pending' } = req.body;
+    if (!title) return res.status(400).json({ error: 'title is required' });
+    const email = req.user?.email || null;
+    const userRow = email ? await smtAdminPool.query(`SELECT id FROM users.users WHERE email = $1 LIMIT 1`, [email]) : { rows: [] };
+    const createdBy = userRow.rows[0]?.id || null;
+    const assigneeArr = Array.isArray(assigned_to) ? assigned_to.map(Number).filter(Boolean) : [];
+    const { rows } = await smtAdminPool.query(
+      `INSERT INTO sales.dashboard_tasks (title, description, assigned_to, due_date, status, created_by)
+       VALUES ($1, $2, $3, $4::date, $5, $6) RETURNING *`,
+      [title, description || null, assigneeArr, due_date || null, status, createdBy]
+    );
+    res.status(201).json({ ok: true, task: rows[0] });
+  } catch (e) {
+    console.error('POST /api/dashboard-tasks error:', e.message);
+    res.status(500).json({ ok: false, error: e.message });
+  }
+});
+
+/** PATCH /api/dashboard-tasks/:id */
+app.patch('/api/dashboard-tasks/:id', async (req, res) => {
+  try {
+    const { title, description, assigned_to, due_date, status } = req.body;
+    const hasAssignees = 'assigned_to' in req.body;
+    const assigneeArr = hasAssignees ? (Array.isArray(assigned_to) ? assigned_to.map(Number).filter(Boolean) : []) : undefined;
+    const { rows } = await smtAdminPool.query(
+      `UPDATE sales.dashboard_tasks SET
+         title       = COALESCE($1, title),
+         description = COALESCE($2, description),
+         assigned_to = CASE WHEN $3 THEN $4::integer[] ELSE assigned_to END,
+         due_date    = CASE WHEN $5 IS NOT NULL THEN $5::date ELSE due_date END,
+         status      = COALESCE($6, status),
+         updated_at  = now()
+       WHERE id = $7 RETURNING *`,
+      [title || null, description !== undefined ? (description || null) : null,
+       hasAssignees, hasAssignees ? assigneeArr : [],
+       due_date || null, status || null, req.params.id]
+    );
+    if (!rows.length) return res.status(404).json({ error: 'Task not found' });
+    res.json({ ok: true, task: rows[0] });
+  } catch (e) {
+    console.error('PATCH /api/dashboard-tasks error:', e.message);
+    res.status(500).json({ ok: false, error: e.message });
+  }
+});
+
+/** DELETE /api/dashboard-tasks/:id */
+app.delete('/api/dashboard-tasks/:id', async (req, res) => {
+  try {
+    await smtAdminPool.query(`DELETE FROM sales.dashboard_tasks WHERE id = $1`, [req.params.id]);
+    res.json({ ok: true });
+  } catch (e) {
+    console.error('DELETE /api/dashboard-tasks error:', e.message);
+    res.status(500).json({ ok: false, error: e.message });
+  }
+});
+
 // ── Library Links (users.library_links in smt_db) ─────────────────────────────
 
 /** GET /api/library-links */
