@@ -5278,7 +5278,23 @@ app.get('/api/sales-dashboard/campaigns/audit', async (req, res) => {
 
 // ── User Tasks (users.user_tasks in smt_db) ──
 
-/** GET /api/user-tasks — fetch tasks for the logged-in user (resolved by email) */
+/** GET /api/users — list all users for assignee dropdown */
+app.get('/api/users', async (req, res) => {
+  try {
+    const { rows } = await smtAdminPool.query(
+      `SELECT id, name, email, role, picture
+       FROM users.users
+       WHERE name IS NOT NULL AND name <> '' AND email NOT LIKE '%@bb.com' AND name <> 'Bold User Bot' AND name <> 'Pending Login'
+       ORDER BY name ASC`
+    );
+    res.json({ ok: true, users: rows });
+  } catch (e) {
+    console.error('GET /api/users error:', e.message);
+    res.status(500).json({ ok: false, users: [] });
+  }
+});
+
+/** GET /api/user-tasks — fetch tasks for the logged-in user OR tasks assigned to them */
 app.get('/api/user-tasks', async (req, res) => {
   try {
     const { status, limit = 200 } = req.query;
@@ -5291,15 +5307,26 @@ app.get('/api/user-tasks', async (req, res) => {
     if (!userRow.rows.length) return res.json({ ok: true, tasks: [], note: 'No user record found for ' + email });
     const userId = userRow.rows[0].id;
     const params = [userId];
-    let where = 'WHERE user_id = $1';
+    // Show tasks owned by user OR tasks where user is in assignee_ids
+    let where = `WHERE (user_id = $1 OR $1 = ANY(COALESCE(assignee_ids, ARRAY[]::integer[])))`; 
     if (status) { params.push(status); where += ` AND status = $${params.length}`; }
     const { rows } = await smtAdminPool.query(
-      `SELECT id, description, status, task_type, horizon, accountable_person,
-              due_date_suggestion, priority_score, details, created_at
-       FROM users.user_tasks ${where}
+      `SELECT t.id, t.description, t.status, t.task_type, t.horizon, t.accountable_person,
+              t.due_date_suggestion, t.priority_score, t.details, t.created_at,
+              t.assignee_ids,
+              COALESCE(
+                (
+                  SELECT json_agg(json_build_object('id', u.id, 'name', u.name, 'email', u.email, 'picture', u.picture))
+                  FROM users.users u
+                  WHERE u.id = ANY(COALESCE(t.assignee_ids, '{}'))
+                ),
+                '[]'::json
+              ) AS assignees
+       FROM users.user_tasks t
+       ${where}
        ORDER BY
-         CASE status WHEN 'pending' THEN 1 WHEN 'captured' THEN 2 WHEN 'done' THEN 3 ELSE 4 END,
-         priority_score DESC NULLS LAST, created_at DESC
+         CASE t.status WHEN 'pending' THEN 1 WHEN 'captured' THEN 2 WHEN 'done' THEN 3 ELSE 4 END,
+         t.priority_score DESC NULLS LAST, t.created_at DESC
        LIMIT $${params.length + 1}`,
       [...params, Number(limit)]
     );
@@ -5314,19 +5341,20 @@ app.get('/api/user-tasks', async (req, res) => {
 app.post('/api/user-tasks', async (req, res) => {
   try {
     const { description, status='pending', task_type='Next Action', horizon='Ground',
-            accountable_person, due_date_suggestion, priority_score, details } = req.body;
+            accountable_person, due_date_suggestion, priority_score, details, assignee_ids } = req.body;
     if (!description) return res.status(400).json({ error: 'description is required' });
     const email = req.user?.email || null;
     if (!email) return res.status(401).json({ ok: false, error: 'Not authenticated' });
     const userRow = await smtAdminPool.query(`SELECT id FROM users.users WHERE email = $1 LIMIT 1`, [email]);
     if (!userRow.rows.length) return res.status(404).json({ ok: false, error: 'User not found: ' + email });
     const userId = userRow.rows[0].id;
+    const assigneeArr = Array.isArray(assignee_ids) ? assignee_ids.map(Number).filter(Boolean) : [];
     const result = await smtAdminPool.query(
       `INSERT INTO users.user_tasks
-         (user_id, description, status, task_type, horizon, accountable_person, due_date_suggestion, priority_score, details)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *`,
+         (user_id, description, status, task_type, horizon, accountable_person, due_date_suggestion, priority_score, details, assignee_ids)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING *`,
       [userId, description, status, task_type, horizon,
-       accountable_person||null, due_date_suggestion||null, priority_score||null, details||null]
+       accountable_person||null, due_date_suggestion||null, priority_score||null, details||null, assigneeArr]
     );
     res.status(201).json({ ok: true, task: result.rows[0] });
   } catch (e) {
@@ -5339,7 +5367,12 @@ app.post('/api/user-tasks', async (req, res) => {
 app.patch('/api/user-tasks/:id', async (req, res) => {
   try {
     const { description, status, task_type, horizon, accountable_person,
-            due_date_suggestion, priority_score, details } = req.body;
+            due_date_suggestion, priority_score, details, assignee_ids } = req.body;
+    // Build dynamic update — only update assignee_ids if explicitly sent
+    const hasAssignees = 'assignee_ids' in req.body;
+    const assigneeArr = hasAssignees
+      ? (Array.isArray(assignee_ids) ? assignee_ids.map(Number).filter(Boolean) : [])
+      : undefined;
     const result = await smtAdminPool.query(
       `UPDATE users.user_tasks SET
          description         = COALESCE($1, description),
@@ -5349,11 +5382,14 @@ app.patch('/api/user-tasks/:id', async (req, res) => {
          accountable_person  = COALESCE($5, accountable_person),
          due_date_suggestion = COALESCE($6, due_date_suggestion),
          priority_score      = COALESCE($7, priority_score),
-         details             = COALESCE($8, details)
-       WHERE id = $9 RETURNING *`,
+         details             = COALESCE($8, details),
+         assignee_ids        = CASE WHEN $9 THEN $10::integer[] ELSE assignee_ids END
+       WHERE id = $11 RETURNING *`,
       [description||null, status||null, task_type||null, horizon||null,
        accountable_person||null, due_date_suggestion||null,
-       priority_score||null, details||null, req.params.id]
+       priority_score||null, details||null,
+       hasAssignees, hasAssignees ? assigneeArr : [],
+       req.params.id]
     );
     if (!result.rows.length) return res.status(404).json({ error: 'Task not found' });
     res.json({ ok: true, task: result.rows[0] });
@@ -5784,6 +5820,173 @@ app.get('/api/skylead/lead-thread', async (req, res) => {
   } catch (e) {
     console.error('GET /api/skylead/lead-thread error:', e.message);
     res.status(500).json({ ok: false, error: e.message, messages: [] });
+  }
+});
+
+
+
+// ── Dashboard Tasks (sales.dashboard_tasks in smt_db) ────────────────────────
+// All tasks are visible to ALL logged-in users regardless of who created them.
+
+/** GET /api/dashboard-tasks */
+app.get('/api/dashboard-tasks', async (req, res) => {
+  try {
+    const { status } = req.query;
+    let where = '';
+    const params = [];
+    if (status && status !== 'all') { params.push(status); where = `WHERE t.status = $1`; }
+    const { rows } = await smtAdminPool.query(
+      `SELECT t.id, t.title, t.description, t.assigned_to, t.due_date, t.status,
+              t.created_at, t.updated_at,
+              u.name AS created_by_name,
+              COALESCE(
+                (SELECT json_agg(json_build_object('id', au.id, 'name', au.name, 'email', au.email))
+                 FROM users.users au WHERE au.id = ANY(COALESCE(t.assigned_to, ARRAY[]::integer[]))),
+                '[]'::json
+              ) AS assignees
+       FROM sales.dashboard_tasks t
+       LEFT JOIN users.users u ON u.id = t.created_by
+       ${where}
+       ORDER BY
+         CASE t.status WHEN 'pending' THEN 1 WHEN 'in_progress' THEN 2 WHEN 'done' THEN 3 ELSE 4 END,
+         t.due_date ASC NULLS LAST, t.created_at DESC`,
+      params
+    );
+    res.json({ ok: true, tasks: rows });
+  } catch (e) {
+    console.error('GET /api/dashboard-tasks error:', e.message);
+    res.status(500).json({ ok: false, tasks: [] });
+  }
+});
+
+/** POST /api/dashboard-tasks */
+app.post('/api/dashboard-tasks', async (req, res) => {
+  try {
+    const { title, description, assigned_to, due_date, status = 'pending' } = req.body;
+    if (!title) return res.status(400).json({ error: 'title is required' });
+    const email = req.user?.email || null;
+    const userRow = email ? await smtAdminPool.query(`SELECT id FROM users.users WHERE email = $1 LIMIT 1`, [email]) : { rows: [] };
+    const createdBy = userRow.rows[0]?.id || null;
+    const assigneeArr = Array.isArray(assigned_to) ? assigned_to.map(Number).filter(Boolean) : [];
+    const { rows } = await smtAdminPool.query(
+      `INSERT INTO sales.dashboard_tasks (title, description, assigned_to, due_date, status, created_by)
+       VALUES ($1, $2, $3, $4::date, $5, $6) RETURNING *`,
+      [title, description || null, assigneeArr, due_date || null, status, createdBy]
+    );
+    res.status(201).json({ ok: true, task: rows[0] });
+  } catch (e) {
+    console.error('POST /api/dashboard-tasks error:', e.message);
+    res.status(500).json({ ok: false, error: e.message });
+  }
+});
+
+/** PATCH /api/dashboard-tasks/:id */
+app.patch('/api/dashboard-tasks/:id', async (req, res) => {
+  try {
+    const { title, description, assigned_to, due_date, status } = req.body;
+    const hasAssignees = 'assigned_to' in req.body;
+    const assigneeArr = hasAssignees ? (Array.isArray(assigned_to) ? assigned_to.map(Number).filter(Boolean) : []) : undefined;
+    const { rows } = await smtAdminPool.query(
+      `UPDATE sales.dashboard_tasks SET
+         title       = COALESCE($1, title),
+         description = COALESCE($2, description),
+         assigned_to = CASE WHEN $3 THEN $4::integer[] ELSE assigned_to END,
+         due_date    = CASE WHEN $5 IS NOT NULL THEN $5::date ELSE due_date END,
+         status      = COALESCE($6, status),
+         updated_at  = now()
+       WHERE id = $7 RETURNING *`,
+      [title || null, description !== undefined ? (description || null) : null,
+       hasAssignees, hasAssignees ? assigneeArr : [],
+       due_date || null, status || null, req.params.id]
+    );
+    if (!rows.length) return res.status(404).json({ error: 'Task not found' });
+    res.json({ ok: true, task: rows[0] });
+  } catch (e) {
+    console.error('PATCH /api/dashboard-tasks error:', e.message);
+    res.status(500).json({ ok: false, error: e.message });
+  }
+});
+
+/** DELETE /api/dashboard-tasks/:id */
+app.delete('/api/dashboard-tasks/:id', async (req, res) => {
+  try {
+    await smtAdminPool.query(`DELETE FROM sales.dashboard_tasks WHERE id = $1`, [req.params.id]);
+    res.json({ ok: true });
+  } catch (e) {
+    console.error('DELETE /api/dashboard-tasks error:', e.message);
+    res.status(500).json({ ok: false, error: e.message });
+  }
+});
+
+// ── Library Links (users.library_links in smt_db) ─────────────────────────────
+
+/** GET /api/library-links */
+app.get('/api/library-links', async (req, res) => {
+  try {
+    const { rows } = await smtAdminPool.query(
+      `SELECT l.id, l.title, l.url, l.link_type, l.description, l.created_at, l.updated_at,
+              u.name AS created_by_name
+       FROM users.library_links l
+       LEFT JOIN users.users u ON u.id = l.created_by
+       ORDER BY l.created_at DESC`
+    );
+    res.json({ ok: true, links: rows });
+  } catch (e) {
+    console.error('GET /api/library-links error:', e.message);
+    res.status(500).json({ ok: false, links: [] });
+  }
+});
+
+/** POST /api/library-links */
+app.post('/api/library-links', async (req, res) => {
+  try {
+    const { title, url, link_type = 'spreadsheet', description } = req.body;
+    if (!title || !url) return res.status(400).json({ error: 'title and url are required' });
+    const email = req.user?.email || null;
+    const userRow = email ? await smtAdminPool.query(`SELECT id FROM users.users WHERE email = $1 LIMIT 1`, [email]) : { rows: [] };
+    const userId = userRow.rows[0]?.id || null;
+    const { rows } = await smtAdminPool.query(
+      `INSERT INTO users.library_links (title, url, link_type, description, created_by)
+       VALUES ($1, $2, $3, $4, $5) RETURNING *`,
+      [title, url, link_type, description || null, userId]
+    );
+    res.status(201).json({ ok: true, link: rows[0] });
+  } catch (e) {
+    console.error('POST /api/library-links error:', e.message);
+    res.status(500).json({ ok: false, error: e.message });
+  }
+});
+
+/** PATCH /api/library-links/:id */
+app.patch('/api/library-links/:id', async (req, res) => {
+  try {
+    const { title, url, link_type, description } = req.body;
+    const { rows } = await smtAdminPool.query(
+      `UPDATE users.library_links SET
+         title       = COALESCE($1, title),
+         url         = COALESCE($2, url),
+         link_type   = COALESCE($3, link_type),
+         description = COALESCE($4, description),
+         updated_at  = now()
+       WHERE id = $5 RETURNING *`,
+      [title || null, url || null, link_type || null, description !== undefined ? (description || null) : null, req.params.id]
+    );
+    if (!rows.length) return res.status(404).json({ error: 'Link not found' });
+    res.json({ ok: true, link: rows[0] });
+  } catch (e) {
+    console.error('PATCH /api/library-links error:', e.message);
+    res.status(500).json({ ok: false, error: e.message });
+  }
+});
+
+/** DELETE /api/library-links/:id */
+app.delete('/api/library-links/:id', async (req, res) => {
+  try {
+    await smtAdminPool.query(`DELETE FROM users.library_links WHERE id = $1`, [req.params.id]);
+    res.json({ ok: true });
+  } catch (e) {
+    console.error('DELETE /api/library-links error:', e.message);
+    res.status(500).json({ ok: false, error: e.message });
   }
 });
 

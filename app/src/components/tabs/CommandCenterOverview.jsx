@@ -237,24 +237,24 @@ const LOW_CAMPS = [
   {name:'BIM Modeler Outreach',metric:'4.8%',reason:'Low hiring signal in segment',color:'#F5B945'},
 ];
 const CAMPAIGNS = [
-  // Laura — Bold Business
-  {num:1,sdr:'Laura',title:'Digital Ops / Automation Analyst',sub:'3PL / Freight Logistics · 50–500 employees · US',color:'#06E5EC'},
-  {num:2,sdr:'Laura',title:'RCM Specialist',sub:'Hospitals, Health Systems & ASCs · 50–500 employees',color:'#4D8DFF'},
-  {num:3,sdr:'Laura',title:'Senior Accountant / FP&A Analyst',sub:'PE Portfolio Companies · $100M–$2B AUM',color:'#8B7CF6'},
+  // Laura - Bold Business
+  {num:1,sdr:'Laura',title:'Digital Ops / Automation Analyst',sub:'3PL / Freight Logistics · 50-500 employees · US',color:'#06E5EC'},
+  {num:2,sdr:'Laura',title:'RCM Specialist',sub:'Hospitals, Health Systems & ASCs · 50-500 employees',color:'#4D8DFF'},
+  {num:3,sdr:'Laura',title:'Senior Accountant / FP&A Analyst',sub:'PE Portfolio Companies · $100M-$2B AUM',color:'#8B7CF6'},
   {num:4,sdr:'Laura',title:'Enterprise ERP Consultant (SAP)',sub:'Manufacturing & Distribution · SAP ECC End of Life 2027',color:'#F5B945'},
-  {num:5,sdr:'Laura',title:'AI Ops Analyst',sub:'B2B SaaS / Fintech / Insurtech · 50–300 employees',color:'#f97316'},
+  {num:5,sdr:'Laura',title:'AI Ops Analyst',sub:'B2B SaaS / Fintech / Insurtech · 50-300 employees',color:'#f97316'},
   {num:6,sdr:'Laura',title:'E-Commerce Analytics Analyst',sub:'D2C E-Commerce · Shopify/BigCommerce · >$5M GMV',color:'#f43f5e'},
   {num:7,sdr:'Laura',title:'Healthcare IT Support Analyst',sub:'Multi-location Practices, DSOs, PT/Urgent Care Chains',color:'#a78bfa'},
-  {num:8,sdr:'Laura',title:'CET Designer / Space Planning Specialist',sub:'Commercial Furniture Dealers & AEC · 50–500 employees',color:'#3B82F6'},
-  // Darren — Mercury Z
+  {num:8,sdr:'Laura',title:'CET Designer / Space Planning Specialist',sub:'Commercial Furniture Dealers & AEC · 50-500 employees',color:'#3B82F6'},
+  // Darren - Mercury Z
   {num:1,sdr:'Darren',title:'Fiber Optic Fusion Splicer / Field Technician',sub:'Fiber Carriers, ISPs, EPC Firms & Broadband Contractors',color:'#2DD4BF'},
-  {num:2,sdr:'Darren',title:'Customer Success Operations Analyst',sub:'B2B SaaS / Subscription · Post-Series A · 30–300 employees',color:'#06E5EC'},
-  {num:3,sdr:'Darren',title:'Finance & Accounting Ops Specialist',sub:'SMBs & PE-Backed Portfolio Companies · 15–200 employees',color:'#F5B945'},
-  {num:4,sdr:'Darren',title:'HR & People Ops Coordinator',sub:'High-Growth Startups · Series A–C · 50–300 employees',color:'#f97316'},
-  {num:5,sdr:'Darren',title:'Software QA / Test Ops Analyst',sub:'Product-Led SaaS · 30–300 employees · $3M–$50M ARR',color:'#8B7CF6'},
-  {num:6,sdr:'Darren',title:'Sales Ops & CRM Admin Specialist',sub:'Inside Sales Teams · B2B · 20–250 employees',color:'#4D8DFF'},
+  {num:2,sdr:'Darren',title:'Customer Success Operations Analyst',sub:'B2B SaaS / Subscription · Post-Series A · 30-300 employees',color:'#06E5EC'},
+  {num:3,sdr:'Darren',title:'Finance & Accounting Ops Specialist',sub:'SMBs & PE-Backed Portfolio Companies · 15-200 employees',color:'#F5B945'},
+  {num:4,sdr:'Darren',title:'HR & People Ops Coordinator',sub:'High-Growth Startups · Series A-C · 50-300 employees',color:'#f97316'},
+  {num:5,sdr:'Darren',title:'Software QA / Test Ops Analyst',sub:'Product-Led SaaS · 30-300 employees · $3M-$50M ARR',color:'#8B7CF6'},
+  {num:6,sdr:'Darren',title:'Sales Ops & CRM Admin Specialist',sub:'Inside Sales Teams · B2B · 20-250 employees',color:'#4D8DFF'},
   {num:7,sdr:'Darren',title:'DWDM / Optical Transport Engineer',sub:'Carriers, Hyperscale DCI, Fiber Operators · 400G/800G',color:'#f43f5e'},
-  {num:8,sdr:'Darren',title:'NOC Engineer / Network Operations Center Analyst',sub:'Telecom Carriers, ISPs, Broadband Operators · 25–2,000',color:'#a78bfa'},
+  {num:8,sdr:'Darren',title:'NOC Engineer / Network Operations Center Analyst',sub:'Telecom Carriers, ISPs, Broadband Operators · 25-2,000',color:'#a78bfa'},
 ];
 // PEOPLE is now dynamic — built from loaded briefs (see filteredCamps below)
 const SEQUENCE = [
@@ -276,22 +276,155 @@ const STATUS_CFG={
 const TASK_TYPES=['Next Action','Project'];
 const HORIZONS=['Ground','Horizon 1','Horizon 2','Horizon 3','Horizon 4','Horizon 5'];
 
-const TASK_PER_PAGE=10;
+const TASK_PER_PAGE=5;
+// ─ Multi-select assignee dropdown component ────────────────────────────────────────
+// Renders pill avatars for selected users and a dropdown checklist to add/remove
+function AssigneeMultiSelect({ users, selectedIds, onChange }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef ? null : null; // simple click-outside via onBlur on container
+  const selected = users.filter(u => selectedIds.includes(u.id));
+  const COLORS = ['#06E5EC','#4D8DFF','#8B7CF6','#F5B945','#2DD4BF','#F2667A','#A5B4FC'];
+
+  const toggle = (id) => {
+    if (selectedIds.includes(id)) onChange(selectedIds.filter(x => x !== id));
+    else onChange([...selectedIds, id]);
+  };
+
+  return (
+    <div style={{position:'relative'}}>
+      {/* Trigger */}
+      <div
+        onClick={() => setOpen(o => !o)}
+        style={{
+          minHeight:38, padding:'4px 10px', borderRadius:8,
+          border:'1px solid rgba(255,255,255,.12)',
+          background:'rgba(255,255,255,.04)',
+          cursor:'pointer', display:'flex', flexWrap:'wrap',
+          alignItems:'center', gap:4,
+        }}
+      >
+        {selected.length === 0 && (
+          <span style={{font:'13px Inter,sans-serif',color:'rgba(255,255,255,.3)'}}>Select people…</span>
+        )}
+        {selected.map((u, i) => (
+          <span key={u.id} style={{
+            display:'inline-flex', alignItems:'center', gap:4,
+            padding:'2px 8px 2px 2px', borderRadius:20,
+            background:`${COLORS[i % COLORS.length]}18`,
+            border:`1px solid ${COLORS[i % COLORS.length]}44`,
+            font:'600 11px Inter,sans-serif',
+            color: COLORS[i % COLORS.length],
+          }}>
+            <span style={{
+              width:18, height:18, borderRadius:'50%',
+              background: COLORS[i % COLORS.length],
+              color:'#000', font:'700 9px Inter,sans-serif',
+              display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0,
+            }}>{(u.name||'?')[0].toUpperCase()}</span>
+            {(u.name||'').split(' ')[0]}
+          </span>
+        ))}
+        <span style={{marginLeft:'auto',color:'rgba(255,255,255,.3)',fontSize:10,flexShrink:0}}>▾</span>
+      </div>
+
+      {/* Dropdown */}
+      {open && (
+        <div
+          style={{
+            position:'absolute', top:'calc(100% + 4px)', left:0, right:0, zIndex:9999,
+            background:'#0d1a42', border:'1px solid rgba(255,255,255,.15)',
+            borderRadius:10, boxShadow:'0 12px 40px rgba(0,0,0,.6)',
+            maxHeight:240, overflowY:'auto',
+          }}
+          // Close on outside click
+          onMouseLeave={() => {}}
+        >
+          {/* Close overlay */}
+          <div
+            style={{position:'fixed',inset:0,zIndex:-1}}
+            onClick={() => setOpen(false)}
+          />
+          {users.map((u, i) => {
+            const checked = selectedIds.includes(u.id);
+            const color = COLORS[i % COLORS.length];
+            return (
+              <div
+                key={u.id}
+                onClick={() => toggle(u.id)}
+                style={{
+                  display:'flex', alignItems:'center', gap:10,
+                  padding:'9px 14px',
+                  cursor:'pointer',
+                  background: checked ? `${color}10` : 'transparent',
+                  borderBottom:'1px solid rgba(255,255,255,.05)',
+                  transition:'background .1s',
+                }}
+                onMouseEnter={e => e.currentTarget.style.background = checked ? `${color}18` : 'rgba(255,255,255,.05)'}
+                onMouseLeave={e => e.currentTarget.style.background = checked ? `${color}10` : 'transparent'}
+              >
+                {/* Checkbox */}
+                <span style={{
+                  width:16, height:16, borderRadius:4, flexShrink:0,
+                  border:`2px solid ${checked ? color : 'rgba(255,255,255,.25)'}`,
+                  background: checked ? color : 'transparent',
+                  display:'flex', alignItems:'center', justifyContent:'center',
+                  transition:'all .15s',
+                }}>
+                  {checked && <svg width="9" height="9" viewBox="0 0 12 12"><polyline points="2,6 5,9 10,3" stroke="#000" strokeWidth="2" fill="none" strokeLinecap="round"/></svg>}
+                </span>
+                {/* Avatar */}
+                <span style={{
+                  width:24, height:24, borderRadius:'50%', flexShrink:0,
+                  background: color, color:'#000',
+                  font:'700 11px Inter,sans-serif',
+                  display:'flex', alignItems:'center', justifyContent:'center',
+                }}>{(u.name||'?')[0].toUpperCase()}</span>
+                {/* Name + email */}
+                <div style={{flex:1, minWidth:0}}>
+                  <div style={{font:'600 13px Inter,sans-serif', color: checked ? '#EAF0FF' : '#9FB0D8'}}>
+                    {u.name || u.email}
+                  </div>
+                  <div style={{font:'10px Inter,sans-serif', color:'rgba(255,255,255,.3)', marginTop:1}}>
+                    {u.email}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+          {users.length === 0 && (
+            <div style={{padding:'16px',font:'13px Inter,sans-serif',color:'#7E8DB5',textAlign:'center'}}>
+              Loading users…
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function TaskListSection({authHeaders}){
   const [tasks,setTasks]=useState([]);
   const [loading,setLoading]=useState(true);
   const [filterStatus,setFilterStatus]=useState('all');
   const [search,setSearch]=useState('');
   const [taskPage,setTaskPage]=useState(0);
-  const [modal,setModal]=useState(null); // null | {mode:'add'} | {mode:'edit', task}
+  const [modal,setModal]=useState(null);
   const [saving,setSaving]=useState(false);
-  const BLANK={description:'',status:'pending',task_type:'Next Action',horizon:'Ground',
-    accountable_person:'',due_date_suggestion:'',priority_score:'',details:''};
+  const [allUsers,setAllUsers]=useState([]);
+  const BLANK={title:'',description:'',status:'pending',due_date:'',assigned_to:[]};
   const [form,setForm]=useState(BLANK);
+
+  // Load users once
+  useEffect(()=>{
+    fetch('/api/users',{headers:authHeaders()})
+      .then(r=>r.ok?r.json():null)
+      .then(j=>{ if(j?.users) setAllUsers(j.users); })
+      .catch(()=>{});
+  },[]);
 
   const load=()=>{
     setLoading(true);
-    fetch('/api/user-tasks?limit=200',{headers:authHeaders()})
+    fetch('/api/dashboard-tasks',{headers:authHeaders()})
       .then(r=>r.ok?r.json():null)
       .then(j=>{ if(j?.tasks) setTasks(j.tasks); })
       .catch(()=>{})
@@ -300,19 +433,29 @@ function TaskListSection({authHeaders}){
   useEffect(()=>{ load(); },[]);
 
   const openAdd=()=>{ setForm(BLANK); setModal({mode:'add'}); };
-  const openEdit=(t)=>{ setForm({
-    description:t.description||'', status:t.status||'pending',
-    task_type:t.task_type||'Next Action', horizon:t.horizon||'Ground',
-    accountable_person:t.accountable_person||'', due_date_suggestion:t.due_date_suggestion||'',
-    priority_score:t.priority_score||'', details:t.details||'',
-  }); setModal({mode:'edit',task:t}); };
+  const openEdit=(t)=>{
+    setForm({
+      title:t.title||'',
+      description:t.description||'',
+      status:t.status||'pending',
+      due_date:t.due_date?t.due_date.split('T')[0]:'',
+      assigned_to:Array.isArray(t.assigned_to)?t.assigned_to:[],
+    });
+    setModal({mode:'edit',task:t});
+  };
 
   const handleSave=async(e)=>{
     e.preventDefault(); setSaving(true);
     try{
-      const body={...form, priority_score:form.priority_score?Number(form.priority_score):null};
+      const body={
+        title:form.title,
+        description:form.description||null,
+        status:form.status,
+        due_date:form.due_date||null,
+        assigned_to:form.assigned_to||[],
+      };
       const isEdit=modal.mode==='edit';
-      const res=await fetch(isEdit?`/api/user-tasks/${modal.task.id}`:'/api/user-tasks',{
+      const res=await fetch(isEdit?`/api/dashboard-tasks/${modal.task.id}`:'/api/dashboard-tasks',{
         method:isEdit?'PATCH':'POST',
         headers:{...authHeaders(),'Content-Type':'application/json'},
         body:JSON.stringify(body),
@@ -323,13 +466,13 @@ function TaskListSection({authHeaders}){
 
   const handleDelete=async(id)=>{
     if(!window.confirm('Delete this task?')) return;
-    await fetch(`/api/user-tasks/${id}`,{method:'DELETE',headers:authHeaders()});
+    await fetch(`/api/dashboard-tasks/${id}`,{method:'DELETE',headers:authHeaders()});
     setTasks(prev=>prev.filter(t=>t.id!==id));
   };
 
   const handleStatusToggle=async(task)=>{
     const next=task.status==='done'?'pending':'done';
-    await fetch(`/api/user-tasks/${task.id}`,{
+    await fetch(`/api/dashboard-tasks/${task.id}`,{
       method:'PATCH',
       headers:{...authHeaders(),'Content-Type':'application/json'},
       body:JSON.stringify({status:next}),
@@ -337,9 +480,45 @@ function TaskListSection({authHeaders}){
     setTasks(prev=>prev.map(t=>t.id===task.id?{...t,status:next}:t));
   };
 
+  const PILL_COLORS=['#06E5EC','#4D8DFF','#8B7CF6','#F5B945','#2DD4BF','#F2667A','#A5B4FC'];
+
+  const AssigneePills=({task})=>{
+    const ids=Array.isArray(task.assigned_to)?task.assigned_to:[];
+    if(ids.length===0) return <span style={{font:'11px Inter,sans-serif',color:'#7E8DB5'}}>—</span>;
+    const enriched=Array.isArray(task.assignees)?task.assignees:[];
+    return(
+      <div style={{display:'flex',flexWrap:'wrap',gap:3,alignItems:'center'}}>
+        {ids.slice(0,3).map((id,i)=>{
+          const u=enriched.find(a=>a.id===id)||allUsers.find(u=>u.id===id);
+          const color=PILL_COLORS[i%PILL_COLORS.length];
+          return(
+            <span key={id} title={u?.name||''} style={{
+              display:'inline-flex',alignItems:'center',gap:3,
+              padding:'1px 6px 1px 2px',borderRadius:20,
+              background:`${color}15`,border:`1px solid ${color}40`,
+              font:'600 10px Inter,sans-serif',color,
+            }}>
+              <span style={{width:16,height:16,borderRadius:'50%',background:color,color:'#000',
+                font:'700 9px Inter,sans-serif',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
+                {(u?.name||'?')[0].toUpperCase()}
+              </span>
+              {(u?.name||'').split(' ')[0]||`#${id}`}
+            </span>
+          );
+        })}
+        {ids.length>3&&<span style={{font:'10px Inter,sans-serif',color:'rgba(255,255,255,.4)'}}>+{ids.length-3}</span>}
+      </div>
+    );
+  };
+
+  const getSearchText=(t)=>[
+    t.title,t.description,
+    ...(Array.isArray(t.assignees)?t.assignees.map(a=>a.name):[])
+  ].filter(Boolean).join(' ').toLowerCase();
+
   const filtered=tasks
     .filter(t=>filterStatus==='all'||t.status===filterStatus)
-    .filter(t=>!search||t.description.toLowerCase().includes(search.toLowerCase())||(t.accountable_person||'').toLowerCase().includes(search.toLowerCase()));
+    .filter(t=>!search||getSearchText(t).includes(search.toLowerCase()));
   const taskPages=Math.ceil(filtered.length/TASK_PER_PAGE);
   const pagedTasks=filtered.slice(taskPage*TASK_PER_PAGE,(taskPage+1)*TASK_PER_PAGE);
 
@@ -349,32 +528,33 @@ function TaskListSection({authHeaders}){
   const lbl={font:'600 10px Inter,sans-serif',letterSpacing:'.07em',textTransform:'uppercase',
     color:'#7E8DB5',marginBottom:5,display:'block'};
 
-  return (
+  const fmtDate=(d)=>{
+    if(!d) return '—';
+    const dt=new Date(d);
+    return dt.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+  };
+
+  return(
     <div style={{marginTop:32,marginBottom:32}}>
       {/* Header */}
       <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:14}}>
         <div className="cc-sect-label" style={{marginBottom:0}}>Task list</div>
         <div style={{display:'flex',alignItems:'center',gap:8}}>
-          {/* Search */}
           <div style={{position:'relative'}}>
             <svg style={{position:'absolute',left:9,top:'50%',transform:'translateY(-50%)',pointerEvents:'none'}} width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#7E8DB5" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-            <input value={search} onChange={e=>{ setSearch(e.target.value); setTaskPage(0); }} placeholder="Search tasks…"
+            <input value={search} onChange={e=>{setSearch(e.target.value);setTaskPage(0);}} placeholder="Search tasks…"
               style={{paddingLeft:30,paddingRight:search?24:10,height:32,borderRadius:8,
                 border:'1px solid rgba(255,255,255,.15)',background:'rgba(255,255,255,.05)',
                 color:'#EAF0FF',font:'13px Inter,sans-serif',outline:'none',width:180}}/>
-            {search&&<span onClick={()=>{ setSearch(''); setTaskPage(0); }} style={{position:'absolute',right:8,top:'50%',
+            {search&&<span onClick={()=>{setSearch('');setTaskPage(0);}} style={{position:'absolute',right:8,top:'50%',
               transform:'translateY(-50%)',color:'#7E8DB5',cursor:'pointer',fontSize:14}}>×</span>}
           </div>
-          {/* Status filter */}
-          <select value={filterStatus} onChange={e=>{ setFilterStatus(e.target.value); setTaskPage(0); }}
+          <select value={filterStatus} onChange={e=>{setFilterStatus(e.target.value);setTaskPage(0);}}
             style={{height:32,padding:'0 10px',borderRadius:8,border:'1px solid rgba(255,255,255,.15)',
               background:'rgba(255,255,255,.05)',color:'#EAF0FF',font:'12px Inter,sans-serif',outline:'none'}}>
             <option value="all">All statuses</option>
-            {Object.entries(STATUS_CFG).map(([k,v])=>(
-              <option key={k} value={k}>{v.label}</option>
-            ))}
+            {Object.entries(STATUS_CFG).map(([k,v])=>(<option key={k} value={k}>{v.label}</option>))}
           </select>
-          {/* Add button */}
           <button onClick={openAdd}
             style={{display:'inline-flex',alignItems:'center',gap:6,height:32,padding:'0 14px',
               borderRadius:8,border:'1px solid rgba(6,229,236,.4)',background:'rgba(6,229,236,.08)',
@@ -384,63 +564,63 @@ function TaskListSection({authHeaders}){
         </div>
       </div>
 
-      {/* Task cards */}
+      {/* Table */}
       <div style={{background:'rgba(255,255,255,.025)',border:'1px solid rgba(255,255,255,.08)',borderRadius:12,overflow:'hidden'}}>
-        {/* Table header */}
-        <div style={{display:'grid',gridTemplateColumns:'32px 1fr 90px 90px 100px 100px 130px',
+        <div style={{display:'grid',gridTemplateColumns:'32px 1fr 1.4fr 180px 110px 120px',
           padding:'10px 16px',borderBottom:'1px solid rgba(255,255,255,.08)',background:'rgba(2,8,32,.3)'}}>
-          {['','Task / Description','Type','Horizon','Assigned to','Due','Status'].map((h,i)=>(
+          {['','Title','Description','Assigned to','Due date','Status'].map((h,i)=>(
             <span key={i} style={{font:'600 10px Inter,sans-serif',letterSpacing:'.06em',textTransform:'uppercase',color:'#7E8DB5'}}>{h}</span>
           ))}
         </div>
-
         {loading
-          ? [1,2,3].map(i=>(
+          ?[1,2,3].map(i=>(
               <div key={i} style={{padding:'14px 16px',borderBottom:'1px solid rgba(255,255,255,.05)'}}>
                 <div className="cc-skel" style={{height:16,width:'60%'}}/>
               </div>
             ))
-          : filtered.length===0
-            ? <div style={{padding:32,textAlign:'center',font:'13px Inter,sans-serif',color:'#7E8DB5'}}>
-                {search||filterStatus!=='all'?'No matching tasks.':'No tasks yet. Click “+ New Task” to add one.'}
+          :filtered.length===0
+            ?<div style={{padding:32,textAlign:'center',font:'13px Inter,sans-serif',color:'#7E8DB5'}}>
+                {search||filterStatus!=='all'?'No matching tasks.':'No tasks yet. Click "+ New Task" to add one.'}
               </div>
-            : pagedTasks.map(t=>{
+            :pagedTasks.map(t=>{
                 const sc=STATUS_CFG[t.status]||STATUS_CFG.pending;
-                return (
-                  <div key={t.id} style={{display:'grid',gridTemplateColumns:'32px 1fr 90px 90px 100px 100px 130px',
+                return(
+                  <div key={t.id} style={{display:'grid',gridTemplateColumns:'32px 1fr 1.4fr 180px 110px 120px',
                     alignItems:'center',padding:'11px 16px',
                     borderBottom:'1px solid rgba(255,255,255,.05)',
-                    opacity:t.status==='dismissed'?.5:1,
-                    transition:'background .1s'}}
+                    opacity:t.status==='dismissed'?.5:1,transition:'background .1s'}}
                     onMouseEnter={e=>e.currentTarget.style.background='rgba(255,255,255,.03)'}
                     onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
                     {/* Checkbox */}
                     <span onClick={()=>handleStatusToggle(t)} style={{cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center'}}>
-                      <span style={{width:16,height:16,borderRadius:4,border:`2px solid ${t.status==='done'?'#2DD4BF':'rgba(255,255,255,.25)'}`,
-                        background:t.status==='done'?'#2DD4BF':'transparent',display:'flex',alignItems:'center',justifyContent:'center',transition:'all .15s'}}>
+                      <span style={{width:16,height:16,borderRadius:4,
+                        border:`2px solid ${t.status==='done'?'#2DD4BF':'rgba(255,255,255,.25)'}`,
+                        background:t.status==='done'?'#2DD4BF':'transparent',
+                        display:'flex',alignItems:'center',justifyContent:'center',transition:'all .15s'}}>
                         {t.status==='done'&&<svg width="9" height="9" viewBox="0 0 12 12"><polyline points="2,6 5,9 10,3" stroke="#000" strokeWidth="2" fill="none" strokeLinecap="round"/></svg>}
                       </span>
                     </span>
-                    {/* Description + details */}
-                    <div style={{minWidth:0,paddingRight:12}}>
-                      <div style={{font:'13px Inter,sans-serif',color:t.status==='done'?'#7E8DB5':'#EAF0FF',
+                    {/* Title */}
+                    <div style={{minWidth:0,paddingRight:8}}>
+                      <div style={{font:'600 13px Inter,sans-serif',
+                        color:t.status==='done'?'#7E8DB5':'#EAF0FF',
                         textDecoration:t.status==='done'?'line-through':'none',
                         overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}
-                        title={t.description}>{t.description}</div>
-                      {t.details&&(
-                        <div style={{font:'11px/1.4 Inter,sans-serif',color:'#7E8DB5',
-                          marginTop:2,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}
-                          title={t.details}>{t.details}</div>
-                      )}
+                        title={t.title}>{t.title}</div>
                     </div>
-                    {/* Type */}
-                    <span style={{font:'11px Inter,sans-serif',color:'#9FB0D8'}}>{t.task_type||'—'}</span>
-                    {/* Horizon */}
-                    <span style={{font:'11px Inter,sans-serif',color:'#9FB0D8'}}>{t.horizon||'—'}</span>
-                    {/* Assigned */}
-                    <span style={{font:'11px Inter,sans-serif',color:'#9FB0D8',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{t.accountable_person||'—'}</span>
-                    {/* Due */}
-                    <span style={{font:'11px Inter,sans-serif',color:t.due_date_suggestion?'#F5B945':'#7E8DB5'}}>{t.due_date_suggestion||'—'}</span>
+                    {/* Description */}
+                    <div style={{minWidth:0,paddingRight:8}}>
+                      <div style={{font:'12px Inter,sans-serif',color:'#7E8DB5',
+                        overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}
+                        title={t.description||''}>{t.description||'—'}</div>
+                    </div>
+                    {/* Assigned to pills */}
+                    <div style={{minWidth:0}}><AssigneePills task={t}/></div>
+                    {/* Due date */}
+                    <span style={{font:'11px Inter,sans-serif',
+                      color:t.due_date?'#F5B945':'#7E8DB5',whiteSpace:'nowrap'}}>
+                      {fmtDate(t.due_date)}
+                    </span>
                     {/* Status + actions */}
                     <span style={{display:'flex',alignItems:'center',gap:6,overflow:'visible'}}>
                       <span style={{font:'700 10px Inter,sans-serif',padding:'2px 8px',borderRadius:20,
@@ -462,7 +642,6 @@ function TaskListSection({authHeaders}){
         }
       </div>
 
-      {/* Count */}
       {!loading&&filtered.length>0&&(
         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginTop:8}}>
           <span style={{font:'11px Inter,sans-serif',color:'#7E8DB5'}}>
@@ -475,26 +654,50 @@ function TaskListSection({authHeaders}){
 
       {/* Add / Edit Modal */}
       {modal&&(
-        <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,.7)',zIndex:1000,display:'flex',alignItems:'center',justifyContent:'center',padding:20}}
+        <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,.7)',zIndex:1000,
+          display:'flex',alignItems:'center',justifyContent:'center',padding:20}}
           onClick={()=>setModal(null)}>
-          <div style={{width:'100%',maxWidth:560,background:'#080f2a',border:'1px solid rgba(255,255,255,.12)',
-            borderRadius:14,boxShadow:'0 40px 80px rgba(0,0,0,.7)',overflow:'hidden'}}
+          <div style={{width:'100%',maxWidth:620,background:'#080f2a',
+            border:'1px solid rgba(255,255,255,.12)',borderRadius:14,
+            boxShadow:'0 40px 80px rgba(0,0,0,.7)',overflow:'hidden'}}
             onClick={e=>e.stopPropagation()}>
             <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',
-              padding:'16px 24px',borderBottom:'1px solid rgba(255,255,255,.08)'}}>
-              <div style={{font:'700 16px Inter,sans-serif',color:'#fff'}}>
+              padding:'18px 28px',borderBottom:'1px solid rgba(255,255,255,.08)'}}>
+              <div style={{font:'700 17px Inter,sans-serif',color:'#fff'}}>
                 {modal.mode==='edit'?'Edit Task':'New Task'}
               </div>
               <button onClick={()=>setModal(null)}
-                style={{background:'none',border:'none',color:'#7E8DB5',fontSize:20,cursor:'pointer',lineHeight:1}}>×</button>
+                style={{background:'none',border:'none',color:'#7E8DB5',fontSize:22,cursor:'pointer',lineHeight:1}}>×</button>
             </div>
-            <form onSubmit={handleSave} style={{padding:'20px 24px',display:'flex',flexDirection:'column',gap:14}}>
+            <form onSubmit={handleSave} style={{padding:'24px 28px',display:'flex',flexDirection:'column',gap:16,maxHeight:'82vh',overflowY:'auto'}}>
+              {/* Title */}
               <div>
-                <label style={lbl}>Description *</label>
-                <textarea required rows={3} value={form.description}
-                  onChange={e=>setForm(f=>({...f,description:e.target.value}))}
-                  style={{...fi,resize:'vertical',fontFamily:'Inter,sans-serif'}}/>
+                <label style={lbl}>Title *</label>
+                <input required value={form.title} onChange={e=>setForm(f=>({...f,title:e.target.value}))}
+                  placeholder="What needs to be done?" style={fi}/>
               </div>
+              {/* Description */}
+              <div>
+                <label style={lbl}>Description</label>
+                <textarea rows={3} value={form.description} onChange={e=>setForm(f=>({...f,description:e.target.value}))}
+                  placeholder="Add more detail (optional)"
+                  style={{...fi,resize:'vertical',fontFamily:'Inter,sans-serif',lineHeight:1.5}}/>
+              </div>
+              {/* Assigned to */}
+              <div>
+                <label style={{...lbl,color:'#06E5EC'}}>
+                  Assigned to
+                  <span style={{fontWeight:400,textTransform:'none',letterSpacing:0,marginLeft:6,color:'rgba(255,255,255,.3)',fontSize:10}}>
+                    — visible to all users
+                  </span>
+                </label>
+                <AssigneeMultiSelect
+                  users={allUsers}
+                  selectedIds={form.assigned_to||[]}
+                  onChange={ids=>setForm(f=>({...f,assigned_to:ids}))}
+                />
+              </div>
+              {/* Status + Due date */}
               <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
                 <div>
                   <label style={lbl}>Status</label>
@@ -503,44 +706,18 @@ function TaskListSection({authHeaders}){
                   </select>
                 </div>
                 <div>
-                  <label style={lbl}>Task Type</label>
-                  <select value={form.task_type} onChange={e=>setForm(f=>({...f,task_type:e.target.value}))} style={{...fi,height:38}}>
-                    {TASK_TYPES.map(t=>(<option key={t} value={t}>{t}</option>))}
-                  </select>
-                </div>
-                <div>
-                  <label style={lbl}>Horizon</label>
-                  <select value={form.horizon} onChange={e=>setForm(f=>({...f,horizon:e.target.value}))} style={{...fi,height:38}}>
-                    {HORIZONS.map(h=>(<option key={h} value={h}>{h}</option>))}
-                  </select>
-                </div>
-                <div>
-                  <label style={lbl}>Assigned To</label>
-                  <input value={form.accountable_person} onChange={e=>setForm(f=>({...f,accountable_person:e.target.value}))}
-                    placeholder="e.g. Abhinanda" style={fi}/>
-                </div>
-                <div>
-                  <label style={lbl}>Due</label>
-                  <input value={form.due_date_suggestion} onChange={e=>setForm(f=>({...f,due_date_suggestion:e.target.value}))}
-                    placeholder="e.g. today, ASAP, 2026-07-15" style={fi}/>
-                </div>
-                <div>
-                  <label style={lbl}>Priority (1–100)</label>
-                  <input type="number" min="1" max="100" value={form.priority_score}
-                    onChange={e=>setForm(f=>({...f,priority_score:e.target.value}))} style={fi}/>
+                  <label style={lbl}>Due date</label>
+                  <input type="date" value={form.due_date} onChange={e=>setForm(f=>({...f,due_date:e.target.value}))}
+                    style={{...fi,colorScheme:'dark'}}/>
                 </div>
               </div>
-              <div>
-                <label style={lbl}>Details</label>
-                <textarea rows={2} value={form.details} onChange={e=>setForm(f=>({...f,details:e.target.value}))}
-                  style={{...fi,resize:'vertical',fontFamily:'Inter,sans-serif'}}/>
-              </div>
-              <div style={{display:'flex',justifyContent:'flex-end',gap:10,marginTop:4}}>
+              <div style={{display:'flex',justifyContent:'flex-end',gap:10,marginTop:4,
+                paddingTop:8,borderTop:'1px solid rgba(255,255,255,.06)'}}>
                 <button type="button" onClick={()=>setModal(null)}
-                  style={{padding:'8px 20px',borderRadius:8,border:'1px solid rgba(255,255,255,.15)',
+                  style={{padding:'9px 22px',borderRadius:8,border:'1px solid rgba(255,255,255,.15)',
                     background:'none',color:'#9FB0D8',font:'600 13px Inter,sans-serif',cursor:'pointer'}}>Cancel</button>
                 <button type="submit" disabled={saving}
-                  style={{padding:'8px 24px',borderRadius:8,border:'none',
+                  style={{padding:'9px 28px',borderRadius:8,border:'none',
                     background:saving?'rgba(6,229,236,.4)':'#06E5EC',
                     color:'#000814',font:'700 13px Inter,sans-serif',cursor:saving?'default':'pointer'}}>
                   {saving?'Saving…':modal.mode==='edit'?'Save Changes':'Create Task'}
@@ -554,6 +731,301 @@ function TaskListSection({authHeaders}){
   );
 }
 // ────────────────────────────────────────────────────────────────────────────
+
+// ─ Library Section ───────────────────────────────────────────────────────────────────
+const LINK_TYPES = [
+  { value: 'spreadsheet', label: 'Spreadsheet', icon: '📅', color: '#28c76f' },
+  { value: 'doc',         label: 'Document',    icon: '📄', color: '#4D8DFF' },
+  { value: 'other',       label: 'Other',       icon: '🔗', color: '#8B7CF6' },
+];
+
+function LibrarySection({ authHeaders }) {
+  const [links, setLinks] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [modal, setModal] = useState(null); // null | {mode:'add'} | {mode:'edit', link}
+  const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(null);
+  const BLANK = { title: '', url: '', link_type: 'spreadsheet', description: '' };
+  const [form, setForm] = useState(BLANK);
+
+  const load = () => {
+    setLoading(true);
+    fetch('/api/library-links', { headers: authHeaders() })
+      .then(r => r.ok ? r.json() : null)
+      .then(j => { if (j?.links) setLinks(j.links); })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  };
+  useEffect(() => { load(); }, []);
+
+  const openAdd = () => { setForm(BLANK); setModal({ mode: 'add' }); };
+  const openEdit = (l) => {
+    setForm({ title: l.title, url: l.url, link_type: l.link_type, description: l.description || '' });
+    setModal({ mode: 'edit', link: l });
+  };
+
+  const handleSave = async (e) => {
+    e.preventDefault(); setSaving(true);
+    try {
+      const isEdit = modal.mode === 'edit';
+      const res = await fetch(
+        isEdit ? `/api/library-links/${modal.link.id}` : '/api/library-links',
+        {
+          method: isEdit ? 'PATCH' : 'POST',
+          headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+          body: JSON.stringify(form),
+        }
+      );
+      if (res.ok) { setModal(null); load(); }
+    } finally { setSaving(false); }
+  };
+
+  const handleDelete = async (id) => {
+    if (!window.confirm('Remove this link from the library?')) return;
+    setDeleting(id);
+    await fetch(`/api/library-links/${id}`, { method: 'DELETE', headers: authHeaders() });
+    setLinks(prev => prev.filter(l => l.id !== id));
+    setDeleting(null);
+  };
+
+  const fi = {
+    width: '100%', boxSizing: 'border-box', padding: '8px 12px', borderRadius: 8,
+    border: '1px solid rgba(255,255,255,.12)', background: 'rgba(255,255,255,.04)',
+    color: '#EAF0FF', font: '13px Inter,sans-serif', outline: 'none',
+  };
+  const lbl = {
+    font: '600 10px Inter,sans-serif', letterSpacing: '.07em', textTransform: 'uppercase',
+    color: '#7E8DB5', marginBottom: 5, display: 'block',
+  };
+
+  // Group by type
+  const grouped = LINK_TYPES.map(t => ({
+    ...t,
+    items: links.filter(l => l.link_type === t.value),
+  })).filter(g => g.items.length > 0);
+
+  return (
+    <div style={{ marginTop: 32, marginBottom: 32 }}>
+      {/* Header */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+        <div className="cc-sect-label" style={{ marginBottom: 0 }}>Library</div>
+        <button onClick={openAdd} style={{
+          display: 'inline-flex', alignItems: 'center', gap: 6, height: 32, padding: '0 14px',
+          borderRadius: 8, border: '1px solid rgba(6,229,236,.4)', background: 'rgba(6,229,236,.08)',
+          color: '#06E5EC', font: '600 12px Inter,sans-serif', cursor: 'pointer',
+        }}>
+          <span style={{ fontSize: 16, lineHeight: 1 }}>+</span> Add Link
+        </button>
+      </div>
+
+      {/* Links grid */}
+      {loading ? (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(280px,1fr))', gap: 12 }}>
+          {[1, 2, 3].map(i => (
+            <div key={i} style={{ background: 'rgba(255,255,255,.03)', borderRadius: 12, padding: 20 }}>
+              <div className="cc-skel" style={{ height: 14, width: '60%', marginBottom: 10 }} />
+              <div className="cc-skel" style={{ height: 11, width: '80%' }} />
+            </div>
+          ))}
+        </div>
+      ) : links.length === 0 ? (
+        <div style={{
+          padding: '36px 24px', textAlign: 'center',
+          background: 'rgba(255,255,255,.025)', border: '1px solid rgba(255,255,255,.08)',
+          borderRadius: 12, color: '#7E8DB5', font: '13px Inter,sans-serif',
+        }}>
+          <div style={{ fontSize: 32, marginBottom: 10 }}>📂</div>
+          No links yet. Click "+ Add Link" to add spreadsheets or documents.
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+          {grouped.length > 0 ? grouped.map(group => (
+            <div key={group.value}>
+              {/* Group label */}
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: 8,
+                marginBottom: 10, font: '600 11px Inter,sans-serif',
+                letterSpacing: '.06em', textTransform: 'uppercase', color: group.color,
+              }}>
+                <span>{group.icon}</span>
+                <span>{group.label}s</span>
+                <span style={{ color: 'rgba(255,255,255,.2)', fontWeight: 400 }}>({group.items.length})</span>
+              </div>
+              {/* Cards */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(280px,1fr))', gap: 12 }}>
+                {group.items.map(link => (
+                  <div key={link.id} style={{
+                    background: 'rgba(255,255,255,.03)',
+                    border: `1px solid rgba(255,255,255,.08)`,
+                    borderRadius: 12, padding: '16px 18px',
+                    position: 'relative', overflow: 'hidden',
+                    transition: 'border-color .15s, background .15s',
+                  }}
+                    onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,.05)'; e.currentTarget.style.borderColor = `${group.color}44`; }}
+                    onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,.03)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,.08)'; }}
+                  >
+                    {/* Accent bar */}
+                    <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, background: group.color, borderRadius: '12px 12px 0 0' }} />
+                    {/* Icon + title */}
+                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginTop: 4 }}>
+                      <span style={{ fontSize: 20, flexShrink: 0 }}>{group.icon}</span>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <a
+                          href={link.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          style={{
+                            font: '600 14px Inter,sans-serif', color: '#EAF0FF',
+                            textDecoration: 'none', display: 'block',
+                            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                          }}
+                          onMouseEnter={e => e.target.style.color = group.color}
+                          onMouseLeave={e => e.target.style.color = '#EAF0FF'}
+                          title={link.title}
+                        >
+                          {link.title}
+                        </a>
+                        {link.description && (
+                          <div style={{
+                            font: '11px/1.4 Inter,sans-serif', color: '#7E8DB5',
+                            marginTop: 4, overflow: 'hidden', textOverflow: 'ellipsis',
+                            display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
+                          }}>{link.description}</div>
+                        )}
+                      </div>
+                    </div>
+                    {/* Footer: added by + actions */}
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 14 }}>
+                      <span style={{ font: '10px Inter,sans-serif', color: 'rgba(255,255,255,.25)' }}>
+                        {link.created_by_name ? `Added by ${link.created_by_name.split(' ')[0]}` : ''}
+                      </span>
+                      <div style={{ display: 'flex', gap: 6 }}>
+                        <button onClick={() => openEdit(link)} title="Edit"
+                          style={{
+                            width: 26, height: 26, borderRadius: 6,
+                            border: '1px solid rgba(255,255,255,.12)',
+                            background: 'rgba(255,255,255,.06)', color: '#9FB0D8',
+                            cursor: 'pointer', fontSize: 11,
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          }}>&#9998;</button>
+                        <button
+                          onClick={() => handleDelete(link.id)}
+                          disabled={deleting === link.id}
+                          title="Remove"
+                          style={{
+                            width: 26, height: 26, borderRadius: 6,
+                            border: '1px solid rgba(242,102,122,.25)',
+                            background: 'rgba(242,102,122,.06)', color: '#F2667A',
+                            cursor: 'pointer', fontSize: 14,
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          }}>&#215;</button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )) : (
+            // Flat grid if all same type
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(280px,1fr))', gap: 12 }}>
+              {links.map(link => {
+                const t = LINK_TYPES.find(x => x.value === link.link_type) || LINK_TYPES[2];
+                return (
+                  <div key={link.id} style={{
+                    background: 'rgba(255,255,255,.03)',
+                    border: '1px solid rgba(255,255,255,.08)',
+                    borderRadius: 12, padding: '16px 18px',
+                  }}>
+                    <a href={link.url} target="_blank" rel="noopener noreferrer"
+                      style={{ font: '600 14px Inter,sans-serif', color: '#EAF0FF', textDecoration: 'none' }}>
+                      {t.icon} {link.title}
+                    </a>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Add / Edit Modal */}
+      {modal && (
+        <div
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.7)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}
+          onClick={() => setModal(null)}
+        >
+          <div
+            style={{
+              width: '100%', maxWidth: 520, background: '#080f2a',
+              border: '1px solid rgba(255,255,255,.12)', borderRadius: 14,
+              boxShadow: '0 40px 80px rgba(0,0,0,.7)', overflow: 'hidden',
+            }}
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Modal header */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '18px 24px', borderBottom: '1px solid rgba(255,255,255,.08)' }}>
+              <div style={{ font: '700 16px Inter,sans-serif', color: '#fff' }}>
+                {modal.mode === 'edit' ? 'Edit Link' : 'Add Library Link'}
+              </div>
+              <button onClick={() => setModal(null)} style={{ background: 'none', border: 'none', color: '#7E8DB5', fontSize: 22, cursor: 'pointer', lineHeight: 1 }}>&times;</button>
+            </div>
+            {/* Form */}
+            <form onSubmit={handleSave} style={{ padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+              <div>
+                <label style={lbl}>Type</label>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  {LINK_TYPES.map(t => (
+                    <button
+                      key={t.value}
+                      type="button"
+                      onClick={() => setForm(f => ({ ...f, link_type: t.value }))}
+                      style={{
+                        flex: 1, padding: '8px 0', borderRadius: 8, cursor: 'pointer',
+                        font: '600 12px Inter,sans-serif',
+                        border: `1px solid ${form.link_type === t.value ? t.color : 'rgba(255,255,255,.12)'}`,
+                        background: form.link_type === t.value ? `${t.color}18` : 'rgba(255,255,255,.03)',
+                        color: form.link_type === t.value ? t.color : '#7E8DB5',
+                        transition: 'all .15s',
+                      }}
+                    >
+                      {t.icon} {t.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <label style={lbl}>Title *</label>
+                <input required value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))}
+                  placeholder="e.g. CET Designers Tracker" style={fi} />
+              </div>
+              <div>
+                <label style={lbl}>URL *</label>
+                <input required type="url" value={form.url} onChange={e => setForm(f => ({ ...f, url: e.target.value }))}
+                  placeholder="https://docs.google.com/..." style={fi} />
+              </div>
+              <div>
+                <label style={lbl}>Description <span style={{ fontWeight: 400, textTransform: 'none', letterSpacing: 0, color: 'rgba(255,255,255,.3)' }}>(optional)</span></label>
+                <input value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
+                  placeholder="What is this for?" style={fi} />
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 4, paddingTop: 8, borderTop: '1px solid rgba(255,255,255,.06)' }}>
+                <button type="button" onClick={() => setModal(null)} style={{
+                  padding: '9px 20px', borderRadius: 8, border: '1px solid rgba(255,255,255,.15)',
+                  background: 'none', color: '#9FB0D8', font: '600 13px Inter,sans-serif', cursor: 'pointer',
+                }}>Cancel</button>
+                <button type="submit" disabled={saving} style={{
+                  padding: '9px 24px', borderRadius: 8, border: 'none',
+                  background: saving ? 'rgba(6,229,236,.4)' : '#06E5EC',
+                  color: '#000814', font: '700 13px Inter,sans-serif', cursor: saving ? 'default' : 'pointer',
+                }}>{saving ? 'Saving...' : modal.mode === 'edit' ? 'Save Changes' : 'Add Link'}</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 function SalesTab({modalAgent,setModalAgent}) {
   const [period,setPeriod]=useState('7d');
@@ -593,11 +1065,13 @@ function SalesTab({modalAgent,setModalAgent}) {
   const [sdrPage,setSdrPage]=useState(0);
   const [sbPage,setSbPage]=useState(0);
   const [sbSearch,setSbSearch]=useState('');
-  const SDR_PER_PAGE=10;
-  const SB_PER_PAGE=10;
-  const FU_PER_PAGE=10;
+  const SDR_PER_PAGE=5;
+  const SB_PER_PAGE=5;
+  const FU_PER_PAGE=5;
   const [p1Page,setP1Page]=useState(0);
   const [p2Page,setP2Page]=useState(0);
+  const [p1Search,setP1Search]=useState('');
+  const [p2Search,setP2Search]=useState('');
   const [campIdx,setCampIdx]=useState(0);
   const [campEdits,setCampEdits]=useState({});   // overrides keyed by campIdx
   const [customCampaigns,setCustomCampaigns]=useState([]); // ALL briefs loaded from DB (built-ins + user-created)
@@ -844,7 +1318,7 @@ function SalesTab({modalAgent,setModalAgent}) {
   const fmtDp=d=>{ if(!d)return''; const [,m,dd]=d.split('-'); return `${MONTHS_SHORT[+m-1]} ${+dd}`; };
 
   // ── SDR picker helpers ──
-  const dpLabel=dpStart&&dpEnd?`${fmtDp(dpStart)} — ${fmtDp(dpEnd)}`:dpStart?`${fmtDp(dpStart)} — select end`:'Custom range';
+  const dpLabel=dpStart&&dpEnd?`${fmtDp(dpStart)} - ${fmtDp(dpEnd)}`:dpStart?`${fmtDp(dpStart)} - select end`:'Custom range';
 
   const dpWeeks=(()=>{
     const first=new Date(dpY,dpM,1).getDay();
@@ -877,7 +1351,7 @@ function SalesTab({modalAgent,setModalAgent}) {
   };
 
   // ── Sales picker helpers (sp) ──
-  const spLabel=spStart&&spEnd?`${fmtDp(spStart)} — ${fmtDp(spEnd)}`:spStart?`${fmtDp(spStart)} — select end`:'Custom range';
+  const spLabel=spStart&&spEnd?`${fmtDp(spStart)} - ${fmtDp(spEnd)}`:spStart?`${fmtDp(spStart)} - select end`:'Custom range';
 
   const spWeeks=(()=>{
     const first=new Date(spY,spM,1).getDay();
@@ -946,14 +1420,14 @@ function SalesTab({modalAgent,setModalAgent}) {
   const callModalRecords=callsModal&&callRecords
     ?(()=>{
         const list=callsModal.campaign_list||[];
-        // Sandbox: single campaign — filter strictly by campaign_name
+        // Sandbox: single campaign - filter strictly by campaign_name
         if(list.length===1){
           const name=list[0].campaign_name;
           return name
             ?callRecords.filter(r=>r.campaign_name===name)
             :callRecords.filter(r=>r.account_id===callsModal.account_id);
         }
-        // SDR table: multiple campaigns — filter by account_id
+        // SDR table: multiple campaigns - filter by account_id
         // (call_records already date-filtered by the API)
         return callRecords.filter(r=>r.account_id===callsModal.account_id);
       })()
@@ -963,7 +1437,7 @@ function SalesTab({modalAgent,setModalAgent}) {
     e.preventDefault(); setAddingCall(true);
     try{
       if(editingCallId){
-        // Edit mode — PATCH existing record
+        // Edit mode - PATCH existing record
         const res=await fetch(`/api/sales-dashboard/call-records/${editingCallId}`,{
           method:'PATCH',
           headers:{...authHeaders(),'Content-Type':'application/json'},
@@ -975,7 +1449,7 @@ function SalesTab({modalAgent,setModalAgent}) {
           cancelEditCall();
         }
       } else {
-        // Add mode — POST new record
+        // Add mode - POST new record
         const res=await fetch('/api/sales-dashboard/call-records',{
           method:'POST',
           headers:{...authHeaders(),'Content-Type':'application/json'},
@@ -1000,102 +1474,102 @@ function SalesTab({modalAgent,setModalAgent}) {
   const v=l=>skyLoad?<span className="cc-skel" style={{display:'inline-block',width:60,height:40}}/>:l;
 
   const CAMP_DEFAULTS=[
-    // L1 — Digital Ops / Automation Analyst
-    {icp:[{label:'Industry',value:'3PL / Freight Logistics'},{label:'Company Size',value:'50–500 employees'},{label:'Geography',value:'US'},{label:'Tech Stack',value:'McLeod / TMW / MercuryGate TMS · Power Automate · Zapier'},{label:'Revenue',value:'$10M–$200M'},{label:'Trigger',value:'PE-backed or recent acquisition'}],
+    // L1 - Digital Ops / Automation Analyst
+    {icp:[{label:'Industry',value:'3PL / Freight Logistics'},{label:'Company Size',value:'50-500 employees'},{label:'Geography',value:'US'},{label:'Tech Stack',value:'McLeod / TMW / MercuryGate TMS · Power Automate · Zapier'},{label:'Revenue',value:'$10M-$200M'},{label:'Trigger',value:'PE-backed or recent acquisition'}],
      personas:['COO / VP Ops (primary)','Director of Freight Ops','Director of Transportation','Head of Last-Mile','VP of Technology','GM'],
-     signals:['Apollo: Logistics & SC, COO/VP Ops, 50–500 employees','Job postings for Ops Coordinator or Logistics Analyst at 3PLs','Intent data on freight automation / TMS integration','PE-backed 3PLs acquired in last 24 months'],
-     hook:'Manual freight exception tracking, check-calls, appointment scheduling, and detention billing eat 3–5 hrs/dispatcher/day. Labor scales linearly until someone automates it.',
-     valueProp:'Offshore Digital Ops Analyst who maps workflows and builds automations using existing tools (Power Automate, Zapier, TMS APIs) at a fraction of onshore cost — in-seat within 2–3 weeks.'},
-    // L2 — RCM Specialist
-    {icp:[{label:'Industry',value:'Hospitals, Health Systems & ASCs'},{label:'Company Size',value:'50–500 employees'},{label:'Geography',value:'US'},{label:'Tech Stack',value:'Epic · Cerner · athenahealth · Meditech'},{label:'Revenue',value:'$20M–$300M NPR'},{label:'Trigger',value:'AR days >50, denial rate >8%, RCM turnover'}],
+     signals:['Apollo: Logistics & SC, COO/VP Ops, 50-500 employees','Job postings for Ops Coordinator or Logistics Analyst at 3PLs','Intent data on freight automation / TMS integration','PE-backed 3PLs acquired in last 24 months'],
+     hook:'Manual freight exception tracking, check-calls, appointment scheduling, and detention billing eat 3-5 hrs/dispatcher/day. Labor scales linearly until someone automates it.',
+     valueProp:'Offshore Digital Ops Analyst who maps workflows and builds automations using existing tools (Power Automate, Zapier, TMS APIs) at a fraction of onshore cost - in-seat within 2-3 weeks.'},
+    // L2 - RCM Specialist
+    {icp:[{label:'Industry',value:'Hospitals, Health Systems & ASCs'},{label:'Company Size',value:'50-500 employees'},{label:'Geography',value:'US'},{label:'Tech Stack',value:'Epic · Cerner · athenahealth · Meditech'},{label:'Revenue',value:'$20M-$300M NPR'},{label:'Trigger',value:'AR days >50, denial rate >8%, RCM turnover'}],
      personas:['VP / Director of Revenue Cycle (primary)','Director of Patient Financial Services','CFO / VP Finance','Director of Coding & Billing / HIM','COO','CEO / Administrator'],
-     signals:['Apollo: Hospital & HC, 50–500, Director of Revenue Cycle','Job postings for RCM Specialist / Denial Management / Prior Auth Specialist','HFMA member directory'],
-     hook:'RCM turnover runs 30–40% annually. Prior auth requirements up 20%+ YoY. Onshore RCM hires cost $45K–$70K and take 60–90 days, leaving cash on the table.',
-     valueProp:'Dedicated offshore RCM Specialists — ICD-10 certified, trained on Epic/Cerner/Meditech — handling denial management, prior auth follow-up, AR recovery. In-seat 2–3 weeks at 40–55% of onshore cost.'},
-    // L3 — Senior Accountant / FP&A Analyst
-    {icp:[{label:'Industry',value:'PE Portfolio Companies'},{label:'Company Size',value:'PE firms · 5–20 portfolio companies'},{label:'Geography',value:'US + Canada'},{label:'Tech Stack',value:'NetSuite · QuickBooks · Sage Intacct'},{label:'Revenue',value:'$100M–$2B AUM'},{label:'Trigger',value:'0–24 months post-acquisition'}],
+     signals:['Apollo: Hospital & HC, 50-500, Director of Revenue Cycle','Job postings for RCM Specialist / Denial Management / Prior Auth Specialist','HFMA member directory'],
+     hook:'RCM turnover runs 30-40% annually. Prior auth requirements up 20%+ YoY. Onshore RCM hires cost $45K-$70K and take 60-90 days, leaving cash on the table.',
+     valueProp:'Dedicated offshore RCM Specialists - ICD-10 certified, trained on Epic/Cerner/Meditech - handling denial management, prior auth follow-up, AR recovery. In-seat 2-3 weeks at 40-55% of onshore cost.'},
+    // L3 - Senior Accountant / FP&A Analyst
+    {icp:[{label:'Industry',value:'PE Portfolio Companies'},{label:'Company Size',value:'PE firms · 5-20 portfolio companies'},{label:'Geography',value:'US + Canada'},{label:'Tech Stack',value:'NetSuite · QuickBooks · Sage Intacct'},{label:'Revenue',value:'$100M-$2B AUM'},{label:'Trigger',value:'0-24 months post-acquisition'}],
      personas:['Operating Partner / VP Portfolio Ops (primary)','Chief of Staff / Portfolio COO','Principal / Sr. Associate Ops','CFO / VP Finance at portco','Controller','Head of Finance Transformation'],
      signals:['Pitchbook / Crunchbase: PE firms with deals closed last 12 months','LinkedIn: Operating Partner / VP Portfolio Ops at PE firms','Portfolio company financial standup signals'],
-     hook:'PE firms close a deal and immediately need financial standup in 100 days. Onshore accounting takes 60–90 days to recruit at $90K–$130K/yr. One OP relationship = 5–15 placements over a fund cycle.',
-     valueProp:'Dedicated offshore Senior Accountants / FP&A Analysts inside portco ERP systems within 2 weeks at 40–60% of onshore cost.'},
-    // L4 — Enterprise ERP Consultant (SAP)
-    {icp:[{label:'Industry',value:'Manufacturing & Distribution'},{label:'Company Size',value:'200–1,000 employees'},{label:'Geography',value:'US + Canada'},{label:'Tech Stack',value:'SAP ECC 6.0 (no S/4HANA migration started)'},{label:'Revenue',value:'$50M–$500M'},{label:'Trigger',value:'SAP ECC End of Life — January 2027'}],
+     hook:'PE firms close a deal and immediately need financial standup in 100 days. Onshore accounting takes 60-90 days to recruit at $90K-$130K/yr. One OP relationship = 5-15 placements over a fund cycle.',
+     valueProp:'Dedicated offshore Senior Accountants / FP&A Analysts inside portco ERP systems within 2 weeks at 40-60% of onshore cost.'},
+    // L4 - Enterprise ERP Consultant (SAP)
+    {icp:[{label:'Industry',value:'Manufacturing & Distribution'},{label:'Company Size',value:'200-1,000 employees'},{label:'Geography',value:'US + Canada'},{label:'Tech Stack',value:'SAP ECC 6.0 (no S/4HANA migration started)'},{label:'Revenue',value:'$50M-$500M'},{label:'Trigger',value:'SAP ECC End of Life - January 2027'}],
      personas:['CIO / VP IT / Director IT (primary)','Director Enterprise Apps / Head of Business Systems','SAP Program Manager','Director of Digital Transformation','CFO','COO / VP Ops'],
-     signals:['ZoomInfo / Apollo: Mfg/Distribution, 200–1K, SAP ECC in tech stack','Job postings for SAP Basis Admin / FICO Analyst / ERP PM','Intent data on SAP migration / S4HANA','G2 / Gartner SAP ECC reviewers'],
-     hook:'SAP ends Extended Maintenance for ECC 6.0 in January 2027. Onshore SAP consultant day rates at $250–$400/hr at peak saturation. 18-month window creates natural urgency.',
-     valueProp:'Certified SAP S/4HANA consultants (FICO, MM, PP, SD, WM) embedded into migration programs at 50–65% of onshore day rates. Greenfield, brownfield, selective data transition.'},
-    // L5 — AI Ops Analyst
-    {icp:[{label:'Industry',value:'B2B SaaS / Fintech / Insurtech'},{label:'Company Size',value:'50–300 employees'},{label:'Geography',value:'US + Canada'},{label:'Tech Stack',value:'OpenAI · LangChain · Pinecone · Weaviate'},{label:'Revenue',value:'$5M–$100M ARR'},{label:'Trigger',value:'AI feature live in production, no dedicated AI Ops hire'}],
+     signals:['ZoomInfo / Apollo: Mfg/Distribution, 200-1K, SAP ECC in tech stack','Job postings for SAP Basis Admin / FICO Analyst / ERP PM','Intent data on SAP migration / S4HANA','G2 / Gartner SAP ECC reviewers'],
+     hook:'SAP ends Extended Maintenance for ECC 6.0 in January 2027. Onshore SAP consultant day rates at $250-$400/hr at peak saturation. 18-month window creates natural urgency.',
+     valueProp:'Certified SAP S/4HANA consultants (FICO, MM, PP, SD, WM) embedded into migration programs at 50-65% of onshore day rates. Greenfield, brownfield, selective data transition.'},
+    // L5 - AI Ops Analyst
+    {icp:[{label:'Industry',value:'B2B SaaS / Fintech / Insurtech'},{label:'Company Size',value:'50-300 employees'},{label:'Geography',value:'US + Canada'},{label:'Tech Stack',value:'OpenAI · LangChain · Pinecone · Weaviate'},{label:'Revenue',value:'$5M-$100M ARR'},{label:'Trigger',value:'AI feature live in production, no dedicated AI Ops hire'}],
      personas:['VP / Director of Engineering (primary)','CTO (<100 employees)','Head of AI / Director of ML','Director of Platform Engineering','Chief AI Officer','Head of Product'],
-     signals:['Apollo: B2B SaaS, 50–300, OpenAI / LangChain stack','LinkedIn: “AI-powered” in product description, no ML Engineer on staff','ProductHunt / G2: recent AI launches','Job postings for ML Engineer at small SaaS'],
-     hook:'Companies with AI in production hit “Day 2” problems — model drift, prompt failures, hallucinations, API cost blowouts, monitoring gaps. Onshore AI Ops costs $140K–$180K.',
-     valueProp:'Dedicated offshore AI Ops Analysts who monitor LLM pipeline performance, manage prompt versioning, track model drift, handle vector DB maintenance, and optimize API costs — at 50% of onshore cost.'},
-    // L6 — E-Commerce Analytics Analyst
-    {icp:[{label:'Industry',value:'D2C E-Commerce · Shopify/BigCommerce brands'},{label:'Company Size',value:'20–200 employees'},{label:'Geography',value:'US + Canada'},{label:'Tech Stack',value:'Shopify · Klaviyo · GA4 · Meta Ads'},{label:'Revenue',value:'>$5M GMV'},{label:'Trigger',value:'VC/PE funded last 24 months or Shopify Plus tier'}],
+     signals:['Apollo: B2B SaaS, 50-300, OpenAI / LangChain stack','LinkedIn: "AI-powered" in product description, no ML Engineer on staff','ProductHunt / G2: recent AI launches','Job postings for ML Engineer at small SaaS'],
+     hook:'Companies with AI in production hit "Day 2" problems - model drift, prompt failures, hallucinations, API cost blowouts, monitoring gaps. Onshore AI Ops costs $140K-$180K.',
+     valueProp:'Dedicated offshore AI Ops Analysts who monitor LLM pipeline performance, manage prompt versioning, track model drift, handle vector DB maintenance, and optimize API costs - at 50% of onshore cost.'},
+    // L6 - E-Commerce Analytics Analyst
+    {icp:[{label:'Industry',value:'D2C E-Commerce · Shopify/BigCommerce brands'},{label:'Company Size',value:'20-200 employees'},{label:'Geography',value:'US + Canada'},{label:'Tech Stack',value:'Shopify · Klaviyo · GA4 · Meta Ads'},{label:'Revenue',value:'>$5M GMV'},{label:'Trigger',value:'VC/PE funded last 24 months or Shopify Plus tier'}],
      personas:['COO / Head of E-Commerce Ops (primary)','VP / Director of Growth','Director of Performance Marketing / Head of Paid Acquisition','Head of Analytics / BI Manager','CFO','Founder / CEO'],
-     signals:['Shopify Plus brand list','Apollo: Retail/E-Commerce, 20–200, Shopify+Klaviyo+GA4','Job postings for Data / E-Commerce / Growth Analyst','Crunchbase: VC-backed D2C Series A/B last 24 months'],
-     hook:'D2C brands above $5M GMV making inventory and ad spend decisions on gut feel. Data sits disconnected across Shopify, Klaviyo, GA4, Meta Ads. Onshore data analyst costs $70K–$100K.',
-     valueProp:'Dedicated offshore E-Commerce Analytics Analysts who build and maintain dashboards, cohort reports, LTV models, ad attribution reporting — embedded into Shopify/Klaviyo/GA4/Meta — updated weekly.'},
-    // L7 — Healthcare IT Support Analyst
-    {icp:[{label:'Industry',value:'Multi-location Practices, DSOs, PT/Urgent Care Chains'},{label:'Company Size',value:'3–30 locations'},{label:'Geography',value:'US'},{label:'Tech Stack',value:'Epic · Athena · eClinicalWorks · Dentrix · Curve'},{label:'Revenue',value:'$5M–$50M'},{label:'Trigger',value:'Recent acquisition or IT support job postings'}],
+     signals:['Shopify Plus brand list','Apollo: Retail/E-Commerce, 20-200, Shopify+Klaviyo+GA4','Job postings for Data / E-Commerce / Growth Analyst','Crunchbase: VC-backed D2C Series A/B last 24 months'],
+     hook:'D2C brands above $5M GMV making inventory and ad spend decisions on gut feel. Data sits disconnected across Shopify, Klaviyo, GA4, Meta Ads. Onshore data analyst costs $70K-$100K.',
+     valueProp:'Dedicated offshore E-Commerce Analytics Analysts who build and maintain dashboards, cohort reports, LTV models, ad attribution reporting - embedded into Shopify/Klaviyo/GA4/Meta - updated weekly.'},
+    // L7 - Healthcare IT Support Analyst
+    {icp:[{label:'Industry',value:'Multi-location Practices, DSOs, PT/Urgent Care Chains'},{label:'Company Size',value:'3-30 locations'},{label:'Geography',value:'US'},{label:'Tech Stack',value:'Epic · Athena · eClinicalWorks · Dentrix · Curve'},{label:'Revenue',value:'$5M-$50M'},{label:'Trigger',value:'Recent acquisition or IT support job postings'}],
      personas:['Practice Administrator / Office Manager (primary)','Director / VP of Operations','VP / Director of IT','Regional Director','COO','Director of Clinical Informatics / EHR Administrator'],
      signals:['Apollo: Healthcare/Medical Practice, multi-location, Practice Admin/Dir Ops','Job postings for IT Support / Help Desk / EHR Specialist at medical groups','Glassdoor staff reviews mentioning EHR issues','Cross-target with Campaign c2 DSO list'],
-     hook:'Multi-location practices share one overwhelmed IT person across 5–10 locations. Onshore IT support costs $60K–$90K/technician. First response is always a voicemail.',
-     valueProp:'Dedicated offshore Healthcare IT Support Analysts — trained on Epic/Athena/Dentrix, HIPAA-compliant, US business hours — handling Tier 1/2 tickets, user onboarding, EHR troubleshooting, device mgmt at 40–60% of onshore cost.'},
-    // L8 — CET Designer
-    {icp:[{label:'Industry',value:'Contract Furniture Dealerships'},{label:'Company Size',value:'50–500 employees'},{label:'Geography',value:'US + Canada'},{label:'Tech Stack',value:'CET Commercial Interiors · ProjectMatrix · e-automate'},{label:'Revenue',value:'$2M–$30M'},{label:'Trigger',value:'Project volume spike / space plan backlog'}],
+     hook:'Multi-location practices share one overwhelmed IT person across 5-10 locations. Onshore IT support costs $60K-$90K/technician. First response is always a voicemail.',
+     valueProp:'Dedicated offshore Healthcare IT Support Analysts - trained on Epic/Athena/Dentrix, HIPAA-compliant, US business hours - handling Tier 1/2 tickets, user onboarding, EHR troubleshooting, device mgmt at 40-60% of onshore cost.'},
+    // L8 - CET Designer
+    {icp:[{label:'Industry',value:'Contract Furniture Dealerships'},{label:'Company Size',value:'50-500 employees'},{label:'Geography',value:'US + Canada'},{label:'Tech Stack',value:'CET Commercial Interiors · ProjectMatrix · e-automate'},{label:'Revenue',value:'$2M-$30M'},{label:'Trigger',value:'Project volume spike / space plan backlog'}],
      personas:['President / Owner / Principal (primary)','VP / Director of Sales','Design Manager / Director of Design','COO / Director of Operations','Project Manager','AE / Senior AE'],
-     signals:['LinkedIn title search for “CET Designer” / “Space Planner” to identify ICP companies','Manufacturer dealer locators (Steelcase, Haworth, MillerKnoll)','Apollo: Office Furniture/Commercial Interiors, 50–500, President/Owner/VP Sales','Job postings for CET Designer / Space Planner'],
-     hook:'CET-proficient designers are scarce and slow to hire onshore ($55K–$80K, 60–90 day ramp). When project volume spikes, space plans pile up and proposals go out late. One delayed RFP can cost a $200K–$500K project.',
-     valueProp:'Dedicated offshore CET Designer / Space Planning Specialists — trained in CET Designer (Configura), AutoCAD, furniture specification — handling floor plans, space plans, finish/fabric spec, proposal drawings. In-seat 2–3 weeks at 40–55% of onshore cost.'},
-    // D1 — Fiber Optic Fusion Splicer
-    {icp:[{label:'Industry',value:'Fiber Carriers, ISPs, EPC Firms, BEAD Awardees'},{label:'Company Size',value:'50–5,000+ employees'},{label:'Geography',value:'US'},{label:'Tech Stack',value:'SM/MM/Ribbon/FTTX · Aerial/Underground'},{label:'Revenue',value:'$5M–$500M+'},{label:'Trigger',value:'BEAD buildout / 400G expansion / fusion splicer job postings'}],
-     personas:['Director / VP of Field Operations (primary)','VP / Director of Network Construction','VP / Director of Engineering','Program / Project Manager – Fiber Deployment','HR Director / Talent Acquisition','Director of Field Services'],
+     signals:['LinkedIn title search for "CET Designer" / "Space Planner" to identify ICP companies','Manufacturer dealer locators (Steelcase, Haworth, MillerKnoll)','Apollo: Office Furniture/Commercial Interiors, 50-500, President/Owner/VP Sales','Job postings for CET Designer / Space Planner'],
+     hook:'CET-proficient designers are scarce and slow to hire onshore ($55K-$80K, 60-90 day ramp). When project volume spikes, space plans pile up and proposals go out late. One delayed RFP can cost a $200K-$500K project.',
+     valueProp:'Dedicated offshore CET Designer / Space Planning Specialists - trained in CET Designer (Configura), AutoCAD, furniture specification - handling floor plans, space plans, finish/fabric spec, proposal drawings. In-seat 2-3 weeks at 40-55% of onshore cost.'},
+    // D1 - Fiber Optic Fusion Splicer
+    {icp:[{label:'Industry',value:'Fiber Carriers, ISPs, EPC Firms, BEAD Awardees'},{label:'Company Size',value:'50-5,000+ employees'},{label:'Geography',value:'US'},{label:'Tech Stack',value:'SM/MM/Ribbon/FTTX · Aerial/Underground'},{label:'Revenue',value:'$5M-$500M+'},{label:'Trigger',value:'BEAD buildout / 400G expansion / fusion splicer job postings'}],
+     personas:['Director / VP of Field Operations (primary)','VP / Director of Network Construction','VP / Director of Engineering','Program / Project Manager - Fiber Deployment','HR Director / Talent Acquisition','Director of Field Services'],
      signals:['LinkedIn job postings for Fusion Splicer / OSP Technician','BEAD award recipients in active deployment phase','FTTH / FTTX build announcements','Repeat postings open 30+ days'],
      hook:'Certified BICSI/FOA fusion splicers are in critical short supply nationally. BEAD buildouts running concurrently across 40+ states. Demand projects 58K new fiber tech positions by 2032 with ~178K worker shortfall.',
-     valueProp:'National bench of deployment-ready fusion splicers — BICSI/FOA certified, SM/MM/ribbon/FTTX/aerial/underground — deployable in 1–2 weeks vs. 6–12 week hiring cycle. 600+ nationwide infrastructure professionals. Variable project cost, no FTE overhead.'},
-    // D2 — Customer Success Operations Analyst
-    {icp:[{label:'Industry',value:'B2B SaaS, HR Tech, Legal Tech, PropTech'},{label:'Company Size',value:'30–300 employees'},{label:'Geography',value:'US + Canada'},{label:'Tech Stack',value:'Gainsight · ChurnZero · Salesforce · Zendesk · Intercom'},{label:'Revenue',value:'$3M–$50M ARR'},{label:'Trigger',value:'NRR below 110%, churn spike, CS team overwhelmed'}],
+     valueProp:'National bench of deployment-ready fusion splicers - BICSI/FOA certified, SM/MM/ribbon/FTTX/aerial/underground - deployable in 1-2 weeks vs. 6-12 week hiring cycle. 600+ nationwide infrastructure professionals. Variable project cost, no FTE overhead.'},
+    // D2 - Customer Success Operations Analyst
+    {icp:[{label:'Industry',value:'B2B SaaS, HR Tech, Legal Tech, PropTech'},{label:'Company Size',value:'30-300 employees'},{label:'Geography',value:'US + Canada'},{label:'Tech Stack',value:'Gainsight · ChurnZero · Salesforce · Zendesk · Intercom'},{label:'Revenue',value:'$3M-$50M ARR'},{label:'Trigger',value:'NRR below 110%, churn spike, CS team overwhelmed'}],
      personas:['VP / Director of Customer Success (primary)','Chief Customer Officer','Director of CS Ops','VP of Renewals','COO / Head of Operations','Head of Onboarding / Director of Implementation'],
-     signals:['Apollo: B2B SaaS, 30–300, VP/Dir of CS','Job postings for CS Coordinator / CS Ops Analyst','Gainsight / ChurnZero users on G2'],
-     hook:'CSMs spend 40–50% of their time on operational tasks instead of customer relationships. One churn event costs 12× the monthly contract value in recovery effort.',
-     valueProp:'Dedicated offshore CS Ops Analysts — health score monitoring, QBR deck prep, renewal calendar management, onboarding task tracking, Gainsight/Salesforce hygiene — at 40–55% of onshore cost. In-seat within 2 weeks.'},
-    // D3 — Finance & Accounting Ops Specialist
-    {icp:[{label:'Industry',value:'Professional Services, Agency, Construction, Retail'},{label:'Company Size',value:'15–200 employees'},{label:'Geography',value:'US + Canada'},{label:'Tech Stack',value:'QuickBooks · Xero · NetSuite · Sage'},{label:'Revenue',value:'$3M–$50M'},{label:'Trigger',value:'Controller vacancy, bookkeeper turnover, month-end close delays'}],
+     signals:['Apollo: B2B SaaS, 30-300, VP/Dir of CS','Job postings for CS Coordinator / CS Ops Analyst','Gainsight / ChurnZero users on G2'],
+     hook:'CSMs spend 40-50% of their time on operational tasks instead of customer relationships. One churn event costs 12× the monthly contract value in recovery effort.',
+     valueProp:'Dedicated offshore CS Ops Analysts - health score monitoring, QBR deck prep, renewal calendar management, onboarding task tracking, Gainsight/Salesforce hygiene - at 40-55% of onshore cost. In-seat within 2 weeks.'},
+    // D3 - Finance & Accounting Ops Specialist
+    {icp:[{label:'Industry',value:'Professional Services, Agency, Construction, Retail'},{label:'Company Size',value:'15-200 employees'},{label:'Geography',value:'US + Canada'},{label:'Tech Stack',value:'QuickBooks · Xero · NetSuite · Sage'},{label:'Revenue',value:'$3M-$50M'},{label:'Trigger',value:'Controller vacancy, bookkeeper turnover, month-end close delays'}],
      personas:['CEO / Owner / Founder (primary)','CFO / VP Finance','Controller / Director of Accounting','COO / Director of Operations','Managing Partner','Operating Partner (PE)'],
-     signals:['Apollo: Professional Services/Agency/Construction, 15–200, CEO/CFO/Controller','Job postings for Bookkeeper / Staff Accountant','PE portco signals via Pitchbook'],
-     hook:'SMBs bleed cash when bookkeepers quit. Month-end close slips 2–4 weeks. Hiring onshore takes 60–90 days at $55K–$80K/yr for a role that’s 80% transaction processing.',
-     valueProp:'Dedicated offshore Finance & Accounting Ops Specialists — QuickBooks/Xero/NetSuite — handling AP/AR, bank reconciliation, month-end close, payroll support. In-seat 2 weeks at 45–60% of onshore cost.'},
-    // D4 — HR & People Ops Coordinator
-    {icp:[{label:'Industry',value:'SaaS, Fintech, HealthTech, Consumer Tech'},{label:'Company Size',value:'50–300 employees'},{label:'Geography',value:'US + Canada'},{label:'Tech Stack',value:'Workday · BambooHR · Rippling · Gusto · Greenhouse'},{label:'Revenue',value:'$5M–$100M ARR'},{label:'Trigger',value:'Hiring surge >10 hires/quarter, solo HRBP stretched'}],
+     signals:['Apollo: Professional Services/Agency/Construction, 15-200, CEO/CFO/Controller','Job postings for Bookkeeper / Staff Accountant','PE portco signals via Pitchbook'],
+     hook:'SMBs bleed cash when bookkeepers quit. Month-end close slips 2-4 weeks. Hiring onshore takes 60-90 days at $55K-$80K/yr for a role that is 80% transaction processing.',
+     valueProp:'Dedicated offshore Finance & Accounting Ops Specialists - QuickBooks/Xero/NetSuite - handling AP/AR, bank reconciliation, month-end close, payroll support. In-seat 2 weeks at 45-60% of onshore cost.'},
+    // D4 - HR & People Ops Coordinator
+    {icp:[{label:'Industry',value:'SaaS, Fintech, HealthTech, Consumer Tech'},{label:'Company Size',value:'50-300 employees'},{label:'Geography',value:'US + Canada'},{label:'Tech Stack',value:'Workday · BambooHR · Rippling · Gusto · Greenhouse'},{label:'Revenue',value:'$5M-$100M ARR'},{label:'Trigger',value:'Hiring surge >10 hires/quarter, solo HRBP stretched'}],
      personas:['VP of People / Head of People (primary)','Solo HRBP','Director of Talent / Director of Recruiting','CPO','COO / Head of Operations','CEO / Co-Founder (<50 employees)'],
-     signals:['Apollo: SaaS/Fintech/HealthTech, 50–300, VP People/HRBP','Job postings for HR Coordinator / People Ops Coordinator','Greenhouse users on G2','Series A/B funding announcements'],
-     hook:'Solo HR team at a 100-person startup doing recruiting coordination, onboarding, benefits admin, compliance, and HRIS simultaneously. Onboarding slips — new hires start with no laptop, no access, no manager meeting.',
-     valueProp:'Dedicated offshore HR & People Ops Coordinators — BambooHR/Rippling/Greenhouse/Workday — handling onboarding workflows, HRIS data entry, benefits enrollment coordination, recruiting scheduling. In-seat 2 weeks at 45–60% of onshore cost.'},
-    // D5 — Software QA / Test Ops Analyst
-    {icp:[{label:'Industry',value:'B2B SaaS, Developer Tools, Productivity SaaS'},{label:'Company Size',value:'30–300 employees'},{label:'Geography',value:'US + Canada'},{label:'Tech Stack',value:'Jira · TestRail · Selenium · Playwright · Postman · GitHub Actions'},{label:'Revenue',value:'$3M–$50M ARR'},{label:'Trigger',value:'Shipping bugs in prod, no dedicated QA hire'}],
+     signals:['Apollo: SaaS/Fintech/HealthTech, 50-300, VP People/HRBP','Job postings for HR Coordinator / People Ops Coordinator','Greenhouse users on G2','Series A/B funding announcements'],
+     hook:'Solo HR team at a 100-person startup doing recruiting coordination, onboarding, benefits admin, compliance, and HRIS simultaneously. Onboarding slips - new hires start with no laptop, no access, no manager meeting.',
+     valueProp:'Dedicated offshore HR & People Ops Coordinators - BambooHR/Rippling/Greenhouse/Workday - handling onboarding workflows, HRIS data entry, benefits enrollment coordination, recruiting scheduling. In-seat 2 weeks at 45-60% of onshore cost.'},
+    // D5 - Software QA / Test Ops Analyst
+    {icp:[{label:'Industry',value:'B2B SaaS, Developer Tools, Productivity SaaS'},{label:'Company Size',value:'30-300 employees'},{label:'Geography',value:'US + Canada'},{label:'Tech Stack',value:'Jira · TestRail · Selenium · Playwright · Postman · GitHub Actions'},{label:'Revenue',value:'$3M-$50M ARR'},{label:'Trigger',value:'Shipping bugs in prod, no dedicated QA hire'}],
      personas:['VP / Director of Engineering (primary)','Head of QA / Director of QA','CTO (<80 employees)','Head of Product / VP Product','Engineering Manager','Director of Platform'],
-     signals:['Apollo: B2B SaaS, 30–300, VP/Dir Engineering','Job postings for QA Engineer / SDET','G2: Jira/TestRail users with no QA role on LinkedIn','GitHub: repos with no test coverage'],
-     hook:'QA is either non-existent or done by engineers who resent it. One bad release costs 5–10× the QA hire in churn. Onshore QA engineers cost $90K–$130K and are hard to hire.',
-     valueProp:'Dedicated offshore QA / Test Ops Analysts — Selenium/Playwright/TestRail/Jira/Postman — owning regression test suites, manual exploratory testing, API testing, bug triage. In-seat 2 weeks at 50–65% of onshore cost.'},
-    // D6 — Sales Ops & CRM Admin Specialist
-    {icp:[{label:'Industry',value:'B2B SaaS, Professional Services, Insurance, Financial Services'},{label:'Company Size',value:'20–250 employees'},{label:'Geography',value:'US + Canada'},{label:'Tech Stack',value:'Salesforce · HubSpot · Outreach · Salesloft · ZoomInfo'},{label:'Revenue',value:''},{label:'Trigger',value:'CRM data quality issues, job posting for Sales Ops or Salesforce Admin'}],
+     signals:['Apollo: B2B SaaS, 30-300, VP/Dir Engineering','Job postings for QA Engineer / SDET','G2: Jira/TestRail users with no QA role on LinkedIn','GitHub: repos with no test coverage'],
+     hook:'QA is either non-existent or done by engineers who resent it. One bad release costs 5-10× the QA hire in churn. Onshore QA engineers cost $90K-$130K and are hard to hire.',
+     valueProp:'Dedicated offshore QA / Test Ops Analysts - Selenium/Playwright/TestRail/Jira/Postman - owning regression test suites, manual exploratory testing, API testing, bug triage. In-seat 2 weeks at 50-65% of onshore cost.'},
+    // D6 - Sales Ops & CRM Admin Specialist
+    {icp:[{label:'Industry',value:'B2B SaaS, Professional Services, Insurance, Financial Services'},{label:'Company Size',value:'20-250 employees'},{label:'Geography',value:'US + Canada'},{label:'Tech Stack',value:'Salesforce · HubSpot · Outreach · Salesloft · ZoomInfo'},{label:'Revenue',value:''},{label:'Trigger',value:'CRM data quality issues, job posting for Sales Ops or Salesforce Admin'}],
      personas:['VP / Director of Sales (primary)','Head of Sales Ops / Director of Sales Ops','Revenue Ops Manager / Director of RevOps','CRO','Salesforce Admin / Business Systems Manager','CEO / Founder (<50 employees)'],
-     signals:['Apollo: B2B SaaS/Prof Services, 20–250, VP Sales/Sales Ops','Job postings for Sales Ops / Salesforce Admin','Salesforce AppExchange: companies adopting Outreach/Salesloft','G2: Salesforce/HubSpot users reviewing CRM pain points'],
-     hook:'AEs spend 20–30% of their week on CRM hygiene and admin. Salesforce Admin costs $80K–$110K onshore; Sales Ops Analyst $70K–$95K. Most mid-market teams can’t afford both.',
-     valueProp:'Dedicated offshore Sales Ops & CRM Admin Specialists — Salesforce/HubSpot/Outreach/Salesloft — owning CRM data hygiene, pipeline reporting, lead routing, sequence management, sales admin workflows. In-seat 2 weeks at 45–60% of onshore cost.'},
-    // D7 — DWDM / Optical Transport Engineer
-    {icp:[{label:'Industry',value:'Tier 1/2 Carriers, Fiber Operators, Hyperscale DCI, MSPs'},{label:'Company Size',value:'100–5,000+ employees'},{label:'Geography',value:'US + Canada'},{label:'Tech Stack',value:'Ciena · Nokia · Infinera · Fujitsu · 400G/800G'},{label:'Revenue',value:'$50M–$5B+'},{label:'Trigger',value:'400G/800G modernization, AI traffic explosion, SONET/TDM sunset'}],
+     signals:['Apollo: B2B SaaS/Prof Services, 20-250, VP Sales/Sales Ops','Job postings for Sales Ops / Salesforce Admin','Salesforce AppExchange: companies adopting Outreach/Salesloft','G2: Salesforce/HubSpot users reviewing CRM pain points'],
+     hook:'AEs spend 20-30% of their week on CRM hygiene and admin. Salesforce Admin costs $80K-$110K onshore; Sales Ops Analyst $70K-$95K. Most mid-market teams cannot afford both.',
+     valueProp:'Dedicated offshore Sales Ops & CRM Admin Specialists - Salesforce/HubSpot/Outreach/Salesloft - owning CRM data hygiene, pipeline reporting, lead routing, sequence management, sales admin workflows. In-seat 2 weeks at 45-60% of onshore cost.'},
+    // D7 - DWDM / Optical Transport Engineer
+    {icp:[{label:'Industry',value:'Tier 1/2 Carriers, Fiber Operators, Hyperscale DCI, MSPs'},{label:'Company Size',value:'100-5,000+ employees'},{label:'Geography',value:'US + Canada'},{label:'Tech Stack',value:'Ciena · Nokia · Infinera · Fujitsu · 400G/800G'},{label:'Revenue',value:'$50M-$5B+'},{label:'Trigger',value:'400G/800G modernization, AI traffic explosion, SONET/TDM sunset'}],
      personas:['VP / Director of Network Engineering / VP of Transport (primary)','Director of Optical Transport / DWDM','Director of Data Center Infrastructure','VP of Network Architecture','CTO / VP Technology (regional operators)','Network Program Manager'],
      signals:['Job postings for DWDM Engineer / Optical Transport Engineer / OTN Engineer','400G / 800G upgrade announcements','DCI expansion / new data center campus announcements','SONET/TDM sunset programs underway','Contract listings on Dice.com / LinkedIn'],
-     hook:'AI traffic is breaking transport networks — bandwidth doubling/tripling within months. Multi-vendor DWDM engineers (Ciena + Nokia + Infinera + Fujitsu) are nearly impossible to find. SDN/IP-optical convergence requires hybrid skill sets that are extremely scarce.',
-     valueProp:'Specialized DWDM and optical transport engineers — multi-vendor experienced, project-ready, deployed without FTE overhead. Multi-vendor depth across Ciena/Nokia/Infinera/Fujitsu. Legacy SONET/TDM + modern 400G/800G coverage. Shift-flexible project deployment.'},
-    // D8 — NOC Engineer
-    {icp:[{label:'Industry',value:'Regional ISPs, CLECs, Telecom Carriers, MNSPs, Cable MSOs'},{label:'Company Size',value:'25–2,000 employees'},{label:'Geography',value:'US'},{label:'Tech Stack',value:'SolarWinds · Nagios · PRTG · Spectrum · ServiceNow'},{label:'Revenue',value:'$5M–$500M+'},{label:'Trigger',value:'24x7 NOC coverage gap, BEAD expansion, NOC turnover'}],
+     hook:'AI traffic is breaking transport networks - bandwidth doubling/tripling within months. Multi-vendor DWDM engineers (Ciena + Nokia + Infinera + Fujitsu) are nearly impossible to find. SDN/IP-optical convergence requires hybrid skill sets that are extremely scarce.',
+     valueProp:'Specialized DWDM and optical transport engineers - multi-vendor experienced, project-ready, deployed without FTE overhead. Multi-vendor depth across Ciena/Nokia/Infinera/Fujitsu. Legacy SONET/TDM + modern 400G/800G coverage. Shift-flexible project deployment.'},
+    // D8 - NOC Engineer
+    {icp:[{label:'Industry',value:'Regional ISPs, CLECs, Telecom Carriers, MNSPs, Cable MSOs'},{label:'Company Size',value:'25-2,000 employees'},{label:'Geography',value:'US'},{label:'Tech Stack',value:'SolarWinds · Nagios · PRTG · Spectrum · ServiceNow'},{label:'Revenue',value:'$5M-$500M+'},{label:'Trigger',value:'24x7 NOC coverage gap, BEAD expansion, NOC turnover'}],
      personas:['VP / Director of Network Operations (primary)','VP of Operations / COO at Regional ISP','Director of IT / VP of IT (building/expanding NOC)','NOC Manager / NOC Lead','Director of Managed Services (MNSP)','Director of Infrastructure'],
      signals:['Job postings for NOC Engineer / Network Ops Analyst','ISP/carrier announcing new service territory or expanded coverage','BEAD expansion states','MSPs scaling to new regions','LinkedIn: VP of Network Ops, Dir of IT at telecom/ISP companies'],
-     hook:'24x7/365 NOC requires minimum 6–8 FTEs just to cover basic shifts — before PTO, sick leave, holidays, turnover. Most regional ISPs don’t have that bench. NOC turnover is brutal due to rotating shifts and holiday coverage.',
-     valueProp:'Pre-vetted, carrier-grade NOC engineers — SolarWinds/Nagios/PRTG/Spectrum/ServiceNow — deployable in 1–2 weeks. Shift-flexible: night shift, weekend, holiday coverage. Telecom stack depth: fiber, DWDM, broadband access (GPON/DOCSIS), routing/switching.'}
+     hook:'24x7/365 NOC requires minimum 6-8 FTEs just to cover basic shifts - before PTO, sick leave, holidays, turnover. Most regional ISPs do not have that bench. NOC turnover is brutal due to rotating shifts and holiday coverage.',
+     valueProp:'Pre-vetted, carrier-grade NOC engineers - SolarWinds/Nagios/PRTG/Spectrum/ServiceNow - deployable in 1-2 weeks. Shift-flexible: night shift, weekend, holiday coverage. Telecom stack depth: fiber, DWDM, broadband access (GPON/DOCSIS), routing/switching.'}
   ];
   // All campaigns come from DB only — never fall back to hardcoded list
   const _allCamps=customCampaigns;
@@ -1104,13 +1578,13 @@ function SalesTab({modalAgent,setModalAgent}) {
   const camp={...campBase,...campOverride};
   const DEFAULT_SEQUENCE=[
     {n:'1',title:'LinkedIn CR + Note',meta:'Day 1',subject:'',
-     body:'Hi [First Name],\n\nI noticed [Company] is hiring for [Role] and had a thought — finding candidates with the right tooling background is tough in this market.\n\nWe embed AI-Amplified Talent™ into commercial furniture teams like yours — CET Designers and Space Planners who integrate in days, not months, at 60% less cost.\n\nWorth a quick conversation?\n\nBest,\nLaura Petersen | Bold Business\nlpetersen@boldbusiness.com',color:'#06E5EC'},
-    {n:'2',title:'Email — Value prop',meta:'Day 3',subject:'60% cost reduction — [Company] + Bold Business',
-     body:'Hi [First Name],\n\nFollowing up on my note. We partner with leading furniture dealers (Steelcase, MillerKnoll, HNI, Teknion) to provide specialized talent that seamlessly integrates with your workflow.\n\nOur 30-day No-Risk Deployment means if the talent isn’t a fit in the first week, we void the invoice.\n\nCase study: https://drive.google.com/file/d/1Sg8zgsLQq2Bzpg2Z_jENrsPuGoKpjlAe/view\n\nBest,\nLaura',color:'#5AC8FA'},
+     body:'Hi [First Name],\n\nI noticed [Company] is hiring for [Role] and had a thought - finding candidates with the right tooling background is tough in this market.\n\nWe embed AI-Amplified TalentTM into commercial furniture teams like yours - CET Designers and Space Planners who integrate in days, not months, at 60% less cost.\n\nWorth a quick conversation?\n\nBest,\nLaura Petersen | Bold Business\nlpetersen@boldbusiness.com',color:'#06E5EC'},
+    {n:'2',title:'Email - Value prop',meta:'Day 3',subject:'60% cost reduction - [Company] + Bold Business',
+     body:'Hi [First Name],\n\nFollowing up on my note. We partner with leading furniture dealers (Steelcase, MillerKnoll, HNI, Teknion) to provide specialized talent that seamlessly integrates with your workflow.\n\nOur 30-day No-Risk Deployment means if the talent is not a fit in the first week, we void the invoice.\n\nCase study: https://drive.google.com/file/d/1Sg8zgsLQq2Bzpg2Z_jENrsPuGoKpjlAe/view\n\nBest,\nLaura',color:'#5AC8FA'},
     {n:'3',title:'LinkedIn follow-up',meta:'Day 7',subject:'',
-     body:'Hi [First Name] — just circling back on my earlier note. We’ve helped teams like yours reduce staffing costs by 60% while keeping output high.\n\nHappy to share a quick profile if the timing is right. No pressure either way.',color:'#2DD4BF'},
-    {n:'4',title:'Final email — CTA',meta:'Day 14',subject:'Last note — [Company] + Bold Business',
-     body:'Hi [First Name],\n\nOne more note — if scaling your team is on your radar for this quarter, I’d love to set up a quick 15-minute call.\n\nYou can book directly here: https://calendly.com/lenorekopko\n\nEither way, best of luck with the hiring search.\n\nBest,\nLaura Petersen | Bold Business',color:'#F5B945'},
+     body:'Hi [First Name] - just circling back on my earlier note. We have helped teams like yours reduce staffing costs by 60% while keeping output high.\n\nHappy to share a quick profile if the timing is right. No pressure either way.',color:'#2DD4BF'},
+    {n:'4',title:'Final email - CTA',meta:'Day 14',subject:'Last note - [Company] + Bold Business',
+     body:'Hi [First Name],\n\nOne more note - if scaling your team is on your radar for this quarter, I would love to set up a quick 15-minute call.\n\nYou can book directly here: https://calendly.com/lenorekopko\n\nEither way, best of luck with the hiring search.\n\nBest,\nLaura Petersen | Bold Business',color:'#F5B945'},
   ];
   const _defaultContent=CAMP_DEFAULTS[campIdx]||{};
   const campContent={..._defaultContent,...campBase,...campOverride};
@@ -1156,11 +1630,11 @@ function SalesTab({modalAgent,setModalAgent}) {
     return <span style={{display:'inline-flex',alignItems:'center',justifyContent:'center',
       minWidth:52,padding:'3px 10px',borderRadius:20,background:bg,
       font:`${isBold?700:600} 12px/1.4 Inter,sans-serif`,color:clr,whiteSpace:'nowrap'}}>
-      {isDash?'—':val}
+      {isDash?'-':val}
     </span>;
   };
   const numPill=(val,onClick=null)=>{
-    const content=val===null||val===undefined||val==='-'?'—':(typeof val==='number'?val.toLocaleString():val);
+    const content=val===null||val===undefined||val==='-'?'-':(typeof val==='number'?val.toLocaleString():val);
     const inner=<span style={{display:'inline-flex',alignItems:'center',justifyContent:'center',
       minWidth:36,padding:'3px 10px',borderRadius:20,background:'rgba(159,176,216,.13)',
       font:'600 12px/1.4 Inter,sans-serif',color:'#C8D4F0',whiteSpace:'nowrap'}}>{content}</span>;
@@ -1202,7 +1676,7 @@ function SalesTab({modalAgent,setModalAgent}) {
                   </button>
                 )}
                 <div style={{font:'700 17px Inter,sans-serif',color:'#fff'}}>
-                  {!repliesDrill&&`Replies — ${repliesModal.name}`}
+                  {!repliesDrill&&`Replies - ${repliesModal.name}`}
                   {repliesDrill?.level==='leads'&&`${repliesDrill.campaign?.campaign_name} Threads`}
                   {repliesDrill?.level==='thread'&&(repliesDrill.lead?.fullName||'Thread')}
                 </div>
@@ -1664,7 +2138,7 @@ function SalesTab({modalAgent,setModalAgent}) {
                             <div style={{font:'11px Inter,sans-serif',color:'#4a5568',marginBottom:6}}>One per line</div>
                             <textarea rows={6} value={form.personas} onChange={e=>setForm(f=>({...f,personas:e.target.value}))} style={fi} placeholder="VP of Operations\nDesign Manager"/>
                           </div>)}
-                        {field('Hook — the pain',
+                        {field('Hook - the pain',
                           <textarea rows={4} value={form.hook} onChange={e=>setForm(f=>({...f,hook:e.target.value}))} style={fi}/>)}
                         {field('Value proposition',
                           <textarea rows={6} value={form.valueProp} onChange={e=>setForm(f=>({...f,valueProp:e.target.value}))} style={fi}/>)}
@@ -1730,7 +2204,7 @@ function SalesTab({modalAgent,setModalAgent}) {
                         background:'none',color:'#9FB0D8',font:'600 13px Inter,sans-serif',cursor:'pointer'}}>Discard</button>
                     <button onClick={save} disabled={saving}
                       style={{padding:'9px 24px',borderRadius:8,border:'none',background:saving?'rgba(6,229,236,.4)':'#06E5EC',
-                        color:'#000814',font:'700 13px Inter,sans-serif',cursor:saving?'default':'pointer',letterSpacing:'.01em'}}>{saving?'Saving…':'Save changes'}</button>
+                        color:'#000814',font:'700 13px Inter,sans-serif',cursor:saving?'default':'pointer',letterSpacing:'.01em'}}>{saving?'Saving...':'Save changes'}</button>
                   </div>
                 </div>
               </div>
@@ -1875,7 +2349,7 @@ function SalesTab({modalAgent,setModalAgent}) {
                         {field('Target personas',
                           <div><div style={{font:'11px Inter,sans-serif',color:'#4a5568',marginBottom:6}}>One per line</div>
                             <textarea rows={6} value={form.personas} onChange={e=>setForm(f=>({...f,personas:e.target.value}))} style={fi} placeholder="VP of Operations"/></div>)}
-                        {field('Hook — the pain',
+                        {field('Hook - the pain',
                           <textarea rows={4} value={form.hook} onChange={e=>setForm(f=>({...f,hook:e.target.value}))} style={fi} placeholder="What problem does the prospect have?"/>)}
                         {field('Value proposition',
                           <textarea rows={6} value={form.valueProp} onChange={e=>setForm(f=>({...f,valueProp:e.target.value}))} style={fi} placeholder="How does Bold Business solve it?"/>)}
@@ -1934,7 +2408,7 @@ function SalesTab({modalAgent,setModalAgent}) {
                       style={{padding:'9px 24px',borderRadius:8,border:'none',
                         background:(form.title.trim()&&!saving)?'#06E5EC':'rgba(6,229,236,.3)',
                         color:'#000814',font:'700 13px Inter,sans-serif',cursor:(form.title.trim()&&!saving)?'pointer':'default',
-                        letterSpacing:'.01em'}}>{saving?'Saving…':'Create brief'}</button>
+                        letterSpacing:'.01em'}}>{saving?'Saving...':'Create brief'}</button>
                   </div>
                 </div>
               </div>
@@ -2002,7 +2476,7 @@ function SalesTab({modalAgent,setModalAgent}) {
                 h('Sourcing Signals',2),
                 ...(c.signals||[]).map(bullet),
                 new Paragraph({spacing:{after:200}}),
-                h('Hook — The Pain',2),
+                h('Hook - The Pain',2),
                 p(c.hook||''),
                 new Paragraph({spacing:{after:200}}),
                 h('Value Proposition',2),
@@ -2010,7 +2484,7 @@ function SalesTab({modalAgent,setModalAgent}) {
                 new Paragraph({spacing:{after:200}}),
                 h('4-Touch Outreach Sequence',2),
                 ...(c.sequence||[]).flatMap((s,i)=>[
-                  h(`Step ${i+1}: ${s.title} — ${s.meta}`,3),
+                  h(`Step ${i+1}: ${s.title} - ${s.meta}`,3),
                   ...(s.subject?[p(`Subject: ${s.subject}`,{italics:true})]:[]),
                   ...( s.body||'').split('\n').map(line=>line?p(line):new Paragraph({spacing:{after:80}})),
                   new Paragraph({spacing:{after:160}}),
@@ -2060,7 +2534,7 @@ function SalesTab({modalAgent,setModalAgent}) {
               heading('Sourcing Signals',12);
               (c.signals||[]).forEach(r=>body(`→ ${r}`,10));
               y+=3;
-              heading('Hook — The Pain',12);
+              heading('Hook - The Pain',12);
               body(c.hook||'',10);
               y+=3;
               heading('Value Proposition',12);
@@ -2068,7 +2542,7 @@ function SalesTab({modalAgent,setModalAgent}) {
               y+=3;
               heading('4-Touch Outreach Sequence',12);
               (c.sequence||[]).forEach((s,i)=>{
-                heading(`Step ${i+1}: ${s.title} — ${s.meta}`,11,true);
+                heading(`Step ${i+1}: ${s.title} - ${s.meta}`,11,true);
                 if(s.subject) body(`Subject: ${s.subject}`,9,[90,90,140]);
                 body(s.body||'',9);
                 y+=2;
@@ -2191,7 +2665,7 @@ function SalesTab({modalAgent,setModalAgent}) {
             <div style={{overflowY:'auto',flex:1,padding:'20px 24px'}}>
               <form onSubmit={handleSaveCamp}>
                 <div style={{display:'flex',flexDirection:'column',gap:14}}>
-                  {/* Campaign name — combobox: dropdown + free-type */}
+                  {/* Campaign name - combobox: dropdown + free-type */}
                   <div style={{display:'flex',flexDirection:'column',gap:4,position:'relative'}}>
                     <label style={{font:'700 11px Inter,sans-serif',color:'#7E8DB5',textTransform:'uppercase',letterSpacing:'.06em'}}>Campaign Name *</label>
                     <input
@@ -2259,7 +2733,7 @@ function SalesTab({modalAgent,setModalAgent}) {
                     <label style={{font:'700 11px Inter,sans-serif',color:'#7E8DB5',textTransform:'uppercase',letterSpacing:'.06em'}}>Target ICP</label>
                     <input value={campModal.form.target_icp}
                       onChange={e=>setCampModal(m=>({...m,form:{...m.form,target_icp:e.target.value}}))}
-                      placeholder="e.g. Commercial Furniture Dealers · 50–500 employees · US"
+                      placeholder="e.g. Commercial Furniture Dealers · 50-500 employees · US"
                       style={{padding:'9px 12px',border:'1px solid rgba(255,255,255,.15)',borderRadius:8,font:'13px Inter,sans-serif',color:'#EAF0FF',background:'rgba(255,255,255,.05)'}}/>
                   </div>
                   {/* Channel + Activity + Date row */}
@@ -2444,7 +2918,7 @@ function SalesTab({modalAgent,setModalAgent}) {
       {/* 1 ── Sales overview label + period selector + sync ── */}
       <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:12,flexWrap:'wrap',marginBottom:12}}>
         <div className="cc-sect-label" style={{marginBottom:0}}>Sales overview</div>
-        {/* Period pills + custom range — Sales overview */}
+        {/* Period pills + custom range - Sales overview */}
         <div style={{display:'flex',alignItems:'center',gap:8}}>
           <div style={{display:'flex',gap:4,background:'rgba(255,255,255,.04)',border:'1px solid rgba(124,124,245,.25)',borderRadius:10,padding:4}}>
             {PERIODS.map(p=>{
@@ -2583,7 +3057,7 @@ function SalesTab({modalAgent,setModalAgent}) {
             <input
               value={sbSearch}
               onChange={e=>{ setSbSearch(e.target.value); setSbPage(0); }}
-              placeholder="Search campaigns…"
+              placeholder="Search campaigns..."
               style={{paddingLeft:30,paddingRight:sbSearch?24:10,height:32,borderRadius:8,
                 border:'1px solid rgba(255,255,255,.15)',background:'rgba(255,255,255,.05)',
                 color:'#EAF0FF',font:'13px Inter,sans-serif',outline:'none',width:200}}/>
@@ -2652,7 +3126,7 @@ function SalesTab({modalAgent,setModalAgent}) {
                         {c.name}
                         {c.is_manual&&<span style={{fontSize:9,fontWeight:700,letterSpacing:'.06em',textTransform:'uppercase',padding:'2px 6px',borderRadius:4,background:'rgba(139,124,246,.2)',color:'#8B7CF6',flexShrink:0,border:'1px solid rgba(139,124,246,.3)'}}>Manual</span>}
                       </span>
-                      <span onClick={()=>setSbOpen(open?null:i)} style={{font:'13px Inter,sans-serif',color:'#9FB0D8',cursor:'pointer',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}} title={c.target_icp||'—'}>{c.target_icp||<span style={{color:'#4a5568',fontStyle:'italic'}}>—</span>}</span>
+                      <span onClick={()=>setSbOpen(open?null:i)} style={{font:'13px Inter,sans-serif',color:'#9FB0D8',cursor:'pointer',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}} title={c.target_icp||'-'}>{c.target_icp||<span style={{color:'#4a5568',fontStyle:'italic'}}>-</span>}</span>
                       <span onClick={()=>setSbOpen(open?null:i)} style={{font:'13px Inter,sans-serif',color:'#EAF0FF',cursor:'pointer'}}>{c.channel||'LinkedIn + Email'}</span>
                       <span onClick={()=>setSbOpen(open?null:i)} style={{font:'700 14px Inter,sans-serif',fontFamily:'monospace',color:mc,cursor:'pointer'}}>{c.key_metric}</span>
                       <span onClick={()=>setSbOpen(open?null:i)} style={{cursor:'pointer'}}><span style={{font:'700 11px Inter,sans-serif',textTransform:'uppercase',letterSpacing:'.03em',padding:'3px 9px',borderRadius:20,color:sc,background:sbg}}>{status}</span></span>
@@ -2939,11 +3413,11 @@ function SalesTab({modalAgent,setModalAgent}) {
               </div>
             )}
           </div>
-          {/* Sync button — inline with filters */}
+          {/* Sync button - inline with filters */}
           <button
             onClick={handleSync}
             disabled={syncing||syncDone}
-            title={syncing?'Syncing…':syncDone?'Done!':'Sync from Skylead'}
+            title={syncing?'Syncing...':syncDone?'Done!':'Sync from Skylead'}
             style={{
               display:'inline-flex',alignItems:'center',justifyContent:'center',gap:6,
               padding:'7px 14px',borderRadius:10,border:'none',
@@ -2959,7 +3433,7 @@ function SalesTab({modalAgent,setModalAgent}) {
               minWidth:120,
             }}>
             {syncDone ? (
-              /* Checkmark — appears after sync completes */
+              /* Checkmark - appears after sync completes */
               <>
                 <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/>
@@ -2973,7 +3447,7 @@ function SalesTab({modalAgent,setModalAgent}) {
                   style={{animation:'cc-spin 0.8s linear infinite'}}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
                 </svg>
-                Syncing…
+                Syncing...
               </>
             ) : (
               /* Default state */
@@ -3053,7 +3527,18 @@ function SalesTab({modalAgent,setModalAgent}) {
       {/* 7 ── Follow-Up Command Center ── */}
       <div className="cc-sect-label">Follow-Up Command Center</div>
 
-      <div style={{font:'700 15px Inter,sans-serif',letterSpacing:'.02em',color:'#06E5EC',marginBottom:10}}>Deal Follow-up</div>
+      {/* Deal Follow-up */}
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:10}}>
+        <div style={{font:'700 15px Inter,sans-serif',letterSpacing:'.02em',color:'#06E5EC'}}>Deal Follow-up</div>
+        <div style={{position:'relative'}}>
+          <svg style={{position:'absolute',left:9,top:'50%',transform:'translateY(-50%)',pointerEvents:'none'}} width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#7E8DB5" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input value={p1Search} onChange={e=>{setP1Search(e.target.value);setP1Page(0);}} placeholder="Search contacts, deals…"
+            style={{paddingLeft:28,paddingRight:p1Search?22:10,height:30,borderRadius:8,border:'1px solid rgba(255,255,255,.15)',
+              background:'rgba(255,255,255,.05)',color:'#EAF0FF',font:'12px Inter,sans-serif',outline:'none',width:200}}/>
+          {p1Search&&<span onClick={()=>{setP1Search('');setP1Page(0);}} style={{position:'absolute',right:7,top:'50%',
+            transform:'translateY(-50%)',color:'#7E8DB5',cursor:'pointer',fontSize:14}}>×</span>}
+        </div>
+      </div>
       <div style={{background:'rgba(255,255,255,.025)',border:'1px solid rgba(255,255,255,.08)',borderRadius:12,overflow:'hidden',marginBottom:22}}>
         <div style={{display:'grid',gridTemplateColumns:'1.1fr 1.4fr 1fr 1.8fr 1.1fr',padding:'11px 16px',borderBottom:'1px solid rgba(255,255,255,.08)',background:'rgba(2,8,32,.3)'}}>
           {['Contact','Deal','Deal stage','Note','Last updated'].map(h=>(
@@ -3065,34 +3550,57 @@ function SalesTab({modalAgent,setModalAgent}) {
             <div className="cc-skel" style={{height:18,width:'60%'}}/>
           </div>
         ))}
-        {!followUpsLoad&&(followUps?.priority1||[]).length===0&&(
-          <div style={{padding:28,textAlign:'center',font:'13px Inter,sans-serif',color:'#7E8DB5'}}>No tagged follow-ups found in HubSpot.</div>
-        )}
-        {!followUpsLoad&&(followUps?.priority1||[]).slice(p1Page*FU_PER_PAGE,(p1Page+1)*FU_PER_PAGE).map((r,i,a)=>(
-          <div key={i} style={{display:'grid',gridTemplateColumns:'1.1fr 1.4fr 1fr 1.8fr 1.1fr',alignItems:'center',padding:'13px 16px',
-            borderBottom:i<a.length-1?'1px solid rgba(255,255,255,.05)':'none'}}>
-            <span style={{font:'600 14px Inter,sans-serif',color:'#EAF0FF'}}>{r.name}</span>
-            {r.hs_url
-              ?<a href={r.hs_url} target="_blank" rel="noopener noreferrer"
-                  style={{font:'14px Inter,sans-serif',color:'#06E5EC',textDecoration:'none',overflow:'hidden',
-                    textOverflow:'ellipsis',whiteSpace:'nowrap',cursor:'pointer'}}
-                  onMouseEnter={e=>e.target.style.textDecoration='underline'}
-                  onMouseLeave={e=>e.target.style.textDecoration='none'}>{r.company}</a>
-              :<span style={{font:'14px Inter,sans-serif',color:'#cdd6ee',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{r.company}</span>}
-            <span><span style={{font:'700 10px Inter,sans-serif',textTransform:'uppercase',letterSpacing:'.03em',
-              padding:'3px 9px',borderRadius:20,color:r.stageClr,background:r.stageBg,whiteSpace:'nowrap'}}>{r.stage}</span></span>
-            <span style={{font:'13px/1.5 Inter,sans-serif',color:r.note?'#9FB0D8':'#4a5170',fontStyle:r.note?'normal':'italic'}}>
-              {r.note||'—'}
-            </span>
-            <span style={{font:'13px Inter,sans-serif',color:'#9FB0D8'}}>{r.last_modified}</span>
-          </div>
-        ))}
-        {!followUpsLoad&&(followUps?.priority1||[]).length>FU_PER_PAGE&&(
-          <div style={{padding:'8px 16px'}}><Pager page={p1Page} setPage={setP1Page} total={(followUps?.priority1||[]).length} perPage={FU_PER_PAGE}/></div>
-        )}
+        {(()=>{
+          const p1Filtered=(followUps?.priority1||[]).filter(r=>!p1Search||
+            (r.name||'').toLowerCase().includes(p1Search.toLowerCase())||
+            (r.company||'').toLowerCase().includes(p1Search.toLowerCase())||
+            (r.stage||'').toLowerCase().includes(p1Search.toLowerCase())||
+            (r.note||'').toLowerCase().includes(p1Search.toLowerCase())
+          );
+          if(!followUpsLoad&&p1Filtered.length===0) return(
+            <div style={{padding:28,textAlign:'center',font:'13px Inter,sans-serif',color:'#7E8DB5'}}>
+              {p1Search?'No matches found.':'No tagged follow-ups found in HubSpot.'}
+            </div>
+          );
+          return(<>
+            {!followUpsLoad&&p1Filtered.slice(p1Page*FU_PER_PAGE,(p1Page+1)*FU_PER_PAGE).map((r,i,a)=>(
+              <div key={i} style={{display:'grid',gridTemplateColumns:'1.1fr 1.4fr 1fr 1.8fr 1.1fr',alignItems:'center',padding:'13px 16px',
+                borderBottom:i<a.length-1?'1px solid rgba(255,255,255,.05)':'none'}}>
+                <span style={{font:'600 14px Inter,sans-serif',color:'#EAF0FF'}}>{r.name}</span>
+                {r.hs_url
+                  ?<a href={r.hs_url} target="_blank" rel="noopener noreferrer"
+                      style={{font:'14px Inter,sans-serif',color:'#06E5EC',textDecoration:'none',overflow:'hidden',
+                        textOverflow:'ellipsis',whiteSpace:'nowrap',cursor:'pointer'}}
+                      onMouseEnter={e=>e.target.style.textDecoration='underline'}
+                      onMouseLeave={e=>e.target.style.textDecoration='none'}>{r.company}</a>
+                  :<span style={{font:'14px Inter,sans-serif',color:'#cdd6ee',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{r.company}</span>}
+                <span><span style={{font:'700 10px Inter,sans-serif',textTransform:'uppercase',letterSpacing:'.03em',
+                  padding:'3px 9px',borderRadius:20,color:r.stageClr,background:r.stageBg,whiteSpace:'nowrap'}}>{r.stage}</span></span>
+                <span style={{font:'13px/1.5 Inter,sans-serif',color:r.note?'#9FB0D8':'#4a5170',fontStyle:r.note?'normal':'italic'}}>
+                  {r.note||'-'}
+                </span>
+                <span style={{font:'13px Inter,sans-serif',color:'#9FB0D8'}}>{r.last_modified}</span>
+              </div>
+            ))}
+            {!followUpsLoad&&p1Filtered.length>FU_PER_PAGE&&(
+              <div style={{padding:'8px 16px'}}><Pager page={p1Page} setPage={setP1Page} total={p1Filtered.length} perPage={FU_PER_PAGE}/></div>
+            )}
+          </>);
+        })()}
       </div>
 
-      <div style={{font:'700 15px Inter,sans-serif',letterSpacing:'.02em',color:'#06E5EC',marginBottom:10}}>Task List Follow-up</div>
+      {/* Task List Follow-up */}
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:10}}>
+        <div style={{font:'700 15px Inter,sans-serif',letterSpacing:'.02em',color:'#06E5EC'}}>Task List Follow-up</div>
+        <div style={{position:'relative'}}>
+          <svg style={{position:'absolute',left:9,top:'50%',transform:'translateY(-50%)',pointerEvents:'none'}} width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#7E8DB5" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input value={p2Search} onChange={e=>{setP2Search(e.target.value);setP2Page(0);}} placeholder="Search contacts, deals…"
+            style={{paddingLeft:28,paddingRight:p2Search?22:10,height:30,borderRadius:8,border:'1px solid rgba(255,255,255,.15)',
+              background:'rgba(255,255,255,.05)',color:'#EAF0FF',font:'12px Inter,sans-serif',outline:'none',width:200}}/>
+          {p2Search&&<span onClick={()=>{setP2Search('');setP2Page(0);}} style={{position:'absolute',right:7,top:'50%',
+            transform:'translateY(-50%)',color:'#7E8DB5',cursor:'pointer',fontSize:14}}>×</span>}
+        </div>
+      </div>
       <div style={{background:'rgba(255,255,255,.025)',border:'1px solid rgba(255,255,255,.08)',borderRadius:12,overflow:'hidden',marginBottom:26}}>
         <div style={{display:'grid',gridTemplateColumns:'1.2fr 1.6fr 1.1fr 2.1fr',padding:'11px 16px',borderBottom:'1px solid rgba(255,255,255,.08)',background:'rgba(2,8,32,.3)'}}>
           {['Contact','Deal','Follow-up date','Note'].map(h=>(
@@ -3104,27 +3612,39 @@ function SalesTab({modalAgent,setModalAgent}) {
             <div className="cc-skel" style={{height:18,width:'70%'}}/>
           </div>
         ))}
-        {!followUpsLoad&&(followUps?.priority2||[]).length===0&&(
-          <div style={{padding:28,textAlign:'center',font:'13px Inter,sans-serif',color:'#7E8DB5'}}>No active deals needing follow-up found.</div>
-        )}
-        {!followUpsLoad&&(followUps?.priority2||[]).slice(p2Page*FU_PER_PAGE,(p2Page+1)*FU_PER_PAGE).map((r,i,a)=>(
-          <div key={i} style={{display:'grid',gridTemplateColumns:'1.2fr 1.6fr 1.1fr 2.1fr',alignItems:'center',padding:'14px 16px',
-            borderBottom:i<a.length-1?'1px solid rgba(255,255,255,.05)':'none'}}>
-            <span style={{font:'600 14px Inter,sans-serif',color:'#EAF0FF'}}>{r.name}</span>
-            {r.hs_url
-              ?<a href={r.hs_url} target="_blank" rel="noopener noreferrer"
-                  style={{font:'14px Inter,sans-serif',color:'#06E5EC',textDecoration:'none',overflow:'hidden',
-                    textOverflow:'ellipsis',whiteSpace:'nowrap',cursor:'pointer'}}
-                  onMouseEnter={e=>e.target.style.textDecoration='underline'}
-                  onMouseLeave={e=>e.target.style.textDecoration='none'}>{r.company}</a>
-              :<span style={{font:'14px Inter,sans-serif',color:'#cdd6ee',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{r.company}</span>}
-            <span style={{font:'13px/1 monospace',color:r.date&&r.date.includes('overdue')?'#F2667A':'#9FB0D8',whiteSpace:'nowrap'}}>{r.date||'-'}</span>
-            <span style={{font:'13px/1.5 Inter,sans-serif',color:'#9FB0D8'}}>{r.note}</span>
-          </div>
-        ))}
-        {!followUpsLoad&&(followUps?.priority2||[]).length>FU_PER_PAGE&&(
-          <div style={{padding:'8px 16px'}}><Pager page={p2Page} setPage={setP2Page} total={(followUps?.priority2||[]).length} perPage={FU_PER_PAGE}/></div>
-        )}
+        {(()=>{
+          const p2Filtered=(followUps?.priority2||[]).filter(r=>!p2Search||
+            (r.name||'').toLowerCase().includes(p2Search.toLowerCase())||
+            (r.company||'').toLowerCase().includes(p2Search.toLowerCase())||
+            (r.date||'').toLowerCase().includes(p2Search.toLowerCase())||
+            (r.note||'').toLowerCase().includes(p2Search.toLowerCase())
+          );
+          if(!followUpsLoad&&p2Filtered.length===0) return(
+            <div style={{padding:28,textAlign:'center',font:'13px Inter,sans-serif',color:'#7E8DB5'}}>
+              {p2Search?'No matches found.':'No active deals needing follow-up found.'}
+            </div>
+          );
+          return(<>
+            {!followUpsLoad&&p2Filtered.slice(p2Page*FU_PER_PAGE,(p2Page+1)*FU_PER_PAGE).map((r,i,a)=>(
+              <div key={i} style={{display:'grid',gridTemplateColumns:'1.2fr 1.6fr 1.1fr 2.1fr',alignItems:'center',padding:'14px 16px',
+                borderBottom:i<a.length-1?'1px solid rgba(255,255,255,.05)':'none'}}>
+                <span style={{font:'600 14px Inter,sans-serif',color:'#EAF0FF'}}>{r.name}</span>
+                {r.hs_url
+                  ?<a href={r.hs_url} target="_blank" rel="noopener noreferrer"
+                      style={{font:'14px Inter,sans-serif',color:'#06E5EC',textDecoration:'none',overflow:'hidden',
+                        textOverflow:'ellipsis',whiteSpace:'nowrap',cursor:'pointer'}}
+                      onMouseEnter={e=>e.target.style.textDecoration='underline'}
+                      onMouseLeave={e=>e.target.style.textDecoration='none'}>{r.company}</a>
+                  :<span style={{font:'14px Inter,sans-serif',color:'#cdd6ee',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{r.company}</span>}
+                <span style={{font:'13px/1 monospace',color:r.date&&r.date.includes('overdue')?'#F2667A':'#9FB0D8',whiteSpace:'nowrap'}}>{r.date||'-'}</span>
+                <span style={{font:'13px/1.5 Inter,sans-serif',color:'#9FB0D8'}}>{r.note}</span>
+              </div>
+            ))}
+            {!followUpsLoad&&p2Filtered.length>FU_PER_PAGE&&(
+              <div style={{padding:'8px 16px'}}><Pager page={p2Page} setPage={setP2Page} total={p2Filtered.length} perPage={FU_PER_PAGE}/></div>
+            )}
+          </>);
+        })()}
       </div>
 
 
@@ -3423,6 +3943,9 @@ function SalesTab({modalAgent,setModalAgent}) {
 
       {/* ── Task List ── */}
       <TaskListSection authHeaders={authHeaders}/>
+
+      {/* ── Library ── */}
+      <LibrarySection authHeaders={authHeaders}/>
 
       {/* ── Email Domains ── */}
       {(()=>{
@@ -3863,13 +4386,13 @@ function Pager({page,setPage,total,perPage}){
   return (
     <div style={{display:'flex',alignItems:'center',justifyContent:'flex-end',gap:4,marginTop:10,paddingTop:8,borderTop:'1px solid rgba(255,255,255,.06)',flexWrap:'wrap'}}>
       <span style={{font:'11px Inter,sans-serif',color:'#7E8DB5',marginRight:6}}>
-        {page*perPage+1}–{Math.min((page+1)*perPage,total)} of {total}
+        {page*perPage+1}-{Math.min((page+1)*perPage,total)} of {total}
       </span>
       {btn('«',page===0,()=>setPage(0))}
       {btn('‹',page===0,()=>setPage(p=>Math.max(0,p-1)))}
-      {start>0&&<span style={{color:'#7E8DB5',font:'11px Inter,sans-serif',padding:'0 2px'}}>…</span>}
+      {start>0&&<span style={{color:'#7E8DB5',font:'11px Inter,sans-serif',padding:'0 2px'}}>...</span>}
       {pageNums.map(i=>pageBtn(i))}
-      {end<pages-1&&<span style={{color:'#7E8DB5',font:'11px Inter,sans-serif',padding:'0 2px'}}>…</span>}
+      {end<pages-1&&<span style={{color:'#7E8DB5',font:'11px Inter,sans-serif',padding:'0 2px'}}>...</span>}
       {btn('›',page===pages-1,()=>setPage(p=>Math.min(pages-1,p+1)))}
       {btn('»',page===pages-1,()=>setPage(pages-1))}
     </div>
