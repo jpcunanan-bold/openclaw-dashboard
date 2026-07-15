@@ -5097,6 +5097,20 @@ app.get('/api/skylead/campaign-names', async (req, res) => {
 // ── Campaign CRUD (sandbox manual add/edit/delete) — uses sales.dashboard_campaigns ──
 // Manually-added rows use a dedicated sequence (sales.manual_campaign_id_seq, starts at 1,000,000,000).
 
+// is_manual already exists live on the shared DB (confirmed via information_schema — someone added
+// it directly against production at some point) but isn't created by any migration in this repo or
+// in smt-api's, which is exactly the kind of undocumented drift that caused confusion about which
+// convention (negative campaign_id vs this flag) is actually authoritative. Make it explicit here.
+(async () => {
+  try {
+    await smtAdminPool.query(`
+      ALTER TABLE sales.dashboard_campaigns ADD COLUMN IF NOT EXISTS is_manual BOOLEAN DEFAULT false
+    `);
+  } catch (e) {
+    console.error('sales.dashboard_campaigns.is_manual migration error:', e.message);
+  }
+})();
+
 // Audit trail for deletes — every manually-added campaign that has disappeared so far did so
 // with no trace of who/what removed it (no DB trigger, no cron, pure app-level DELETE only).
 // This logs the full row plus the caller identity before it's removed, so the next disappearance
