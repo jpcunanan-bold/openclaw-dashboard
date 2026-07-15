@@ -21,7 +21,7 @@ jobs:
         # there, regardless of what was just pushed.
         run: |
           rsync -a --delete --exclude='.env' --exclude='node_modules' "$GITHUB_WORKSPACE/api/" /var/www/laura-dashboard/api/
-          rsync -a --delete --exclude='node_modules' --exclude='dist' "$GITHUB_WORKSPACE/app/" /var/www/laura-dashboard/app/
+          rsync -a --delete --exclude='node_modules' --exclude='dist' --exclude='dist-deploy' "$GITHUB_WORKSPACE/app/" /var/www/laura-dashboard/app/
 
       - name: Write .env
         env:
