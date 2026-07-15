@@ -276,7 +276,7 @@ const STATUS_CFG={
 const TASK_TYPES=['Next Action','Project'];
 const HORIZONS=['Ground','Horizon 1','Horizon 2','Horizon 3','Horizon 4','Horizon 5'];
 
-const TASK_PER_PAGE=10;
+const TASK_PER_PAGE=5;
 // ─ Multi-select assignee dropdown component ────────────────────────────────────────
 // Renders pill avatars for selected users and a dropdown checklist to add/remove
 function AssigneeMultiSelect({ users, selectedIds, onChange }) {
@@ -1091,11 +1091,13 @@ function SalesTab({modalAgent,setModalAgent}) {
   const [sdrPage,setSdrPage]=useState(0);
   const [sbPage,setSbPage]=useState(0);
   const [sbSearch,setSbSearch]=useState('');
-  const SDR_PER_PAGE=10;
-  const SB_PER_PAGE=10;
-  const FU_PER_PAGE=10;
+  const SDR_PER_PAGE=5;
+  const SB_PER_PAGE=5;
+  const FU_PER_PAGE=5;
   const [p1Page,setP1Page]=useState(0);
   const [p2Page,setP2Page]=useState(0);
+  const [p1Search,setP1Search]=useState('');
+  const [p2Search,setP2Search]=useState('');
   const [campIdx,setCampIdx]=useState(0);
   const [campEdits,setCampEdits]=useState({});   // overrides keyed by campIdx
   const [customCampaigns,setCustomCampaigns]=useState([]); // ALL briefs loaded from DB (built-ins + user-created)
@@ -3551,7 +3553,18 @@ function SalesTab({modalAgent,setModalAgent}) {
       {/* 7 ── Follow-Up Command Center ── */}
       <div className="cc-sect-label">Follow-Up Command Center</div>
 
-      <div style={{font:'700 15px Inter,sans-serif',letterSpacing:'.02em',color:'#06E5EC',marginBottom:10}}>Deal Follow-up</div>
+      {/* Deal Follow-up */}
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:10}}>
+        <div style={{font:'700 15px Inter,sans-serif',letterSpacing:'.02em',color:'#06E5EC'}}>Deal Follow-up</div>
+        <div style={{position:'relative'}}>
+          <svg style={{position:'absolute',left:9,top:'50%',transform:'translateY(-50%)',pointerEvents:'none'}} width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#7E8DB5" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input value={p1Search} onChange={e=>{setP1Search(e.target.value);setP1Page(0);}} placeholder="Search contacts, deals…"
+            style={{paddingLeft:28,paddingRight:p1Search?22:10,height:30,borderRadius:8,border:'1px solid rgba(255,255,255,.15)',
+              background:'rgba(255,255,255,.05)',color:'#EAF0FF',font:'12px Inter,sans-serif',outline:'none',width:200}}/>
+          {p1Search&&<span onClick={()=>{setP1Search('');setP1Page(0);}} style={{position:'absolute',right:7,top:'50%',
+            transform:'translateY(-50%)',color:'#7E8DB5',cursor:'pointer',fontSize:14}}>×</span>}
+        </div>
+      </div>
       <div style={{background:'rgba(255,255,255,.025)',border:'1px solid rgba(255,255,255,.08)',borderRadius:12,overflow:'hidden',marginBottom:22}}>
         <div style={{display:'grid',gridTemplateColumns:'1.1fr 1.4fr 1fr 1.8fr 1.1fr',padding:'11px 16px',borderBottom:'1px solid rgba(255,255,255,.08)',background:'rgba(2,8,32,.3)'}}>
           {['Contact','Deal','Deal stage','Note','Last updated'].map(h=>(
@@ -3563,34 +3576,57 @@ function SalesTab({modalAgent,setModalAgent}) {
             <div className="cc-skel" style={{height:18,width:'60%'}}/>
           </div>
         ))}
-        {!followUpsLoad&&(followUps?.priority1||[]).length===0&&(
-          <div style={{padding:28,textAlign:'center',font:'13px Inter,sans-serif',color:'#7E8DB5'}}>No tagged follow-ups found in HubSpot.</div>
-        )}
-        {!followUpsLoad&&(followUps?.priority1||[]).slice(p1Page*FU_PER_PAGE,(p1Page+1)*FU_PER_PAGE).map((r,i,a)=>(
-          <div key={i} style={{display:'grid',gridTemplateColumns:'1.1fr 1.4fr 1fr 1.8fr 1.1fr',alignItems:'center',padding:'13px 16px',
-            borderBottom:i<a.length-1?'1px solid rgba(255,255,255,.05)':'none'}}>
-            <span style={{font:'600 14px Inter,sans-serif',color:'#EAF0FF'}}>{r.name}</span>
-            {r.hs_url
-              ?<a href={r.hs_url} target="_blank" rel="noopener noreferrer"
-                  style={{font:'14px Inter,sans-serif',color:'#06E5EC',textDecoration:'none',overflow:'hidden',
-                    textOverflow:'ellipsis',whiteSpace:'nowrap',cursor:'pointer'}}
-                  onMouseEnter={e=>e.target.style.textDecoration='underline'}
-                  onMouseLeave={e=>e.target.style.textDecoration='none'}>{r.company}</a>
-              :<span style={{font:'14px Inter,sans-serif',color:'#cdd6ee',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{r.company}</span>}
-            <span><span style={{font:'700 10px Inter,sans-serif',textTransform:'uppercase',letterSpacing:'.03em',
-              padding:'3px 9px',borderRadius:20,color:r.stageClr,background:r.stageBg,whiteSpace:'nowrap'}}>{r.stage}</span></span>
-            <span style={{font:'13px/1.5 Inter,sans-serif',color:r.note?'#9FB0D8':'#4a5170',fontStyle:r.note?'normal':'italic'}}>
-              {r.note||'-'}
-            </span>
-            <span style={{font:'13px Inter,sans-serif',color:'#9FB0D8'}}>{r.last_modified}</span>
-          </div>
-        ))}
-        {!followUpsLoad&&(followUps?.priority1||[]).length>FU_PER_PAGE&&(
-          <div style={{padding:'8px 16px'}}><Pager page={p1Page} setPage={setP1Page} total={(followUps?.priority1||[]).length} perPage={FU_PER_PAGE}/></div>
-        )}
+        {(()=>{
+          const p1Filtered=(followUps?.priority1||[]).filter(r=>!p1Search||
+            (r.name||'').toLowerCase().includes(p1Search.toLowerCase())||
+            (r.company||'').toLowerCase().includes(p1Search.toLowerCase())||
+            (r.stage||'').toLowerCase().includes(p1Search.toLowerCase())||
+            (r.note||'').toLowerCase().includes(p1Search.toLowerCase())
+          );
+          if(!followUpsLoad&&p1Filtered.length===0) return(
+            <div style={{padding:28,textAlign:'center',font:'13px Inter,sans-serif',color:'#7E8DB5'}}>
+              {p1Search?'No matches found.':'No tagged follow-ups found in HubSpot.'}
+            </div>
+          );
+          return(<>
+            {!followUpsLoad&&p1Filtered.slice(p1Page*FU_PER_PAGE,(p1Page+1)*FU_PER_PAGE).map((r,i,a)=>(
+              <div key={i} style={{display:'grid',gridTemplateColumns:'1.1fr 1.4fr 1fr 1.8fr 1.1fr',alignItems:'center',padding:'13px 16px',
+                borderBottom:i<a.length-1?'1px solid rgba(255,255,255,.05)':'none'}}>
+                <span style={{font:'600 14px Inter,sans-serif',color:'#EAF0FF'}}>{r.name}</span>
+                {r.hs_url
+                  ?<a href={r.hs_url} target="_blank" rel="noopener noreferrer"
+                      style={{font:'14px Inter,sans-serif',color:'#06E5EC',textDecoration:'none',overflow:'hidden',
+                        textOverflow:'ellipsis',whiteSpace:'nowrap',cursor:'pointer'}}
+                      onMouseEnter={e=>e.target.style.textDecoration='underline'}
+                      onMouseLeave={e=>e.target.style.textDecoration='none'}>{r.company}</a>
+                  :<span style={{font:'14px Inter,sans-serif',color:'#cdd6ee',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{r.company}</span>}
+                <span><span style={{font:'700 10px Inter,sans-serif',textTransform:'uppercase',letterSpacing:'.03em',
+                  padding:'3px 9px',borderRadius:20,color:r.stageClr,background:r.stageBg,whiteSpace:'nowrap'}}>{r.stage}</span></span>
+                <span style={{font:'13px/1.5 Inter,sans-serif',color:r.note?'#9FB0D8':'#4a5170',fontStyle:r.note?'normal':'italic'}}>
+                  {r.note||'-'}
+                </span>
+                <span style={{font:'13px Inter,sans-serif',color:'#9FB0D8'}}>{r.last_modified}</span>
+              </div>
+            ))}
+            {!followUpsLoad&&p1Filtered.length>FU_PER_PAGE&&(
+              <div style={{padding:'8px 16px'}}><Pager page={p1Page} setPage={setP1Page} total={p1Filtered.length} perPage={FU_PER_PAGE}/></div>
+            )}
+          </>);
+        })()}
       </div>
 
-      <div style={{font:'700 15px Inter,sans-serif',letterSpacing:'.02em',color:'#06E5EC',marginBottom:10}}>Task List Follow-up</div>
+      {/* Task List Follow-up */}
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:10}}>
+        <div style={{font:'700 15px Inter,sans-serif',letterSpacing:'.02em',color:'#06E5EC'}}>Task List Follow-up</div>
+        <div style={{position:'relative'}}>
+          <svg style={{position:'absolute',left:9,top:'50%',transform:'translateY(-50%)',pointerEvents:'none'}} width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#7E8DB5" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input value={p2Search} onChange={e=>{setP2Search(e.target.value);setP2Page(0);}} placeholder="Search contacts, deals…"
+            style={{paddingLeft:28,paddingRight:p2Search?22:10,height:30,borderRadius:8,border:'1px solid rgba(255,255,255,.15)',
+              background:'rgba(255,255,255,.05)',color:'#EAF0FF',font:'12px Inter,sans-serif',outline:'none',width:200}}/>
+          {p2Search&&<span onClick={()=>{setP2Search('');setP2Page(0);}} style={{position:'absolute',right:7,top:'50%',
+            transform:'translateY(-50%)',color:'#7E8DB5',cursor:'pointer',fontSize:14}}>×</span>}
+        </div>
+      </div>
       <div style={{background:'rgba(255,255,255,.025)',border:'1px solid rgba(255,255,255,.08)',borderRadius:12,overflow:'hidden',marginBottom:26}}>
         <div style={{display:'grid',gridTemplateColumns:'1.2fr 1.6fr 1.1fr 2.1fr',padding:'11px 16px',borderBottom:'1px solid rgba(255,255,255,.08)',background:'rgba(2,8,32,.3)'}}>
           {['Contact','Deal','Follow-up date','Note'].map(h=>(
@@ -3602,27 +3638,39 @@ function SalesTab({modalAgent,setModalAgent}) {
             <div className="cc-skel" style={{height:18,width:'70%'}}/>
           </div>
         ))}
-        {!followUpsLoad&&(followUps?.priority2||[]).length===0&&(
-          <div style={{padding:28,textAlign:'center',font:'13px Inter,sans-serif',color:'#7E8DB5'}}>No active deals needing follow-up found.</div>
-        )}
-        {!followUpsLoad&&(followUps?.priority2||[]).slice(p2Page*FU_PER_PAGE,(p2Page+1)*FU_PER_PAGE).map((r,i,a)=>(
-          <div key={i} style={{display:'grid',gridTemplateColumns:'1.2fr 1.6fr 1.1fr 2.1fr',alignItems:'center',padding:'14px 16px',
-            borderBottom:i<a.length-1?'1px solid rgba(255,255,255,.05)':'none'}}>
-            <span style={{font:'600 14px Inter,sans-serif',color:'#EAF0FF'}}>{r.name}</span>
-            {r.hs_url
-              ?<a href={r.hs_url} target="_blank" rel="noopener noreferrer"
-                  style={{font:'14px Inter,sans-serif',color:'#06E5EC',textDecoration:'none',overflow:'hidden',
-                    textOverflow:'ellipsis',whiteSpace:'nowrap',cursor:'pointer'}}
-                  onMouseEnter={e=>e.target.style.textDecoration='underline'}
-                  onMouseLeave={e=>e.target.style.textDecoration='none'}>{r.company}</a>
-              :<span style={{font:'14px Inter,sans-serif',color:'#cdd6ee',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{r.company}</span>}
-            <span style={{font:'13px/1 monospace',color:r.date&&r.date.includes('overdue')?'#F2667A':'#9FB0D8',whiteSpace:'nowrap'}}>{r.date||'-'}</span>
-            <span style={{font:'13px/1.5 Inter,sans-serif',color:'#9FB0D8'}}>{r.note}</span>
-          </div>
-        ))}
-        {!followUpsLoad&&(followUps?.priority2||[]).length>FU_PER_PAGE&&(
-          <div style={{padding:'8px 16px'}}><Pager page={p2Page} setPage={setP2Page} total={(followUps?.priority2||[]).length} perPage={FU_PER_PAGE}/></div>
-        )}
+        {(()=>{
+          const p2Filtered=(followUps?.priority2||[]).filter(r=>!p2Search||
+            (r.name||'').toLowerCase().includes(p2Search.toLowerCase())||
+            (r.company||'').toLowerCase().includes(p2Search.toLowerCase())||
+            (r.date||'').toLowerCase().includes(p2Search.toLowerCase())||
+            (r.note||'').toLowerCase().includes(p2Search.toLowerCase())
+          );
+          if(!followUpsLoad&&p2Filtered.length===0) return(
+            <div style={{padding:28,textAlign:'center',font:'13px Inter,sans-serif',color:'#7E8DB5'}}>
+              {p2Search?'No matches found.':'No active deals needing follow-up found.'}
+            </div>
+          );
+          return(<>
+            {!followUpsLoad&&p2Filtered.slice(p2Page*FU_PER_PAGE,(p2Page+1)*FU_PER_PAGE).map((r,i,a)=>(
+              <div key={i} style={{display:'grid',gridTemplateColumns:'1.2fr 1.6fr 1.1fr 2.1fr',alignItems:'center',padding:'14px 16px',
+                borderBottom:i<a.length-1?'1px solid rgba(255,255,255,.05)':'none'}}>
+                <span style={{font:'600 14px Inter,sans-serif',color:'#EAF0FF'}}>{r.name}</span>
+                {r.hs_url
+                  ?<a href={r.hs_url} target="_blank" rel="noopener noreferrer"
+                      style={{font:'14px Inter,sans-serif',color:'#06E5EC',textDecoration:'none',overflow:'hidden',
+                        textOverflow:'ellipsis',whiteSpace:'nowrap',cursor:'pointer'}}
+                      onMouseEnter={e=>e.target.style.textDecoration='underline'}
+                      onMouseLeave={e=>e.target.style.textDecoration='none'}>{r.company}</a>
+                  :<span style={{font:'14px Inter,sans-serif',color:'#cdd6ee',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{r.company}</span>}
+                <span style={{font:'13px/1 monospace',color:r.date&&r.date.includes('overdue')?'#F2667A':'#9FB0D8',whiteSpace:'nowrap'}}>{r.date||'-'}</span>
+                <span style={{font:'13px/1.5 Inter,sans-serif',color:'#9FB0D8'}}>{r.note}</span>
+              </div>
+            ))}
+            {!followUpsLoad&&p2Filtered.length>FU_PER_PAGE&&(
+              <div style={{padding:'8px 16px'}}><Pager page={p2Page} setPage={setP2Page} total={p2Filtered.length} perPage={FU_PER_PAGE}/></div>
+            )}
+          </>);
+        })()}
       </div>
 
 
