@@ -439,7 +439,7 @@ async function authMiddleware(req, res, next) {
   if (req.path === '/api/agents/avatars' && req.method === 'GET') return next();
   // Internal agent secret — allows Laura/Darren scripts to call dashboard APIs
   const AGENT_SECRET = process.env.AGENT_SECRET || '';
-  if (AGENT_SECRET && req.headers['x-agent-secret'] === AGENT_SECRET) return next();
+  if (AGENT_SECRET && req.headers['x-agent-secret'] === AGENT_SECRET) { req.viaAgentSecret = true; return next(); }
 
   // If neither Google nor token auth is configured → open (dev mode)
   if (!GOOGLE_CLIENT_ID && !AUTH_TOKEN) return next();
@@ -4837,7 +4837,7 @@ app.get('/api/skylead/sandbox', async (req, res) => {
         ), 0)                                 AS actual_meetings
       FROM sales.dashboard_campaigns dc
       JOIN sales.dashboard_skylead_ids ds ON dc.account_id = ds.account_id
-      WHERE (1=1 ${whereClause ? whereClause + ' OR dc.is_manual = TRUE' : ''})
+      WHERE 1=1 ${whereClause}
       GROUP BY dc.campaign_name, ds.account_name, ds.account_id, dc.target_icp, dc.channel
       ORDER BY dc.campaign_name, ds.account_name
     `;
@@ -5097,22 +5097,95 @@ app.get('/api/skylead/campaign-names', async (req, res) => {
 // ── Campaign CRUD (sandbox manual add/edit/delete) — uses sales.dashboard_campaigns ──
 // Manually-added rows use a dedicated sequence (sales.manual_campaign_id_seq, starts at 1,000,000,000).
 
+// is_manual already exists live on the shared DB (confirmed via information_schema — someone added
+// it directly against production at some point) but isn't created by any migration in this repo or
+// in smt-api's, which is exactly the kind of undocumented drift that caused confusion about which
+// convention (negative campaign_id vs this flag) is actually authoritative. Make it explicit here.
+(async () => {
+  try {
+    await smtAdminPool.query(`
+      ALTER TABLE sales.dashboard_campaigns ADD COLUMN IF NOT EXISTS is_manual BOOLEAN DEFAULT false
+    `);
+  } catch (e) {
+    console.error('sales.dashboard_campaigns.is_manual migration error:', e.message);
+  }
+})();
+
+// Audit trail for deletes — every manually-added campaign that has disappeared so far did so
+// with no trace of who/what removed it (no DB trigger, no cron, pure app-level DELETE only).
+// This logs the full row plus the caller identity before it's removed, so the next disappearance
+// is traceable instead of a mystery.
+(async () => {
+  try {
+    await smtAdminPool.query(`
+      CREATE TABLE IF NOT EXISTS sales.dashboard_campaigns_audit (
+        id            SERIAL PRIMARY KEY,
+        campaign_id   BIGINT,
+        deleted_row   JSONB,
+        deleted_by    TEXT,
+        deleted_via   TEXT,
+        ip            TEXT,
+        deleted_at    TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
+  } catch (e) {
+    console.error('sales.dashboard_campaigns_audit migration error:', e.message);
+  }
+})();
+
+function campaignAuditActor(req) {
+  if (req.viaAgentSecret) return { by: 'agent', via: 'x-agent-secret' };
+  if (req.user?.email)    return { by: req.user.email, via: 'google-session' };
+  return { by: 'unknown', via: 'token-or-open-auth' };
+}
+
+// DB-level guard — the audit table above only sees deletes that go through our own DELETE
+// endpoint. sales.dashboard_campaigns is a shared table (smt-api's Skylead sync also writes to
+// it), so any external process with DB credentials can delete a manual row without ever touching
+// this app's code. This trigger rejects deleting an is_manual row unless the deleting transaction
+// explicitly opts in via a session flag — only our own DELETE handler below sets it — so the
+// dashboard's delete button still works but nothing else can silently remove manual campaigns.
+(async () => {
+  try {
+    await smtAdminPool.query(`
+      CREATE OR REPLACE FUNCTION sales.protect_manual_campaigns() RETURNS trigger AS $body$
+      BEGIN
+        IF OLD.is_manual AND COALESCE(current_setting('app.allow_manual_campaign_delete', true), '') <> 'true' THEN
+          RAISE EXCEPTION 'Blocked delete of manually-added campaign_id=% "%" — not flagged as an intentional dashboard delete', OLD.campaign_id, OLD.campaign_name;
+        END IF;
+        RETURN OLD;
+      END;
+      $body$ LANGUAGE plpgsql;
+    `);
+    await smtAdminPool.query(`
+      DROP TRIGGER IF EXISTS trg_protect_manual_campaigns ON sales.dashboard_campaigns;
+    `);
+    await smtAdminPool.query(`
+      CREATE TRIGGER trg_protect_manual_campaigns
+      BEFORE DELETE ON sales.dashboard_campaigns
+      FOR EACH ROW EXECUTE FUNCTION sales.protect_manual_campaigns();
+    `);
+  } catch (e) {
+    console.error('protect_manual_campaigns trigger migration error:', e.message);
+  }
+})();
+
 /** POST /api/sales-dashboard/campaigns */
 app.post('/api/sales-dashboard/campaigns', async (req, res) => {
   try {
     const { campaign_name, account_id, activity, target_icp, channel,
             connections_requested, connection_requests_accepted, connection_replies, emails_sent, created_at } = req.body;
     if (!campaign_name || !account_id) return res.status(400).json({ error: 'campaign_name and account_id are required' });
-    // Use a single atomic query: nextval() inline so sequence only advances if INSERT succeeds.
-    // Previously: two separate queries (nextval then INSERT) — if INSERT failed the sequence
-    // was already consumed and the row was silently lost.
+    // Use a dedicated sequence starting at 1,000,000,000 — well above any Skylead ID (~400k range)
+    const idRes = await smtAdminPool.query(`SELECT nextval('sales.manual_campaign_id_seq') AS next_id`);
+    const newId = Number(idRes.rows[0].next_id);
     const result = await smtAdminPool.query(`
       INSERT INTO sales.dashboard_campaigns
         (campaign_id, campaign_name, account_id, activity, target_icp, channel,
          connections_requested, connection_requests_accepted, connection_replies,
          emails_sent, created_at, is_manual)
-      VALUES (nextval('sales.manual_campaign_id_seq'),$1,$2,$3,$4,$5,$6,$7,$8,$9,$10::date,TRUE) RETURNING *`,
-      [campaign_name, account_id, activity||null,
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11::date,TRUE) RETURNING *`,
+      [newId, campaign_name, account_id, activity||null,
        target_icp||null, channel||'LinkedIn + Email',
        connections_requested||0, connection_requests_accepted||0, connection_replies||0,
        emails_sent||0, created_at||new Date().toISOString().split('T')[0]]
@@ -5159,18 +5232,69 @@ app.patch('/api/sales-dashboard/campaigns/:id', async (req, res) => {
 
 /** DELETE /api/sales-dashboard/campaigns/:id */
 app.delete('/api/sales-dashboard/campaigns/:id', async (req, res) => {
+  const client = await smtAdminPool.connect();
   try {
-    await smtAdminPool.query('DELETE FROM sales.dashboard_campaigns WHERE campaign_id = $1', [req.params.id]);
+    await client.query('BEGIN');
+    // Opts this transaction in past the trg_protect_manual_campaigns guard — only this endpoint
+    // sets this flag, so a delete of an is_manual row from anywhere else (e.g. smt-api's Skylead
+    // sync running directly against this shared table) still gets rejected by the trigger.
+    await client.query(`SET LOCAL app.allow_manual_campaign_delete = 'true'`);
+    const { rows } = await client.query('SELECT * FROM sales.dashboard_campaigns WHERE campaign_id = $1', [req.params.id]);
+    const actor = campaignAuditActor(req);
+    if (rows.length) {
+      await client.query(
+        `INSERT INTO sales.dashboard_campaigns_audit (campaign_id, deleted_row, deleted_by, deleted_via, ip)
+         VALUES ($1,$2,$3,$4,$5)`,
+        [req.params.id, JSON.stringify(rows[0]), actor.by, actor.via, req.ip]
+      );
+    }
+    console.log(`Campaign delete: id=${req.params.id} name="${rows[0]?.campaign_name || '?'}" by=${actor.by} via=${actor.via} ip=${req.ip}`);
+    await client.query('DELETE FROM sales.dashboard_campaigns WHERE campaign_id = $1', [req.params.id]);
+    await client.query('COMMIT');
     res.json({ ok: true });
   } catch (e) {
-    console.error('DELETE /api/sales-dashboard/campaigns error:', e.message);
+    await client.query('ROLLBACK').catch(() => {});
+    console.error('DELETE /api/sales-dashboard/campaigns audit/delete error:', e.message);
     res.status(500).json({ error: e.message });
+  } finally {
+    client.release();
+  }
+});
+
+/** GET /api/sales-dashboard/campaigns/audit — who/what deleted campaigns, and when */
+app.get('/api/sales-dashboard/campaigns/audit', async (req, res) => {
+  try {
+    const { rows } = await smtAdminPool.query(
+      `SELECT id, campaign_id, deleted_row->>'campaign_name' AS campaign_name,
+              deleted_row->>'account_id' AS account_id, deleted_by, deleted_via, ip, deleted_at
+       FROM sales.dashboard_campaigns_audit ORDER BY deleted_at DESC LIMIT 200`
+    );
+    res.json({ ok: true, audit: rows });
+  } catch (e) {
+    console.error('GET /api/sales-dashboard/campaigns/audit error:', e.message);
+    res.status(500).json({ ok: false, error: e.message, audit: [] });
   }
 });
 
 // ── User Tasks (users.user_tasks in smt_db) ──
 
-/** GET /api/user-tasks — fetch tasks for the logged-in user (resolved by email) */
+/** GET /api/users — list all users for assignee dropdown */
+app.get('/api/users', async (req, res) => {
+  try {
+    const { rows } = await smtAdminPool.query(
+      `SELECT id, name, email, role, picture
+       FROM users.users
+       WHERE name IS NOT NULL AND name <> '' AND email NOT LIKE '%@bb.com' AND name <> 'Bold User Bot' AND name <> 'Pending Login'
+       ORDER BY name ASC`
+    );
+    res.json({ ok: true, users: rows });
+  } catch (e) {
+    console.error('GET /api/users error:', e.message);
+    res.status(500).json({ ok: false, users: [] });
+  }
+});
+
+/** GET /api/user-tasks — fetch tasks for the logged-in user OR tasks assigned to them */
 app.get('/api/user-tasks', async (req, res) => {
   try {
     const { status, limit = 200 } = req.query;
@@ -5183,15 +5307,26 @@ app.get('/api/user-tasks', async (req, res) => {
     if (!userRow.rows.length) return res.json({ ok: true, tasks: [], note: 'No user record found for ' + email });
     const userId = userRow.rows[0].id;
     const params = [userId];
-    let where = 'WHERE user_id = $1';
+    // Show tasks owned by user OR tasks where user is in assignee_ids
+    let where = `WHERE (user_id = $1 OR $1 = ANY(COALESCE(assignee_ids, ARRAY[]::integer[])))`; 
     if (status) { params.push(status); where += ` AND status = $${params.length}`; }
     const { rows } = await smtAdminPool.query(
-      `SELECT id, description, status, task_type, horizon, accountable_person,
-              due_date_suggestion, priority_score, details, created_at
-       FROM users.user_tasks ${where}
+      `SELECT t.id, t.description, t.status, t.task_type, t.horizon, t.accountable_person,
+              t.due_date_suggestion, t.priority_score, t.details, t.created_at,
+              t.assignee_ids,
+              COALESCE(
+                (
+                  SELECT json_agg(json_build_object('id', u.id, 'name', u.name, 'email', u.email, 'picture', u.picture))
+                  FROM users.users u
+                  WHERE u.id = ANY(COALESCE(t.assignee_ids, '{}'))
+                ),
+                '[]'::json
+              ) AS assignees
+       FROM users.user_tasks t
+       ${where}
        ORDER BY
-         CASE status WHEN 'pending' THEN 1 WHEN 'captured' THEN 2 WHEN 'done' THEN 3 ELSE 4 END,
-         priority_score DESC NULLS LAST, created_at DESC
+         CASE t.status WHEN 'pending' THEN 1 WHEN 'captured' THEN 2 WHEN 'done' THEN 3 ELSE 4 END,
+         t.priority_score DESC NULLS LAST, t.created_at DESC
        LIMIT $${params.length + 1}`,
       [...params, Number(limit)]
     );
@@ -5206,19 +5341,20 @@ app.get('/api/user-tasks', async (req, res) => {
 app.post('/api/user-tasks', async (req, res) => {
   try {
     const { description, status='pending', task_type='Next Action', horizon='Ground',
-            accountable_person, due_date_suggestion, priority_score, details } = req.body;
+            accountable_person, due_date_suggestion, priority_score, details, assignee_ids } = req.body;
     if (!description) return res.status(400).json({ error: 'description is required' });
     const email = req.user?.email || null;
     if (!email) return res.status(401).json({ ok: false, error: 'Not authenticated' });
     const userRow = await smtAdminPool.query(`SELECT id FROM users.users WHERE email = $1 LIMIT 1`, [email]);
     if (!userRow.rows.length) return res.status(404).json({ ok: false, error: 'User not found: ' + email });
     const userId = userRow.rows[0].id;
+    const assigneeArr = Array.isArray(assignee_ids) ? assignee_ids.map(Number).filter(Boolean) : [];
     const result = await smtAdminPool.query(
       `INSERT INTO users.user_tasks
-         (user_id, description, status, task_type, horizon, accountable_person, due_date_suggestion, priority_score, details)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *`,
+         (user_id, description, status, task_type, horizon, accountable_person, due_date_suggestion, priority_score, details, assignee_ids)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING *`,
       [userId, description, status, task_type, horizon,
-       accountable_person||null, due_date_suggestion||null, priority_score||null, details||null]
+       accountable_person||null, due_date_suggestion||null, priority_score||null, details||null, assigneeArr]
     );
     res.status(201).json({ ok: true, task: result.rows[0] });
   } catch (e) {
@@ -5231,7 +5367,12 @@ app.post('/api/user-tasks', async (req, res) => {
 app.patch('/api/user-tasks/:id', async (req, res) => {
   try {
     const { description, status, task_type, horizon, accountable_person,
-            due_date_suggestion, priority_score, details } = req.body;
+            due_date_suggestion, priority_score, details, assignee_ids } = req.body;
+    // Build dynamic update — only update assignee_ids if explicitly sent
+    const hasAssignees = 'assignee_ids' in req.body;
+    const assigneeArr = hasAssignees
+      ? (Array.isArray(assignee_ids) ? assignee_ids.map(Number).filter(Boolean) : [])
+      : undefined;
     const result = await smtAdminPool.query(
       `UPDATE users.user_tasks SET
          description         = COALESCE($1, description),
@@ -5241,11 +5382,14 @@ app.patch('/api/user-tasks/:id', async (req, res) => {
          accountable_person  = COALESCE($5, accountable_person),
          due_date_suggestion = COALESCE($6, due_date_suggestion),
          priority_score      = COALESCE($7, priority_score),
-         details             = COALESCE($8, details)
-       WHERE id = $9 RETURNING *`,
+         details             = COALESCE($8, details),
+         assignee_ids        = CASE WHEN $9 THEN $10::integer[] ELSE assignee_ids END
+       WHERE id = $11 RETURNING *`,
       [description||null, status||null, task_type||null, horizon||null,
        accountable_person||null, due_date_suggestion||null,
-       priority_score||null, details||null, req.params.id]
+       priority_score||null, details||null,
+       hasAssignees, hasAssignees ? assigneeArr : [],
+       req.params.id]
     );
     if (!result.rows.length) return res.status(404).json({ error: 'Task not found' });
     res.json({ ok: true, task: result.rows[0] });
