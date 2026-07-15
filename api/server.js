@@ -5823,6 +5823,79 @@ app.get('/api/skylead/lead-thread', async (req, res) => {
   }
 });
 
+
+// ── Library Links (users.library_links in smt_db) ─────────────────────────────
+
+/** GET /api/library-links */
+app.get('/api/library-links', async (req, res) => {
+  try {
+    const { rows } = await smtAdminPool.query(
+      `SELECT l.id, l.title, l.url, l.link_type, l.description, l.created_at, l.updated_at,
+              u.name AS created_by_name
+       FROM users.library_links l
+       LEFT JOIN users.users u ON u.id = l.created_by
+       ORDER BY l.created_at DESC`
+    );
+    res.json({ ok: true, links: rows });
+  } catch (e) {
+    console.error('GET /api/library-links error:', e.message);
+    res.status(500).json({ ok: false, links: [] });
+  }
+});
+
+/** POST /api/library-links */
+app.post('/api/library-links', async (req, res) => {
+  try {
+    const { title, url, link_type = 'spreadsheet', description } = req.body;
+    if (!title || !url) return res.status(400).json({ error: 'title and url are required' });
+    const email = req.user?.email || null;
+    const userRow = email ? await smtAdminPool.query(`SELECT id FROM users.users WHERE email = $1 LIMIT 1`, [email]) : { rows: [] };
+    const userId = userRow.rows[0]?.id || null;
+    const { rows } = await smtAdminPool.query(
+      `INSERT INTO users.library_links (title, url, link_type, description, created_by)
+       VALUES ($1, $2, $3, $4, $5) RETURNING *`,
+      [title, url, link_type, description || null, userId]
+    );
+    res.status(201).json({ ok: true, link: rows[0] });
+  } catch (e) {
+    console.error('POST /api/library-links error:', e.message);
+    res.status(500).json({ ok: false, error: e.message });
+  }
+});
+
+/** PATCH /api/library-links/:id */
+app.patch('/api/library-links/:id', async (req, res) => {
+  try {
+    const { title, url, link_type, description } = req.body;
+    const { rows } = await smtAdminPool.query(
+      `UPDATE users.library_links SET
+         title       = COALESCE($1, title),
+         url         = COALESCE($2, url),
+         link_type   = COALESCE($3, link_type),
+         description = COALESCE($4, description),
+         updated_at  = now()
+       WHERE id = $5 RETURNING *`,
+      [title || null, url || null, link_type || null, description !== undefined ? (description || null) : null, req.params.id]
+    );
+    if (!rows.length) return res.status(404).json({ error: 'Link not found' });
+    res.json({ ok: true, link: rows[0] });
+  } catch (e) {
+    console.error('PATCH /api/library-links error:', e.message);
+    res.status(500).json({ ok: false, error: e.message });
+  }
+});
+
+/** DELETE /api/library-links/:id */
+app.delete('/api/library-links/:id', async (req, res) => {
+  try {
+    await smtAdminPool.query(`DELETE FROM users.library_links WHERE id = $1`, [req.params.id]);
+    res.json({ ok: true });
+  } catch (e) {
+    console.error('DELETE /api/library-links error:', e.message);
+    res.status(500).json({ ok: false, error: e.message });
+  }
+});
+
 // ── Start ─────────────────────────────────────────────────────────────────────
 app.listen(PORT, '127.0.0.1', () => {
   console.log(`Laura Dashboard API listening on 127.0.0.1:${PORT}`);

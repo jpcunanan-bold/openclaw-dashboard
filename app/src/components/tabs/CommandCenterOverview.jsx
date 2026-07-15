@@ -758,6 +758,301 @@ function TaskListSection({authHeaders}){
 }
 // ────────────────────────────────────────────────────────────────────────────
 
+// ─ Library Section ───────────────────────────────────────────────────────────────────
+const LINK_TYPES = [
+  { value: 'spreadsheet', label: 'Spreadsheet', icon: '📅', color: '#28c76f' },
+  { value: 'doc',         label: 'Document',    icon: '📄', color: '#4D8DFF' },
+  { value: 'other',       label: 'Other',       icon: '🔗', color: '#8B7CF6' },
+];
+
+function LibrarySection({ authHeaders }) {
+  const [links, setLinks] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [modal, setModal] = useState(null); // null | {mode:'add'} | {mode:'edit', link}
+  const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(null);
+  const BLANK = { title: '', url: '', link_type: 'spreadsheet', description: '' };
+  const [form, setForm] = useState(BLANK);
+
+  const load = () => {
+    setLoading(true);
+    fetch('/api/library-links', { headers: authHeaders() })
+      .then(r => r.ok ? r.json() : null)
+      .then(j => { if (j?.links) setLinks(j.links); })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  };
+  useEffect(() => { load(); }, []);
+
+  const openAdd = () => { setForm(BLANK); setModal({ mode: 'add' }); };
+  const openEdit = (l) => {
+    setForm({ title: l.title, url: l.url, link_type: l.link_type, description: l.description || '' });
+    setModal({ mode: 'edit', link: l });
+  };
+
+  const handleSave = async (e) => {
+    e.preventDefault(); setSaving(true);
+    try {
+      const isEdit = modal.mode === 'edit';
+      const res = await fetch(
+        isEdit ? `/api/library-links/${modal.link.id}` : '/api/library-links',
+        {
+          method: isEdit ? 'PATCH' : 'POST',
+          headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+          body: JSON.stringify(form),
+        }
+      );
+      if (res.ok) { setModal(null); load(); }
+    } finally { setSaving(false); }
+  };
+
+  const handleDelete = async (id) => {
+    if (!window.confirm('Remove this link from the library?')) return;
+    setDeleting(id);
+    await fetch(`/api/library-links/${id}`, { method: 'DELETE', headers: authHeaders() });
+    setLinks(prev => prev.filter(l => l.id !== id));
+    setDeleting(null);
+  };
+
+  const fi = {
+    width: '100%', boxSizing: 'border-box', padding: '8px 12px', borderRadius: 8,
+    border: '1px solid rgba(255,255,255,.12)', background: 'rgba(255,255,255,.04)',
+    color: '#EAF0FF', font: '13px Inter,sans-serif', outline: 'none',
+  };
+  const lbl = {
+    font: '600 10px Inter,sans-serif', letterSpacing: '.07em', textTransform: 'uppercase',
+    color: '#7E8DB5', marginBottom: 5, display: 'block',
+  };
+
+  // Group by type
+  const grouped = LINK_TYPES.map(t => ({
+    ...t,
+    items: links.filter(l => l.link_type === t.value),
+  })).filter(g => g.items.length > 0);
+
+  return (
+    <div style={{ marginTop: 32, marginBottom: 32 }}>
+      {/* Header */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+        <div className="cc-sect-label" style={{ marginBottom: 0 }}>Library</div>
+        <button onClick={openAdd} style={{
+          display: 'inline-flex', alignItems: 'center', gap: 6, height: 32, padding: '0 14px',
+          borderRadius: 8, border: '1px solid rgba(6,229,236,.4)', background: 'rgba(6,229,236,.08)',
+          color: '#06E5EC', font: '600 12px Inter,sans-serif', cursor: 'pointer',
+        }}>
+          <span style={{ fontSize: 16, lineHeight: 1 }}>+</span> Add Link
+        </button>
+      </div>
+
+      {/* Links grid */}
+      {loading ? (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(280px,1fr))', gap: 12 }}>
+          {[1, 2, 3].map(i => (
+            <div key={i} style={{ background: 'rgba(255,255,255,.03)', borderRadius: 12, padding: 20 }}>
+              <div className="cc-skel" style={{ height: 14, width: '60%', marginBottom: 10 }} />
+              <div className="cc-skel" style={{ height: 11, width: '80%' }} />
+            </div>
+          ))}
+        </div>
+      ) : links.length === 0 ? (
+        <div style={{
+          padding: '36px 24px', textAlign: 'center',
+          background: 'rgba(255,255,255,.025)', border: '1px solid rgba(255,255,255,.08)',
+          borderRadius: 12, color: '#7E8DB5', font: '13px Inter,sans-serif',
+        }}>
+          <div style={{ fontSize: 32, marginBottom: 10 }}>📂</div>
+          No links yet. Click "+ Add Link" to add spreadsheets or documents.
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+          {grouped.length > 0 ? grouped.map(group => (
+            <div key={group.value}>
+              {/* Group label */}
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: 8,
+                marginBottom: 10, font: '600 11px Inter,sans-serif',
+                letterSpacing: '.06em', textTransform: 'uppercase', color: group.color,
+              }}>
+                <span>{group.icon}</span>
+                <span>{group.label}s</span>
+                <span style={{ color: 'rgba(255,255,255,.2)', fontWeight: 400 }}>({group.items.length})</span>
+              </div>
+              {/* Cards */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(280px,1fr))', gap: 12 }}>
+                {group.items.map(link => (
+                  <div key={link.id} style={{
+                    background: 'rgba(255,255,255,.03)',
+                    border: `1px solid rgba(255,255,255,.08)`,
+                    borderRadius: 12, padding: '16px 18px',
+                    position: 'relative', overflow: 'hidden',
+                    transition: 'border-color .15s, background .15s',
+                  }}
+                    onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,.05)'; e.currentTarget.style.borderColor = `${group.color}44`; }}
+                    onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,.03)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,.08)'; }}
+                  >
+                    {/* Accent bar */}
+                    <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, background: group.color, borderRadius: '12px 12px 0 0' }} />
+                    {/* Icon + title */}
+                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginTop: 4 }}>
+                      <span style={{ fontSize: 20, flexShrink: 0 }}>{group.icon}</span>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <a
+                          href={link.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          style={{
+                            font: '600 14px Inter,sans-serif', color: '#EAF0FF',
+                            textDecoration: 'none', display: 'block',
+                            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                          }}
+                          onMouseEnter={e => e.target.style.color = group.color}
+                          onMouseLeave={e => e.target.style.color = '#EAF0FF'}
+                          title={link.title}
+                        >
+                          {link.title}
+                        </a>
+                        {link.description && (
+                          <div style={{
+                            font: '11px/1.4 Inter,sans-serif', color: '#7E8DB5',
+                            marginTop: 4, overflow: 'hidden', textOverflow: 'ellipsis',
+                            display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
+                          }}>{link.description}</div>
+                        )}
+                      </div>
+                    </div>
+                    {/* Footer: added by + actions */}
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 14 }}>
+                      <span style={{ font: '10px Inter,sans-serif', color: 'rgba(255,255,255,.25)' }}>
+                        {link.created_by_name ? `Added by ${link.created_by_name.split(' ')[0]}` : ''}
+                      </span>
+                      <div style={{ display: 'flex', gap: 6 }}>
+                        <button onClick={() => openEdit(link)} title="Edit"
+                          style={{
+                            width: 26, height: 26, borderRadius: 6,
+                            border: '1px solid rgba(255,255,255,.12)',
+                            background: 'rgba(255,255,255,.06)', color: '#9FB0D8',
+                            cursor: 'pointer', fontSize: 11,
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          }}>&#9998;</button>
+                        <button
+                          onClick={() => handleDelete(link.id)}
+                          disabled={deleting === link.id}
+                          title="Remove"
+                          style={{
+                            width: 26, height: 26, borderRadius: 6,
+                            border: '1px solid rgba(242,102,122,.25)',
+                            background: 'rgba(242,102,122,.06)', color: '#F2667A',
+                            cursor: 'pointer', fontSize: 14,
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          }}>&#215;</button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )) : (
+            // Flat grid if all same type
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(280px,1fr))', gap: 12 }}>
+              {links.map(link => {
+                const t = LINK_TYPES.find(x => x.value === link.link_type) || LINK_TYPES[2];
+                return (
+                  <div key={link.id} style={{
+                    background: 'rgba(255,255,255,.03)',
+                    border: '1px solid rgba(255,255,255,.08)',
+                    borderRadius: 12, padding: '16px 18px',
+                  }}>
+                    <a href={link.url} target="_blank" rel="noopener noreferrer"
+                      style={{ font: '600 14px Inter,sans-serif', color: '#EAF0FF', textDecoration: 'none' }}>
+                      {t.icon} {link.title}
+                    </a>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Add / Edit Modal */}
+      {modal && (
+        <div
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.7)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}
+          onClick={() => setModal(null)}
+        >
+          <div
+            style={{
+              width: '100%', maxWidth: 520, background: '#080f2a',
+              border: '1px solid rgba(255,255,255,.12)', borderRadius: 14,
+              boxShadow: '0 40px 80px rgba(0,0,0,.7)', overflow: 'hidden',
+            }}
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Modal header */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '18px 24px', borderBottom: '1px solid rgba(255,255,255,.08)' }}>
+              <div style={{ font: '700 16px Inter,sans-serif', color: '#fff' }}>
+                {modal.mode === 'edit' ? 'Edit Link' : 'Add Library Link'}
+              </div>
+              <button onClick={() => setModal(null)} style={{ background: 'none', border: 'none', color: '#7E8DB5', fontSize: 22, cursor: 'pointer', lineHeight: 1 }}>&times;</button>
+            </div>
+            {/* Form */}
+            <form onSubmit={handleSave} style={{ padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+              <div>
+                <label style={lbl}>Type</label>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  {LINK_TYPES.map(t => (
+                    <button
+                      key={t.value}
+                      type="button"
+                      onClick={() => setForm(f => ({ ...f, link_type: t.value }))}
+                      style={{
+                        flex: 1, padding: '8px 0', borderRadius: 8, cursor: 'pointer',
+                        font: '600 12px Inter,sans-serif',
+                        border: `1px solid ${form.link_type === t.value ? t.color : 'rgba(255,255,255,.12)'}`,
+                        background: form.link_type === t.value ? `${t.color}18` : 'rgba(255,255,255,.03)',
+                        color: form.link_type === t.value ? t.color : '#7E8DB5',
+                        transition: 'all .15s',
+                      }}
+                    >
+                      {t.icon} {t.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <label style={lbl}>Title *</label>
+                <input required value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))}
+                  placeholder="e.g. CET Designers Tracker" style={fi} />
+              </div>
+              <div>
+                <label style={lbl}>URL *</label>
+                <input required type="url" value={form.url} onChange={e => setForm(f => ({ ...f, url: e.target.value }))}
+                  placeholder="https://docs.google.com/..." style={fi} />
+              </div>
+              <div>
+                <label style={lbl}>Description <span style={{ fontWeight: 400, textTransform: 'none', letterSpacing: 0, color: 'rgba(255,255,255,.3)' }}>(optional)</span></label>
+                <input value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
+                  placeholder="What is this for?" style={fi} />
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 4, paddingTop: 8, borderTop: '1px solid rgba(255,255,255,.06)' }}>
+                <button type="button" onClick={() => setModal(null)} style={{
+                  padding: '9px 20px', borderRadius: 8, border: '1px solid rgba(255,255,255,.15)',
+                  background: 'none', color: '#9FB0D8', font: '600 13px Inter,sans-serif', cursor: 'pointer',
+                }}>Cancel</button>
+                <button type="submit" disabled={saving} style={{
+                  padding: '9px 24px', borderRadius: 8, border: 'none',
+                  background: saving ? 'rgba(6,229,236,.4)' : '#06E5EC',
+                  color: '#000814', font: '700 13px Inter,sans-serif', cursor: saving ? 'default' : 'pointer',
+                }}>{saving ? 'Saving...' : modal.mode === 'edit' ? 'Save Changes' : 'Add Link'}</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function SalesTab({modalAgent,setModalAgent}) {
   const [period,setPeriod]=useState('7d');
 
@@ -3626,6 +3921,9 @@ function SalesTab({modalAgent,setModalAgent}) {
 
       {/* ── Task List ── */}
       <TaskListSection authHeaders={authHeaders}/>
+
+      {/* ── Library ── */}
+      <LibrarySection authHeaders={authHeaders}/>
 
       {/* ── Email Domains ── */}
       {(()=>{
