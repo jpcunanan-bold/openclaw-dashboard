@@ -5125,6 +5125,37 @@ function campaignAuditActor(req) {
   return { by: 'unknown', via: 'token-or-open-auth' };
 }
 
+// DB-level guard — the audit table above only sees deletes that go through our own DELETE
+// endpoint. sales.dashboard_campaigns is a shared table (smt-api's Skylead sync also writes to
+// it), so any external process with DB credentials can delete a manual row without ever touching
+// this app's code. This trigger rejects deleting an is_manual row unless the deleting transaction
+// explicitly opts in via a session flag — only our own DELETE handler below sets it — so the
+// dashboard's delete button still works but nothing else can silently remove manual campaigns.
+(async () => {
+  try {
+    await smtAdminPool.query(`
+      CREATE OR REPLACE FUNCTION sales.protect_manual_campaigns() RETURNS trigger AS $body$
+      BEGIN
+        IF OLD.is_manual AND COALESCE(current_setting('app.allow_manual_campaign_delete', true), '') <> 'true' THEN
+          RAISE EXCEPTION 'Blocked delete of manually-added campaign_id=% "%" — not flagged as an intentional dashboard delete', OLD.campaign_id, OLD.campaign_name;
+        END IF;
+        RETURN OLD;
+      END;
+      $body$ LANGUAGE plpgsql;
+    `);
+    await smtAdminPool.query(`
+      DROP TRIGGER IF EXISTS trg_protect_manual_campaigns ON sales.dashboard_campaigns;
+    `);
+    await smtAdminPool.query(`
+      CREATE TRIGGER trg_protect_manual_campaigns
+      BEFORE DELETE ON sales.dashboard_campaigns
+      FOR EACH ROW EXECUTE FUNCTION sales.protect_manual_campaigns();
+    `);
+  } catch (e) {
+    console.error('protect_manual_campaigns trigger migration error:', e.message);
+  }
+})();
+
 /** POST /api/sales-dashboard/campaigns */
 app.post('/api/sales-dashboard/campaigns', async (req, res) => {
   try {
@@ -5187,22 +5218,32 @@ app.patch('/api/sales-dashboard/campaigns/:id', async (req, res) => {
 
 /** DELETE /api/sales-dashboard/campaigns/:id */
 app.delete('/api/sales-dashboard/campaigns/:id', async (req, res) => {
+  const client = await smtAdminPool.connect();
   try {
-    const { rows } = await smtAdminPool.query('SELECT * FROM sales.dashboard_campaigns WHERE campaign_id = $1', [req.params.id]);
+    await client.query('BEGIN');
+    // Opts this transaction in past the trg_protect_manual_campaigns guard — only this endpoint
+    // sets this flag, so a delete of an is_manual row from anywhere else (e.g. smt-api's Skylead
+    // sync running directly against this shared table) still gets rejected by the trigger.
+    await client.query(`SET LOCAL app.allow_manual_campaign_delete = 'true'`);
+    const { rows } = await client.query('SELECT * FROM sales.dashboard_campaigns WHERE campaign_id = $1', [req.params.id]);
     const actor = campaignAuditActor(req);
     if (rows.length) {
-      await smtAdminPool.query(
+      await client.query(
         `INSERT INTO sales.dashboard_campaigns_audit (campaign_id, deleted_row, deleted_by, deleted_via, ip)
          VALUES ($1,$2,$3,$4,$5)`,
         [req.params.id, JSON.stringify(rows[0]), actor.by, actor.via, req.ip]
       );
     }
     console.log(`Campaign delete: id=${req.params.id} name="${rows[0]?.campaign_name || '?'}" by=${actor.by} via=${actor.via} ip=${req.ip}`);
-    await smtAdminPool.query('DELETE FROM sales.dashboard_campaigns WHERE campaign_id = $1', [req.params.id]);
+    await client.query('DELETE FROM sales.dashboard_campaigns WHERE campaign_id = $1', [req.params.id]);
+    await client.query('COMMIT');
     res.json({ ok: true });
   } catch (e) {
+    await client.query('ROLLBACK').catch(() => {});
     console.error('DELETE /api/sales-dashboard/campaigns audit/delete error:', e.message);
     res.status(500).json({ error: e.message });
+  } finally {
+    client.release();
   }
 });
 
