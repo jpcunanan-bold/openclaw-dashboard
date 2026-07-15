@@ -1,0 +1,15 @@
+[Unit]
+Description=Laura Dashboard API Server
+After=network.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/var/www/laura-dashboard/api
+ExecStart=/usr/bin/node server.js
+Restart=on-failure
+RestartSec=5
+EnvironmentFile=/var/www/laura-dashboard/api/.env
+
+[Install]
+WantedBy=multi-user.target

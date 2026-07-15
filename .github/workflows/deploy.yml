@@ -103,14 +103,11 @@ jobs:
           cp -r /var/www/laura-dashboard/app/dist/* /var/www/laura-dashboard/
 
       - name: Restart API
+        # A backgrounded `nohup ... &` here gets killed by the runner's own post-job orphan-process
+        # cleanup regardless of disown — confirmed the hard way. The API now runs as a real systemd
+        # service (laura-dashboard-api) that lives entirely outside this job's process tree, so we
+        # just ask systemd to restart it. Requires the NOPASSWD sudoers rule for this exact command.
         run: |
-          # Kill only whatever is bound to our port — "pkill -f node server.js" matches by command
-          # text alone and also kills the unrelated laura-dashboard-staging instance as collateral.
-          fuser -k 3100/tcp || true
-          sleep 1
-          cd /var/www/laura-dashboard/api
-          # disown so the self-hosted runner's post-job orphan-process cleanup doesn't reap this.
-          nohup node server.js >> /tmp/laura-api.log 2>&1 &
-          disown
+          sudo -n systemctl restart laura-dashboard-api
           sleep 4
           curl -sf http://127.0.0.1:3100/api/health > /dev/null && echo "API healthy" || echo "WARNING: health check failed"
