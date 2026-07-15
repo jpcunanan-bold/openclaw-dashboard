@@ -37,20 +37,26 @@ OpenClaw Gateway ──▶ laura-tracker plugin ──▶ API Server ──▶ P
 
 ### Deploy
 
+Production deploys automatically on push to `main` via a GitHub Actions self-hosted runner (see
+`.github/workflows/deploy.yml` and `docs/ARCHITECTURE.md` for the full pipeline). Manual steps, if
+ever needed directly on the server:
+
 ```bash
 # 1. Install dependencies
-cd api-server && npm install
-cd ../react-dashboard && npm install
+cd api && npm install
+cd ../app && npm install
 
 # 2. Configure environment
-cp api-server/.env.example api-server/.env
+cp api/.env.example api/.env
 # Edit .env with your PG credentials, Anthropic keys, auth token
 
 # 3. Build dashboard
-cd react-dashboard && npm run build
+cd app && npm run build
+cp -r dist/* /var/www/laura-dashboard/
 
-# 4. Start API server
-systemctl --user start laura-api-server
+# 4. Restart the API (runs as a systemd service, not a bare node process —
+#    see docs/ARCHITECTURE.md for why that matters)
+sudo systemctl restart laura-dashboard-api
 
 # 5. Install the tracking plugin
 mkdir -p ~/.openclaw/extensions/laura-tracker
@@ -69,17 +75,19 @@ systemctl --user restart openclaw-gateway
 ## Project Structure
 
 ```
-├── api-server/           # Express API (port 3100)
+├── api/                  # Express API (port 3100)
 │   ├── server.js         # All endpoints + DB migrations
 │   ├── auto-cost-tracker.js   # Anthropic API cost polling
 │   └── data/             # JSON state files
 ├── plugins/
 │   └── laura-tracker/     # OpenClaw message tracking plugin
-├── react-dashboard/      # Vite + React 19 dashboard
+├── app/                  # Vite + React 19 dashboard
 │   ├── src/components/tabs/  # Tab components
 │   ├── src/hooks/        # Data fetching hooks
 │   └── dist/             # Built assets
 ├── docs/                 # Documentation
+├── .github/workflows/deploy.yml  # Auto-deploy on push to main (self-hosted runner)
+├── laura-dashboard-api.service    # systemd unit for the API process
 └── nginx-api.conf        # Nginx config
 ```
 

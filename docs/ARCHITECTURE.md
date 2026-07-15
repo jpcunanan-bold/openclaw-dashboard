@@ -270,10 +270,11 @@ The ROI tab's 3 category cards use real token consumption from the OpenClaw sess
 ## Deployment
 
 ### Infrastructure
-- **Host**: AWS EC2 (Ubuntu, `ip-172-31-42-37`)
-- **Database**: AWS RDS PostgreSQL (`bb-agents-shared-db.cpsqyxgezuwr.us-east-2.rds.amazonaws.com`)
-- **Web Server**: Nginx (reverse proxy to Express on port 3100)
-- **Process Manager**: systemd user service (`laura-api-server.service`)
+- **Host**: AWS EC2 (Ubuntu, `ip-172-31-19-180`)
+- **Database**: AWS RDS PostgreSQL — `bb-agents-shared-db.cpsqyxgezuwr.us-east-2.rds.amazonaws.com` (bb_agents) and `smt-db.c5vzhv0mqgjy.us-east-1.rds.amazonaws.com` (smt_db, shared with `smt-api`)
+- **Web Server**: Nginx (reverse proxy `/api/` → Express on port 3100, `/app/` → static build)
+- **Process Manager**: systemd **system** service (`laura-dashboard-api.service`, not a user service) — `Restart=on-failure`, survives reboots and (critically) lives outside any CI job's process tree
+- **CI/CD**: GitHub Actions self-hosted runner, registered on this same EC2 instance
 - **Agent Runtime**: OpenClaw Gateway (systemd user service)
 
 ### Services
@@ -281,33 +282,45 @@ The ROI tab's 3 category cards use real token consumption from the OpenClaw sess
 | Service | Type | Purpose |
 |---------|------|---------|
 | `openclaw-gateway.service` | systemd user | Agent runtime + plugin host |
-| `laura-api-server.service` | systemd user | Express API + dashboard serving |
+| `laura-dashboard-api.service` | systemd **system** | Express API + dashboard serving (`/var/www/laura-dashboard/api`) |
+| GitHub Actions self-hosted runner | systemd system | Picks up `.github/workflows/deploy.yml` on push to `main` |
 
 ### Build & Deploy
 
+Deploys are automatic: pushing to `main` triggers `.github/workflows/deploy.yml` on the self-hosted
+runner, which:
+1. Checks out the repo into the runner's own workspace.
+2. **`rsync`s** the checked-out `api/` and `app/` into `/var/www/laura-dashboard/{api,app}` — this
+   step is load-bearing; without it, every later step just rebuilds/restarts whatever code already
+   happened to be sitting in those directories, regardless of what was pushed. (This was broken for
+   an unknown period before 2026-07-15 — every deploy reported success while silently deploying
+   nothing. If a change mysteriously isn't live, this is the first thing to check.)
+3. Writes `/var/www/laura-dashboard/api/.env` from repo variables/secrets.
+4. `npm install` (api) and `npm install && npm run build` (app).
+5. Copies `app/dist/*` into the web root (`/var/www/laura-dashboard/`).
+6. Restarts the API via `sudo systemctl restart laura-dashboard-api` — **not** a raw
+   `nohup node server.js &`. A backgrounded process started inside a job step gets killed by the
+   runner's own post-job orphan-process cleanup even with `disown`; only a real systemd service
+   (or something equally detached from the job's process tree) survives.
+
+Manual deploy (rarely needed — pushing to `main` is the normal path):
 ```bash
-# Build React dashboard
-cd /var/www/laura-dashboard/react-dashboard
-npm run build
-
-# Restart API server (picks up server.js changes)
-systemctl --user restart laura-api-server
-
-# Restart gateway (picks up plugin changes)
-# ⚠️ This interrupts active agent sessions
-systemctl --user restart openclaw-gateway
+cd /var/www/laura-dashboard/api && npm install --omit=dev
+cd /var/www/laura-dashboard/app && npm install && npm run build
+cp -r dist/* /var/www/laura-dashboard/
+sudo systemctl restart laura-dashboard-api
 ```
 
 ### Git Workflow
 
 ```bash
-cd /var/www/laura-dashboard
 git add -A
 git commit -m "descriptive message"
-git push origin dev
+git push origin main
 ```
 
-Branch: `dev` (production). All changes must be pushed — the change is not done until it's in GitHub.
+Branch: `main` (production, auto-deploys). All changes must be pushed — the change is not done
+until it's in GitHub *and* the resulting deploy run has actually succeeded (check `gh run list`).
 
 ---
 
@@ -315,32 +328,37 @@ Branch: `dev` (production). All changes must be pushed — the change is not don
 
 ```
 /var/www/laura-dashboard/
-├── api-server/
+├── api/
 │   ├── server.js              # Main Express API (all endpoints)
 │   ├── auto-cost-tracker.js   # Polls Anthropic Admin API (5min cron)
 │   ├── session-tracker.cjs    # Session-level cost tracking
 │   ├── daily-log-sync.cjs     # Memory → activity sync
 │   ├── sheet-sync.cjs         # Google Sheets data sync
 │   ├── master-sync.cjs        # Master board sync
-│   ├── .env                   # Environment variables (PG, auth, API keys)
+│   ├── .env                   # Environment variables (PG, auth, API keys) — written by the deploy
+│   │                            workflow, not checked into git
 │   └── data/                  # JSON state files
 ├── plugins/
 │   └── laura-tracker/          # OpenClaw plugin (source copy)
 │       ├── openclaw.plugin.json
 │       └── index.ts
-├── react-dashboard/
+├── app/
 │   ├── src/
 │   │   ├── App.jsx
 │   │   ├── components/tabs/   # All tab components
 │   │   ├── hooks/             # Data fetching hooks
 │   │   └── utils/             # Helpers
-│   └── dist/                  # Built assets (served by nginx)
+│   └── dist/                  # Built by `npm run build`, then copied into the web root above it
 ├── docs/
 │   ├── ARCHITECTURE.md        # This file
 │   └── PLUGIN.md              # laura-tracker plugin docs
 ├── nginx-api.conf             # Nginx config
-└── laura-dashboard-api.service # systemd service file
+└── laura-dashboard-api.service # systemd unit — installed at /etc/systemd/system/, not this path
 ```
+
+`/var/www/laura-dashboard/api-server` and `/var/www/laura-dashboard/react-dashboard` may still exist
+on disk as leftovers from before a project restructure — they're dead, not served by anything, and
+not touched by the deploy pipeline. Ignore them; `api/` and `app/` are current.
 
 ### Plugin Location (runtime)
 
@@ -363,3 +381,54 @@ Registered in `~/.openclaw/openclaw.json`:
   }
 }
 ```
+
+---
+
+## Known Incidents
+
+### 2026-07: Manually-added sandbox campaigns silently disappearing (resolved)
+
+**Symptom:** campaigns added by hand in the Campaign Performance sandbox vanished from both the
+dashboard and the database within a day of being added.
+
+**Root cause — two independent bugs that compounded:**
+
+1. **`sales.dashboard_campaigns` is a table shared with a separate service, `smt-api`**, which runs
+   its own Skylead sync 3x/day. Its sync job unconditionally ran
+   `DELETE FROM sales.dashboard_campaigns WHERE account_id = $1` for every account before
+   re-inserting fresh data — wiping out any manually-added row under that same `account_id`,
+   regardless of whether it came from Skylead at all. This app's own sync
+   (`POST /api/skylead/trigger-sync`) was never at fault — it's always been a pure
+   `INSERT ... ON CONFLICT DO UPDATE` that never deletes.
+2. **The deploy pipeline (see Deployment above) was silently not deploying anything** for an unknown
+   period before 2026-07-15 — `actions/checkout` populated the runner's workspace but nothing copied
+   it into `/var/www/laura-dashboard/`, so every "successful" deploy just rebuilt and restarted
+   stale code. This meant early fix attempts appeared to ship but never actually reached production,
+   which is why this took multiple rounds to actually resolve — always verify a fix reached
+   production (`gh run list`, then hit the endpoint) rather than trusting a green deploy.
+
+**Fix, in this repo:**
+- `sales.dashboard_campaigns.is_manual` (boolean, default `false`) is the authoritative way to
+  identify a manually-added row — **not** the sign or size of `campaign_id`. This app's manual-add
+  endpoint (`POST /api/sales-dashboard/campaigns`) sets it explicitly and pulls the ID from
+  `sales.manual_campaign_id_seq` (starts at 1,000,000,000, safely disjoint from Skylead's ~300k–450k
+  range).
+- `sales.dashboard_campaigns_audit` logs every delete that goes through this app's own
+  `DELETE /api/sales-dashboard/campaigns/:id`, with the caller's identity — see
+  `GET /api/sales-dashboard/campaigns/audit`.
+- A Postgres trigger, `trg_protect_manual_campaigns` (`BEFORE DELETE ON sales.dashboard_campaigns`),
+  rejects deleting any `is_manual = true` row unless the deleting transaction explicitly sets
+  `SET LOCAL app.allow_manual_campaign_delete = 'true'` — only this app's DELETE endpoint does that.
+  This protects against *any* writer with DB credentials, not just this app's own code, which
+  matters precisely because the table is shared.
+
+**Fix, in `smt-api`:** its sync's delete now excludes `is_manual = true` rows, and its own
+`POST /campaigns` insert/edit path sets `is_manual` once at insert time and never recomputes it on
+edit (an earlier version derived it from `campaign_id < 0` on every edit/upsert, which would have
+silently un-protected this app's positive-ID rows the first time anyone edited them there).
+
+**Takeaway for future changes to this table:** `sales.dashboard_campaigns` has at least one other
+writer outside this repo. Before changing anything about how manual rows are identified or
+protected, check what's actually live on the database directly (`information_schema`, `pg_trigger`,
+`pg_sequences`) rather than trusting either this repo's or `smt-api`'s committed schema files — both
+have drifted from the live schema before without anyone noticing until data started disappearing.

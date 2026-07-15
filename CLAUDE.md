@@ -8,10 +8,20 @@ Full-stack sales dashboard for Laura + Darren AI outreach agents.
 - **Repo:** https://github.com/BoldBusiness/laura-dashboard
 
 ## Local Dev
+No `dev.sh` exists — run the two pieces in separate terminals:
 ```bash
-bash dev.sh          # starts API (:3100) + Vite (:5173) together
-cd app && npm run build   # production build check
+cd api && npm install && npm start   # API on :3100 (needs api/.env — see api/.env.example)
+cd app && npm install && npm run dev # Vite dev server on :5173, proxies /api to :3100
+cd app && npm run build              # production build check
 ```
+
+## Deploy
+Push to `main` — a GitHub Actions self-hosted runner (registered on the production EC2 box) picks it
+up automatically via `.github/workflows/deploy.yml`: rsyncs the checked-out `api/`/`app/` into
+`/var/www/laura-dashboard/`, builds, and restarts the API via `sudo systemctl restart
+laura-dashboard-api` (a real systemd service — not a bare backgrounded `node` process, which the
+runner's own post-job cleanup will kill). Check `gh run list` after pushing; a green commit doesn't
+guarantee a successful deploy. Full detail in `docs/ARCHITECTURE.md`.
 
 ## Agent Colors (never change)
 - Laura = `#06E5EC` (cyan)
@@ -42,7 +52,7 @@ gh pr create --title "feat(scope): description" --body "$(cat <<'EOF'
 - **Removed:** ...
 
 ## How to Test
-- [ ] `bash dev.sh` — API on :3100, App on :5173
+- [ ] `cd api && npm start` + `cd app && npm run dev` — API on :3100, App on :5173
 - [ ] Check affected tabs/features in browser
 - [ ] `cd app && npm run build` — must pass
 
