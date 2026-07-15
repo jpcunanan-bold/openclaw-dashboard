@@ -439,7 +439,7 @@ async function authMiddleware(req, res, next) {
   if (req.path === '/api/agents/avatars' && req.method === 'GET') return next();
   // Internal agent secret — allows Laura/Darren scripts to call dashboard APIs
   const AGENT_SECRET = process.env.AGENT_SECRET || '';
-  if (AGENT_SECRET && req.headers['x-agent-secret'] === AGENT_SECRET) return next();
+  if (AGENT_SECRET && req.headers['x-agent-secret'] === AGENT_SECRET) { req.viaAgentSecret = true; return next(); }
 
   // If neither Google nor token auth is configured → open (dev mode)
   if (!GOOGLE_CLIENT_ID && !AUTH_TOKEN) return next();
@@ -5097,6 +5097,34 @@ app.get('/api/skylead/campaign-names', async (req, res) => {
 // ── Campaign CRUD (sandbox manual add/edit/delete) — uses sales.dashboard_campaigns ──
 // Manually-added rows use a dedicated sequence (sales.manual_campaign_id_seq, starts at 1,000,000,000).
 
+// Audit trail for deletes — every manually-added campaign that has disappeared so far did so
+// with no trace of who/what removed it (no DB trigger, no cron, pure app-level DELETE only).
+// This logs the full row plus the caller identity before it's removed, so the next disappearance
+// is traceable instead of a mystery.
+(async () => {
+  try {
+    await smtAdminPool.query(`
+      CREATE TABLE IF NOT EXISTS sales.dashboard_campaigns_audit (
+        id            SERIAL PRIMARY KEY,
+        campaign_id   BIGINT,
+        deleted_row   JSONB,
+        deleted_by    TEXT,
+        deleted_via   TEXT,
+        ip            TEXT,
+        deleted_at    TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
+  } catch (e) {
+    console.error('sales.dashboard_campaigns_audit migration error:', e.message);
+  }
+})();
+
+function campaignAuditActor(req) {
+  if (req.viaAgentSecret) return { by: 'agent', via: 'x-agent-secret' };
+  if (req.user?.email)    return { by: req.user.email, via: 'google-session' };
+  return { by: 'unknown', via: 'token-or-open-auth' };
+}
+
 /** POST /api/sales-dashboard/campaigns */
 app.post('/api/sales-dashboard/campaigns', async (req, res) => {
   try {
@@ -5160,11 +5188,36 @@ app.patch('/api/sales-dashboard/campaigns/:id', async (req, res) => {
 /** DELETE /api/sales-dashboard/campaigns/:id */
 app.delete('/api/sales-dashboard/campaigns/:id', async (req, res) => {
   try {
+    const { rows } = await smtAdminPool.query('SELECT * FROM sales.dashboard_campaigns WHERE campaign_id = $1', [req.params.id]);
+    const actor = campaignAuditActor(req);
+    if (rows.length) {
+      await smtAdminPool.query(
+        `INSERT INTO sales.dashboard_campaigns_audit (campaign_id, deleted_row, deleted_by, deleted_via, ip)
+         VALUES ($1,$2,$3,$4,$5)`,
+        [req.params.id, JSON.stringify(rows[0]), actor.by, actor.via, req.ip]
+      );
+    }
+    console.log(`Campaign delete: id=${req.params.id} name="${rows[0]?.campaign_name || '?'}" by=${actor.by} via=${actor.via} ip=${req.ip}`);
     await smtAdminPool.query('DELETE FROM sales.dashboard_campaigns WHERE campaign_id = $1', [req.params.id]);
     res.json({ ok: true });
   } catch (e) {
-    console.error('DELETE /api/sales-dashboard/campaigns error:', e.message);
+    console.error('DELETE /api/sales-dashboard/campaigns audit/delete error:', e.message);
     res.status(500).json({ error: e.message });
+  }
+});
+
+/** GET /api/sales-dashboard/campaigns/audit — who/what deleted campaigns, and when */
+app.get('/api/sales-dashboard/campaigns/audit', async (req, res) => {
+  try {
+    const { rows } = await smtAdminPool.query(
+      `SELECT id, campaign_id, deleted_row->>'campaign_name' AS campaign_name,
+              deleted_row->>'account_id' AS account_id, deleted_by, deleted_via, ip, deleted_at
+       FROM sales.dashboard_campaigns_audit ORDER BY deleted_at DESC LIMIT 200`
+    );
+    res.json({ ok: true, audit: rows });
+  } catch (e) {
+    console.error('GET /api/sales-dashboard/campaigns/audit error:', e.message);
+    res.status(500).json({ ok: false, error: e.message, audit: [] });
   }
 });
 

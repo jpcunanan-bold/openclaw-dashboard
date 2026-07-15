@@ -2639,6 +2639,10 @@ function SalesTab({modalAgent,setModalAgent}) {
                 const AC=['#06E5EC','#4D8DFF','#8B7CF6','#2DD4BF','#F5B945','#F2667A','#B79CFF'];
                 const AB=['rgba(6,229,236,.16)','rgba(77,141,255,.16)','rgba(139,124,246,.16)','rgba(45,212,191,.16)','rgba(245,185,69,.14)','rgba(242,102,122,.15)','rgba(183,156,255,.16)'];
                 const t=c.totals||{};
+                // Manually-added rows use campaign_id >= 1e9 (sales.manual_campaign_id_seq) — target that
+                // specific row for edit/delete instead of always agents[0], which can be a different
+                // SDR/account when a campaign name spans multiple accounts.
+                const targetAgent=(c.agents||[]).find(a=>a.campaign_id>=1000000000)||(c.agents||[])[0]||{};
                 return (
                   <div key={i} style={{borderBottom:'1px solid rgba(255,255,255,.05)'}}>
                     <div style={{display:'grid',gridTemplateColumns:'2fr 1.7fr 1.1fr 1fr .9fr 90px',
@@ -2655,7 +2659,7 @@ function SalesTab({modalAgent,setModalAgent}) {
                       {/* Actions: edit + delete + expand */}
                       <span style={{display:'flex',alignItems:'center',justifyContent:'flex-end',gap:4}}>
                         <button
-                          onClick={e=>{e.stopPropagation();openEditCamp(c,(c.agents||[])[0]||{});}}
+                          onClick={e=>{e.stopPropagation();openEditCamp(c,targetAgent);}}
                           title="Edit campaign"
                           style={{width:26,height:26,borderRadius:6,border:'1px solid rgba(255,255,255,.12)',
                             background:'rgba(255,255,255,.06)',color:'#9FB0D8',cursor:'pointer',
@@ -2663,13 +2667,13 @@ function SalesTab({modalAgent,setModalAgent}) {
                           ✎
                         </button>
                         <button
-                          onClick={e=>{e.stopPropagation();handleDeleteCamp((c.agents||[])[0]?.campaign_id);}}
+                          onClick={e=>{e.stopPropagation();handleDeleteCamp(targetAgent.campaign_id);}}
                           title="Delete campaign"
-                          disabled={campDeleting===(c.agents||[])[0]?.campaign_id}
+                          disabled={campDeleting===targetAgent.campaign_id}
                           style={{width:26,height:26,borderRadius:6,border:'1px solid rgba(242,102,122,.25)',
                             background:'rgba(242,102,122,.06)',color:'#F2667A',cursor:'pointer',
                             fontSize:14,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,
-                            opacity:campDeleting===(c.agents||[])[0]?.campaign_id?.4:1}}>
+                            opacity:campDeleting===targetAgent.campaign_id?.4:1}}>
                           ×
                         </button>
                         <span onClick={()=>setSbOpen(open?null:i)} style={{fontSize:15,color:'#7E8DB5',cursor:'pointer',width:20,textAlign:'center'}}>{open?'⌃':'⌄'}</span>
