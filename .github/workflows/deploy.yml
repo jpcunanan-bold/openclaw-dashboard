@@ -13,6 +13,16 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Sync checked-out code into live deploy paths
+        # Checkout above only populates the runner's own workspace — nothing past this point
+        # reads from it. /var/www/laura-dashboard is a separate, persistent directory that every
+        # later step (install/build/restart) operates on directly, so without this sync step the
+        # deploy just reinstalls/rebuilds/restarts whatever old code already happens to be sitting
+        # there, regardless of what was just pushed.
+        run: |
+          rsync -a --delete --exclude='.env' --exclude='node_modules' "$GITHUB_WORKSPACE/api/" /var/www/laura-dashboard/api/
+          rsync -a --delete --exclude='node_modules' --exclude='dist' --exclude='dist-deploy' "$GITHUB_WORKSPACE/app/" /var/www/laura-dashboard/app/
+
       - name: Write .env
         env:
           GOOGLE_CLIENT_ID: ${{ vars.GOOGLE_CLIENT_ID }}
@@ -93,10 +103,11 @@ jobs:
           cp -r /var/www/laura-dashboard/app/dist/* /var/www/laura-dashboard/
 
       - name: Restart API
+        # A backgrounded `nohup ... &` here gets killed by the runner's own post-job orphan-process
+        # cleanup regardless of disown — confirmed the hard way. The API now runs as a real systemd
+        # service (laura-dashboard-api) that lives entirely outside this job's process tree, so we
+        # just ask systemd to restart it. Requires the NOPASSWD sudoers rule for this exact command.
         run: |
-          pkill -f "node server.js" || true
-          sleep 1
-          cd /var/www/laura-dashboard/api
-          nohup node server.js >> /tmp/laura-api.log 2>&1 &
+          sudo -n systemctl restart laura-dashboard-api
           sleep 4
           curl -sf http://127.0.0.1:3100/api/health > /dev/null && echo "API healthy" || echo "WARNING: health check failed"

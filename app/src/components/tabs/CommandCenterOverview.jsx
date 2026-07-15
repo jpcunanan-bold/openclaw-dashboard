@@ -26,7 +26,7 @@ const STYLES = `
 `;
 
 // ─── Agent metadata ───────────────────────────────────────────────────────────
-// Sales agents only - Zara and Camilla live in the Recruiting tab
+// Sales agents only — Zara and Camilla live in the Recruiting tab
 const AGENTS = [
   { id:'laura',   label:'Laura',   initial:'L',  role:'BB · Sales Outreach',  color:'#06E5EC', bg:'rgba(6,229,236,.16)',  border:'rgba(6,229,236,.5)',   grad:'linear-gradient(90deg,#003BDF,#06E5EC)', width:'72%', cardBorder:'rgba(6,229,236,.25)', status:'active'  },
   { id:'darren',  label:'Darren',  initial:'D',  role:'MZ · SDR',             color:'#4D8DFF', bg:'rgba(77,141,255,.16)', border:'rgba(77,141,255,.5)',  grad:'linear-gradient(90deg,#003BDF,#4D8DFF)', width:'58%', cardBorder:'rgba(255,255,255,.08)', status:'active'  },
@@ -256,7 +256,7 @@ const CAMPAIGNS = [
   {num:7,sdr:'Darren',title:'DWDM / Optical Transport Engineer',sub:'Carriers, Hyperscale DCI, Fiber Operators · 400G/800G',color:'#f43f5e'},
   {num:8,sdr:'Darren',title:'NOC Engineer / Network Operations Center Analyst',sub:'Telecom Carriers, ISPs, Broadband Operators · 25-2,000',color:'#a78bfa'},
 ];
-// PEOPLE is now dynamic - built from loaded briefs (see filteredCamps below)
+// PEOPLE is now dynamic — built from loaded briefs (see filteredCamps below)
 const SEQUENCE = [
   {n:'1',title:'LinkedIn CR + Note',meta:'Day 1',body:'Hiring signal opener - personalized to role.',color:'#06E5EC'},
   {n:'2',title:'Email - Value prop',meta:'Day 3',body:'60% cost reduction hook + case study link.',color:'#5AC8FA'},
@@ -806,14 +806,14 @@ function SalesTab({modalAgent,setModalAgent}) {
   const [customCampaigns,setCustomCampaigns]=useState([]); // ALL briefs loaded from DB (built-ins + user-created)
   const [briefsLoading,setBriefsLoading]=useState(true); // loading state for DB briefs
   const [briefsSeeded,setBriefsSeeded]=useState(false); // whether built-ins have been seeded to DB
-  const [deletedCampIndexes,setDeletedCampIndexes]=useState(new Set()); // kept for legacy compat - no longer primary
+  const [deletedCampIndexes,setDeletedCampIndexes]=useState(new Set()); // kept for legacy compat — no longer primary
   const [briefEditOpen,setBriefEditOpen]=useState(false);
   const [briefNewOpen,setBriefNewOpen]=useState(false);
   // Drag-to-reorder state for campaign brief cards
   const [dragIdx,setDragIdx]=useState(null);
   const [dragOverIdx,setDragOverIdx]=useState(null);
   const [reorderMode,setReorderMode]=useState(false);
-  const [briefToDelete,setBriefToDelete]=useState(null); // {_gi, _dbId, title} - drives confirm modal
+  const [briefToDelete,setBriefToDelete]=useState(null); // {_gi, _dbId, title} — drives confirm modal
   const [exportOpen,setExportOpen]=useState(false);
   const [seqOpen,setSeqOpen]=useState(null); // index of expanded sequence step
   const [sbReload,setSbReload]=useState(0);
@@ -894,7 +894,7 @@ function SalesTab({modalAgent,setModalAgent}) {
   };
 
   useEffect(()=>{
-    // Load briefs directly from DB - no seeding, DB is source of truth
+    // Load briefs directly from DB — no seeding, DB is source of truth
     setBriefsSeeded(true);
     loadBriefs();
   },[]);
@@ -1300,7 +1300,7 @@ function SalesTab({modalAgent,setModalAgent}) {
      hook:'24x7/365 NOC requires minimum 6-8 FTEs just to cover basic shifts - before PTO, sick leave, holidays, turnover. Most regional ISPs do not have that bench. NOC turnover is brutal due to rotating shifts and holiday coverage.',
      valueProp:'Pre-vetted, carrier-grade NOC engineers - SolarWinds/Nagios/PRTG/Spectrum/ServiceNow - deployable in 1-2 weeks. Shift-flexible: night shift, weekend, holiday coverage. Telecom stack depth: fiber, DWDM, broadband access (GPON/DOCSIS), routing/switching.'}
   ];
-  // All campaigns come from DB only - never fall back to hardcoded list
+  // All campaigns come from DB only — never fall back to hardcoded list
   const _allCamps=customCampaigns;
   const campBase=_allCamps[campIdx]||_allCamps[0]||{};
   const campOverride=campEdits[campIdx]||{};
@@ -1777,7 +1777,7 @@ function SalesTab({modalAgent,setModalAgent}) {
               icp,sequence:form.sequence,
             };
             setCampEdits(prev=>({...prev,[campIdx]:updatedContent}));
-            // All campaigns are now DB-backed - always persist the edit
+            // All campaigns are now DB-backed — always persist the edit
             const dbId=customCampaigns[campIdx]?._dbId;
             if(dbId){
               await fetch(`/api/campaign-briefs/${dbId}`,{
@@ -1838,7 +1838,7 @@ function SalesTab({modalAgent,setModalAgent}) {
                     <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:20}}>
                       {/* Left col */}
                       <div style={{display:'flex',flexDirection:'column',gap:16}}>
-                        {/* Assignee + title row - same layout as New Brief form */}
+                        {/* Assignee + title row — same layout as New Brief form */}
                         <div style={{display:'grid',gridTemplateColumns:'1fr 2fr',gap:12,alignItems:'end'}}>
                           {field('Assignee (SDR)',
                             <select value={form.assignee} onChange={e=>setForm(f=>({...f,assignee:e.target.value}))} style={{...inp,resize:'none',background:'#0d1a42'}}>
@@ -2130,7 +2130,7 @@ function SalesTab({modalAgent,setModalAgent}) {
                     {saveErr&&<span style={{color:'#F2667A',font:'12px Inter,sans-serif'}}>{saveErr}</span>}
                   </div>
                   <div style={{display:'flex',gap:10}}>
-                    <button onClick={()=>{setBriefNewOpen(false);setSaveErr('');}}
+                    <button onClick={()=>{setBriefNewOpen(false);setSaveErr('');}} 
                       style={{padding:'9px 20px',borderRadius:8,border:'1px solid rgba(255,255,255,.1)',
                         background:'none',color:'#9FB0D8',font:'600 13px Inter,sans-serif',cursor:'pointer'}}>Cancel</button>
                     <button onClick={save} disabled={!form.title.trim()||saving}
@@ -2842,7 +2842,7 @@ function SalesTab({modalAgent,setModalAgent}) {
                 const AC=['#06E5EC','#4D8DFF','#8B7CF6','#2DD4BF','#F5B945','#F2667A','#B79CFF'];
                 const AB=['rgba(6,229,236,.16)','rgba(77,141,255,.16)','rgba(139,124,246,.16)','rgba(45,212,191,.16)','rgba(245,185,69,.14)','rgba(242,102,122,.15)','rgba(183,156,255,.16)'];
                 const t=c.totals||{};
-                // Manually-added rows use campaign_id >= 1e9 (sales.manual_campaign_id_seq) - target that
+                // Manually-added rows use campaign_id >= 1e9 (sales.manual_campaign_id_seq) — target that
                 // specific row for edit/delete instead of always agents[0], which can be a different
                 // SDR/account when a campaign name spans multiple accounts.
                 const targetAgent=(c.agents||[]).find(a=>a.campaign_id>=1000000000)||(c.agents||[])[0]||{};
@@ -3408,7 +3408,7 @@ function SalesTab({modalAgent,setModalAgent}) {
                 transition:'all .15s',opacity:isDragging?0.4:1,
                 transform:isDragOver?'scale(1.02)':'none',
                 userSelect:'none'}}>
-              {/* Delete button - circle ×, top-right, hover-only */}
+              {/* Delete button — circle ×, top-right, hover-only */}
               {!reorderMode&&(
                 <button
                   onClick={e=>{ e.stopPropagation(); setBriefToDelete({_gi:c._gi,_dbId:c._dbId,title:c.title}); }}
