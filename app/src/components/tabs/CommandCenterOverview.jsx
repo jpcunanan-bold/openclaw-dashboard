@@ -4054,6 +4054,129 @@ const REC_CAMPS=[
   {date:'Jun 28',campaign:'ERP Consultant Search',     account:'Mercury Z',   rec:'Marco D.',  recColor:'#F5B945',cr:54, email:187,inmail:33},
 ];
 
+// ─── Date range filter (period pills + calendar) — same UX as SDR performance summary ──
+function DateRangeFilter() {
+  const today=new Date();
+  const [period,setPeriod]=useState('7d');
+  const [open,setOpen]=useState(false);
+  const [y,setY]=useState(today.getFullYear());
+  const [m,setM]=useState(today.getMonth());
+  const [start,setStart]=useState(null);
+  const [end,setEnd]=useState(null);
+  const [phase,setPhase]=useState('start');
+  const ref=useRef();
+
+  useEffect(()=>{
+    if(!open)return;
+    const h=e=>{ if(ref.current&&!ref.current.contains(e.target)) setOpen(false); };
+    document.addEventListener('mousedown',h);
+    return()=>document.removeEventListener('mousedown',h);
+  },[open]);
+
+  const MONTHS=['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const MONTHS_SHORT=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const fmt=d=>{ if(!d)return''; const [,mm,dd]=d.split('-'); return `${MONTHS_SHORT[+mm-1]} ${+dd}`; };
+  const label=start&&end?`${fmt(start)} - ${fmt(end)}`:start?`${fmt(start)} - select end`:'Custom range';
+
+  const weeks=(()=>{
+    const first=new Date(y,m,1).getDay();
+    const days=new Date(y,m+1,0).getDate();
+    const cells=[...Array(first).fill(null),...Array.from({length:days},(_,i)=>i+1)];
+    const wks=[];
+    for(let i=0;i<cells.length;i+=7) wks.push(cells.slice(i,i+7));
+    return wks;
+  })();
+
+  const pickDay=day=>{
+    if(!day)return;
+    const iso=`${y}-${String(m+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+    if(phase==='start'){ setStart(iso); setEnd(null); setPhase('end'); }
+    else{ if(iso<start){ setStart(iso); setPhase('end'); } else{ setEnd(iso); setPhase('start'); setOpen(false); } }
+  };
+
+  const dayStyle=day=>{
+    if(!day)return{visibility:'hidden'};
+    const iso=`${y}-${String(m+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+    const isSt=iso===start, isEn=iso===end;
+    const inRange=start&&end&&iso>start&&iso<end;
+    return{
+      width:32,height:32,borderRadius:'50%',display:'flex',alignItems:'center',justifyContent:'center',
+      margin:'1px auto',cursor:'pointer',fontSize:13,fontFamily:'Inter,sans-serif',
+      background:isSt||isEn?'#4446DB':inRange?'rgba(68,70,219,.15)':'transparent',
+      color:isSt||isEn?'#fff':inRange?'#4446DB':'#1F2A44',
+      fontWeight:isSt||isEn?700:400,
+    };
+  };
+
+  return (
+    <div style={{display:'flex',alignItems:'center',gap:8}}>
+      <div style={{display:'flex',gap:4,background:'rgba(255,255,255,.04)',border:'1px solid rgba(124,124,245,.25)',borderRadius:10,padding:4}}>
+        {PERIODS.map(p=>{
+          const active=period===p.id&&!(start&&end);
+          return(
+            <button key={p.id} onClick={()=>{ setPeriod(p.id); setStart(null); setEnd(null); setPhase('start'); }} style={{
+              padding:'5px 12px',border:'none',cursor:'pointer',borderRadius:7,
+              background:active?'rgba(124,124,245,.3)':'transparent',
+              font:`${active?700:500} 11px/1 Inter,sans-serif`,
+              color:active?'#EAF0FF':'#7E8DB5',transition:'all .15s'}}>
+              {p.label}
+            </button>
+          );
+        })}
+      </div>
+      <div style={{position:'relative'}} ref={ref}>
+        <div onClick={()=>setOpen(o=>!o)}
+          style={{display:'inline-flex',alignItems:'center',gap:10,padding:'8px 14px',
+            background:(start&&end)?'rgba(124,124,245,.18)':'rgba(255,255,255,.04)',
+            border:(start&&end)?'1px solid rgba(124,124,245,.7)':'1px solid rgba(124,124,245,.45)',
+            borderRadius:10,color:'#EAF0FF',font:'600 14px/1 monospace',cursor:'pointer'}}>
+          <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="#818CF8" strokeWidth={2}>
+            <rect x={3} y={4} width={18} height={18} rx={2}/>
+            <path d="M16 2v4M8 2v4M3 10h18"/>
+          </svg>
+          {label}
+        </div>
+        {open&&(
+          <div style={{position:'absolute',top:'calc(100% + 8px)',right:0,zIndex:60,width:320,
+            background:'#fff',borderRadius:16,boxShadow:'0 24px 60px rgba(2,8,32,.45)',padding:18}}>
+            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:14}}>
+              <div onClick={()=>{ if(m===0){setM(11);setY(v=>v-1);}else setM(v=>v-1); }}
+                style={{width:30,height:30,display:'flex',alignItems:'center',justifyContent:'center',
+                  borderRadius:8,cursor:'pointer',color:'#4446DB',fontSize:18}}>‹</div>
+              <div style={{font:'700 15px Inter,sans-serif',color:'#1F2A44',whiteSpace:'nowrap'}}>
+                {MONTHS[m]} {y}
+              </div>
+              <div onClick={()=>{ if(m===11){setM(0);setY(v=>v+1);}else setM(v=>v+1); }}
+                style={{width:30,height:30,display:'flex',alignItems:'center',justifyContent:'center',
+                  borderRadius:8,cursor:'pointer',color:'#4446DB',fontSize:18}}>›</div>
+            </div>
+            <div style={{display:'grid',gridTemplateColumns:'repeat(7,1fr)',marginBottom:8}}>
+              {['S','M','T','W','T','F','S'].map((d,i)=>(
+                <span key={i} style={{textAlign:'center',font:'700 13px Inter,sans-serif',color:'#9AA3B8'}}>{d}</span>
+              ))}
+            </div>
+            {weeks.map((wk,wi)=>(
+              <div key={wi} style={{display:'grid',gridTemplateColumns:'repeat(7,1fr)',gap:2,marginBottom:3}}>
+                {wk.map((day,di)=>(
+                  <div key={di} onClick={()=>pickDay(day)} style={dayStyle(day)}>{day||''}</div>
+                ))}
+              </div>
+            ))}
+            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',
+              marginTop:12,paddingTop:12,borderTop:'1px solid #EEF1F6'}}>
+              <span onClick={()=>{ setStart(null);setEnd(null);setPhase('start');setOpen(false);setPeriod('7d'); }}
+                style={{cursor:'pointer',font:'700 14px Inter,sans-serif',letterSpacing:'.04em',color:'#4446DB'}}>CLEAR</span>
+              <span style={{font:'italic 400 14px Inter,sans-serif',color:'#9AA3B8'}}>
+                {phase==='start'?'Click a start date':'Click an end date'}
+              </span>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function RecruitingTab({ setModalAgent }) {
   const [filter,setFilter]=useState('Weekly');
   const recGridCols='1fr 1.1fr 1fr 1.1fr .95fr 1.1fr .95fr 1.2fr';
@@ -4067,24 +4190,6 @@ function RecruitingTab({ setModalAgent }) {
   return (
     <div style={{maxWidth:1380,margin:'0 auto',padding:'18px 24px 40px'}}>
 
-      {/* ── Recruiting Agent Fleet (same cards as Sales tab) ── */}
-      <div className="cc-sect-label">Agent fleet · live status</div>
-      <div style={{display:'grid',gridTemplateColumns:'repeat(2,1fr)',gap:12,marginBottom:26}}>
-        {REC_AGENTS.map(ag=>(
-          <div key={ag.id} onClick={()=>setModalAgent(ag)}
-            style={{background:'rgba(255,255,255,.035)',border:`1px solid ${ag.cardBorder}`,borderRadius:12,padding:14,cursor:'pointer',transition:'all .18s'}}
-            onMouseEnter={e=>{e.currentTarget.style.transform='translateY(-1px)';e.currentTarget.style.boxShadow=`0 4px 20px ${ag.color}22`;}}
-            onMouseLeave={e=>{e.currentTarget.style.transform='';e.currentTarget.style.boxShadow='';}}>
-            <div style={{display:'flex',alignItems:'center',gap:9}}>
-              <div style={{width:34,height:34,borderRadius:'50%',display:'flex',alignItems:'center',justifyContent:'center',font:'800 15px Inter,sans-serif',color:ag.color,background:ag.bg,border:`2px solid ${ag.border}`}}>{ag.initial}</div>
-              <div style={{flex:1}}>
-                <div style={{font:'700 16px Inter,sans-serif',color:'#fff'}}>{ag.label}</div>
-              </div>
-              <span style={{width:7,height:7,borderRadius:'50%',background:ag.status==='active'?'#2DD4BF':'#F5B945',boxShadow:`0 0 8px ${ag.status==='active'?'#2DD4BF':'#F5B945'}`}}/>
-            </div>
-          </div>
-        ))}
-      </div>
       {/* KPI strip */}
       <div className="cc-sect-label-purple">Recruiting overview · last 7 days</div>
       <div style={{display:'grid',gridTemplateColumns:'repeat(6,1fr)',gap:12,marginBottom:26}}>
@@ -4122,9 +4227,7 @@ function RecruitingTab({ setModalAgent }) {
               </span>;
             })}
           </div>
-          <span style={{width:'100%',font:'10px monospace',color:'#7E8DB5',textAlign:'right'}}>
-            2026-06-27 → 2026-07-03 · 3 goals
-          </span>
+          <DateRangeFilter/>
         </div>
         {/* Table header */}
         <div style={{display:'grid',gridTemplateColumns:recGridCols,paddingBottom:9,borderBottom:'1px solid rgba(255,255,255,.08)'}}>
@@ -4208,12 +4311,7 @@ function RecruitingTab({ setModalAgent }) {
               </span>;
             })}
           </div>
-          <div style={{display:'flex',alignItems:'center',gap:9,padding:'8px 13px',
-            background:'rgba(255,255,255,.04)',border:'1px solid rgba(255,255,255,.12)',borderRadius:10,
-            font:'600 11px monospace',color:'#EAF0FF'}}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#818CF8" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
-            Jun 28, 2026 <span style={{color:'#7E8DB5'}}>-</span> Jul 04, 2026
-          </div>
+          <DateRangeFilter/>
         </div>
       </div>
 
@@ -4263,6 +4361,25 @@ function RecruitingTab({ setModalAgent }) {
             <span style={{font:'12px monospace',color:'#4D8DFF',textAlign:'right'}}>{r.email}</span>
             <span style={{font:'12px monospace',color:'#A5B4FC',textAlign:'right'}}>{r.inmail}</span>
             <span style={{textAlign:'right',font:'13px Inter,sans-serif',color:'#7E8DB5',cursor:'pointer'}}>✎ ⨯</span>
+          </div>
+        ))}
+      </div>
+
+      {/* ── Recruiting Agent Fleet (same cards as Sales tab) — under Recruiting Campaigns ── */}
+      <div className="cc-sect-label">Agent fleet · live status</div>
+      <div style={{display:'grid',gridTemplateColumns:'repeat(2,1fr)',gap:12,marginBottom:26}}>
+        {REC_AGENTS.map(ag=>(
+          <div key={ag.id} onClick={()=>setModalAgent(ag)}
+            style={{background:'rgba(255,255,255,.035)',border:`1px solid ${ag.cardBorder}`,borderRadius:12,padding:14,cursor:'pointer',transition:'all .18s'}}
+            onMouseEnter={e=>{e.currentTarget.style.transform='translateY(-1px)';e.currentTarget.style.boxShadow=`0 4px 20px ${ag.color}22`;}}
+            onMouseLeave={e=>{e.currentTarget.style.transform='';e.currentTarget.style.boxShadow='';}}>
+            <div style={{display:'flex',alignItems:'center',gap:9}}>
+              <div style={{width:34,height:34,borderRadius:'50%',display:'flex',alignItems:'center',justifyContent:'center',font:'800 15px Inter,sans-serif',color:ag.color,background:ag.bg,border:`2px solid ${ag.border}`}}>{ag.initial}</div>
+              <div style={{flex:1}}>
+                <div style={{font:'700 16px Inter,sans-serif',color:'#fff'}}>{ag.label}</div>
+              </div>
+              <span style={{width:7,height:7,borderRadius:'50%',background:ag.status==='active'?'#2DD4BF':'#F5B945',boxShadow:`0 0 8px ${ag.status==='active'?'#2DD4BF':'#F5B945'}`}}/>
+            </div>
           </div>
         ))}
       </div>
