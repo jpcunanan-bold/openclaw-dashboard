@@ -4236,20 +4236,10 @@ app.get('/api/smt/recruiter/goals', async (req, res) => {
          g.end_week_stage, g.weekly_target,
          g.notes, g.candidates, g.created_at,
          COUNT(CASE
-           WHEN a.goal_period = 'Mid-week' THEN 1
-           WHEN a.goal_period IS NULL AND (
-             EXTRACT(DOW FROM a.created_at AT TIME ZONE 'America/New_York') < 3
-             OR (EXTRACT(DOW FROM a.created_at AT TIME ZONE 'America/New_York') = 3
-                 AND EXTRACT(HOUR FROM a.created_at AT TIME ZONE 'America/New_York') < 12)
-           ) THEN 1
+           WHEN LOWER(TRIM(a.stage)) = LOWER(TRIM(g.mid_week_stage)) THEN 1
          END)::int AS mid_actual,
          COUNT(CASE
-           WHEN a.goal_period = 'End-week' THEN 1
-           WHEN a.goal_period IS NULL AND (
-             EXTRACT(DOW FROM a.created_at AT TIME ZONE 'America/New_York') > 3
-             OR (EXTRACT(DOW FROM a.created_at AT TIME ZONE 'America/New_York') = 3
-                 AND EXTRACT(HOUR FROM a.created_at AT TIME ZONE 'America/New_York') >= 12)
-           ) THEN 1
+           WHEN LOWER(TRIM(a.stage)) = LOWER(TRIM(g.end_week_stage)) THEN 1
          END)::int AS end_actual
        FROM recruiters.goals g
        LEFT JOIN recruiters.activities a
@@ -4273,9 +4263,9 @@ app.get('/api/smt/recruiter/goals', async (req, res) => {
   }
 });
 
-/** GET /api/smt/recruiter/activities — drill-down, supports period+stage filter */
+/** GET /api/smt/recruiter/activities — drill-down, filtered by stage + date range (no mid/end time split: the "period" label is purely which target column was clicked, not a filter) */
 app.get('/api/smt/recruiter/activities', async (req, res) => {
-  const { start, end, recruiter, role, client, period, stage } = req.query;
+  const { start, end, recruiter, role, client, stage } = req.query;
   try {
     const params = [];
     const conds  = [];
@@ -4287,19 +4277,6 @@ app.get('/api/smt/recruiter/activities', async (req, res) => {
     if (role)   { params.push(role);   conds.push(`LOWER(TRIM(role))   = LOWER(TRIM($${params.length}))`); }
     if (client) { params.push(client); conds.push(`LOWER(TRIM(client)) = LOWER(TRIM($${params.length}))`); }
     if (stage)  { params.push(stage);  conds.push(`LOWER(TRIM(stage))  = LOWER(TRIM($${params.length}))`); }
-    if (period === 'mid') {
-      conds.push(`(goal_period = 'Mid-week' OR (goal_period IS NULL AND (
-        EXTRACT(DOW FROM created_at AT TIME ZONE 'America/New_York') < 3
-        OR (EXTRACT(DOW FROM created_at AT TIME ZONE 'America/New_York') = 3
-            AND EXTRACT(HOUR FROM created_at AT TIME ZONE 'America/New_York') < 12)
-      )))`);
-    } else if (period === 'end') {
-      conds.push(`(goal_period = 'End-week' OR (goal_period IS NULL AND (
-        EXTRACT(DOW FROM created_at AT TIME ZONE 'America/New_York') > 3
-        OR (EXTRACT(DOW FROM created_at AT TIME ZONE 'America/New_York') = 3
-            AND EXTRACT(HOUR FROM created_at AT TIME ZONE 'America/New_York') >= 12)
-      )))`);
-    }
     const where = conds.length ? 'WHERE ' + conds.join(' AND ') : '';
     const { rows } = await smtReadPool.query(
       `SELECT id, recruiter_name, role, client, candidate_name, stage,
@@ -4324,6 +4301,50 @@ app.get('/api/smt/recruiter/names', async (req, res) => {
     res.json({ ok: true, recruiters: rows.map(r => r.recruiter_name) });
   } catch (e) {
     if (e.message.includes('does not exist')) return res.json({ ok: true, recruiters: [], pending: true });
+    res.status(500).json({ ok: false, error: e.message });
+  }
+});
+
+/** GET /api/smt/recruiter/campaigns — recruiters.campaigns (lola_readonly — smtReadPool) */
+app.get('/api/smt/recruiter/campaigns', async (req, res) => {
+  const { start, end, recruiter } = req.query;
+  try {
+    const params = [];
+    const conds  = [];
+    if (start)    { params.push(start); conds.push(`date >= $${params.length}`); }
+    if (end)      { params.push(end);   conds.push(`date <= $${params.length}`); }
+    if (recruiter && recruiter !== 'All') {
+      params.push(recruiter); conds.push(`LOWER(REPLACE(recruiter_name,' ','')) = LOWER(REPLACE($${params.length},' ',''))`);
+    }
+    const where = conds.length ? 'WHERE ' + conds.join(' AND ') : '';
+    const { rows } = await smtReadPool.query(
+      `SELECT id, campaign_name, recruiter_name, account_used, cr_sent, email_sent, inmail_sent, date, created_at
+       FROM recruiters.campaigns ${where}
+       ORDER BY date DESC, created_at DESC`,
+      params
+    );
+    res.json({ ok: true, campaigns: rows });
+  } catch (e) {
+    if (e.message.includes('does not exist')) return res.json({ ok: true, campaigns: [], pending: true });
+    res.status(500).json({ ok: false, error: e.message });
+  }
+});
+
+/** POST /api/smt/recruiter/campaigns — manual add; recruiters schema is read-only for lola_* roles, so use smtAdminPool */
+app.post('/api/smt/recruiter/campaigns', async (req, res) => {
+  const { campaign_name, recruiter_name, account_used, cr_sent, email_sent, inmail_sent, date } = req.body || {};
+  if (!campaign_name || !recruiter_name) {
+    return res.status(400).json({ ok: false, error: 'campaign_name and recruiter_name are required' });
+  }
+  try {
+    const { rows } = await smtAdminPool.query(
+      `INSERT INTO recruiters.campaigns (campaign_name, recruiter_name, account_used, cr_sent, email_sent, inmail_sent, date)
+       VALUES ($1,$2,$3,$4,$5,$6,COALESCE($7::date, CURRENT_DATE))
+       RETURNING id, campaign_name, recruiter_name, account_used, cr_sent, email_sent, inmail_sent, date, created_at`,
+      [campaign_name, recruiter_name, account_used || null, Number(cr_sent) || 0, Number(email_sent) || 0, Number(inmail_sent) || 0, date || null]
+    );
+    res.json({ ok: true, campaign: rows[0] });
+  } catch (e) {
     res.status(500).json({ ok: false, error: e.message });
   }
 });
@@ -5549,6 +5570,144 @@ app.delete('/api/campaign-briefs/:id', async (req, res) => {
     res.json({ ok: true });
   } catch (e) {
     console.error('DELETE /api/campaign-briefs/:id error:', e.message);
+    res.status(500).json({ ok: false, error: e.message });
+  }
+});
+
+// ── Recruiting Campaign Briefs — mirrors sales.campaign_briefs, own table recruiters.campaign_briefs ──
+
+/** GET /api/recruiting-campaign-briefs */
+app.get('/api/recruiting-campaign-briefs', async (req, res) => {
+  try {
+    const { rows } = await smtAdminPool.query(
+      `SELECT id, title, subtitle, assignee, account_id, channel, activity,
+              color, sort_order, brief_json, created_at
+       FROM recruiters.campaign_briefs
+       WHERE is_deleted = false OR is_deleted IS NULL
+       ORDER BY sort_order ASC NULLS LAST, id ASC`
+    );
+    const briefs = rows.map(r => ({
+      campaign_id:   r.id,
+      campaign_name: r.title,
+      account_id:    r.account_id,
+      activity:      r.activity,
+      target_icp:    r.subtitle,
+      channel:       r.channel,
+      brief_json:    r.brief_json,
+      created_at:    r.created_at,
+      sort_order:    r.sort_order,
+      assignee:      r.assignee,
+    }));
+    res.json({ ok: true, briefs });
+  } catch (e) {
+    console.error('GET /api/recruiting-campaign-briefs error:', e.message);
+    res.status(500).json({ ok: false, briefs: [] });
+  }
+});
+
+/** POST /api/recruiting-campaign-briefs */
+app.post('/api/recruiting-campaign-briefs', async (req, res) => {
+  try {
+    const { campaign_name, account_id, activity, target_icp, channel, brief_json, assignee } = req.body;
+    if (!campaign_name) return res.status(400).json({ error: 'campaign_name is required' });
+    const sortRes = await smtAdminPool.query(
+      `SELECT COALESCE(MAX(sort_order), 0) + 1 AS next_sort FROM recruiters.campaign_briefs WHERE is_deleted = false OR is_deleted IS NULL`
+    );
+    const sortOrder = Number(sortRes.rows[0].next_sort) || 1;
+    const bj = brief_json || {};
+    const result = await smtAdminPool.query(
+      `INSERT INTO recruiters.campaign_briefs
+         (title, subtitle, assignee, account_id, channel, activity, color, sort_order, brief_json, created_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,CURRENT_DATE) RETURNING *`,
+      [campaign_name, target_icp || bj.sub || null, assignee || bj.sdr || 'Unassigned',
+       account_id || null, channel || 'LinkedIn + Email', activity || null,
+       bj.color || null, sortOrder,
+       brief_json ? JSON.stringify(brief_json) : null]
+    );
+    const r = result.rows[0];
+    res.status(201).json({ ok: true, brief: {
+      campaign_id: r.id, campaign_name: r.title, account_id: r.account_id,
+      target_icp: r.subtitle, channel: r.channel, activity: r.activity,
+      brief_json: r.brief_json, created_at: r.created_at,
+      sort_order: r.sort_order, assignee: r.assignee,
+    }});
+  } catch (e) {
+    console.error('POST /api/recruiting-campaign-briefs error:', e.message);
+    res.status(500).json({ ok: false, error: e.message });
+  }
+});
+
+/** PATCH /api/recruiting-campaign-briefs/:id */
+app.patch('/api/recruiting-campaign-briefs/:id', async (req, res) => {
+  try {
+    const { campaign_name, account_id, activity, target_icp, channel, brief_json, assignee } = req.body;
+    const result = await smtAdminPool.query(
+      `UPDATE recruiters.campaign_briefs SET
+         title      = COALESCE($1, title),
+         account_id = COALESCE($2, account_id),
+         activity   = COALESCE($3, activity),
+         subtitle   = COALESCE($4, subtitle),
+         channel    = COALESCE($5, channel),
+         brief_json = COALESCE($6, brief_json),
+         assignee   = COALESCE($7, assignee),
+         updated_at = NOW()
+       WHERE id = $8 RETURNING *`,
+      [campaign_name || null, account_id || null, activity || null,
+       target_icp || null, channel || null,
+       brief_json ? JSON.stringify(brief_json) : null,
+       assignee !== undefined ? assignee : null, req.params.id]
+    );
+    if (!result.rows.length) return res.status(404).json({ error: 'Brief not found' });
+    const r = result.rows[0];
+    res.json({ ok: true, brief: {
+      campaign_id: r.id, campaign_name: r.title, account_id: r.account_id,
+      target_icp: r.subtitle, channel: r.channel, activity: r.activity,
+      brief_json: r.brief_json, created_at: r.created_at,
+      sort_order: r.sort_order, assignee: r.assignee,
+    }});
+  } catch (e) {
+    console.error('PATCH /api/recruiting-campaign-briefs error:', e.message);
+    res.status(500).json({ ok: false, error: e.message });
+  }
+});
+
+/** POST /api/recruiting-campaign-briefs/reorder — bulk sort_order update */
+app.post('/api/recruiting-campaign-briefs/reorder', async (req, res) => {
+  try {
+    const { order } = req.body; // [{id, sort_order}]
+    if (!Array.isArray(order)) return res.status(400).json({ error: 'order array required' });
+    const client = await smtAdminPool.connect();
+    try {
+      await client.query('BEGIN');
+      for (const item of order) {
+        await client.query(
+          `UPDATE recruiters.campaign_briefs SET sort_order = $1, updated_at = NOW() WHERE id = $2`,
+          [item.sort_order, item.id]
+        );
+      }
+      await client.query('COMMIT');
+    } catch (err) {
+      await client.query('ROLLBACK'); throw err;
+    } finally { client.release(); }
+    res.json({ ok: true });
+  } catch (e) {
+    console.error('POST /api/recruiting-campaign-briefs/reorder error:', e.message);
+    res.status(500).json({ ok: false, error: e.message });
+  }
+});
+
+/** DELETE /api/recruiting-campaign-briefs/:id — soft-delete */
+app.delete('/api/recruiting-campaign-briefs/:id', async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    if (isNaN(id)) return res.status(400).json({ error: 'Invalid id' });
+    await smtAdminPool.query(
+      `UPDATE recruiters.campaign_briefs SET is_deleted = true, updated_at = NOW() WHERE id = $1`,
+      [id]
+    );
+    res.json({ ok: true });
+  } catch (e) {
+    console.error('DELETE /api/recruiting-campaign-briefs/:id error:', e.message);
     res.status(500).json({ ok: false, error: e.message });
   }
 });

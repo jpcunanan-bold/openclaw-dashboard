@@ -3,7 +3,7 @@
  * Sales tab: Skylead API stats, Agent Fleet (modal), SDR table, Campaign Brief
  * Recruiting tab: KPIs, Performance Tracker, Campaigns table, Role Brief
  */
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { authHeaders } from '../LoginGate';
 
 // ─── Animations injected once ────────────────────────────────────────────────
@@ -4027,17 +4027,13 @@ function SalesTab({modalAgent,setModalAgent}) {
 
 // ─── Recruiting Tab ───────────────────────────────────────────────────────────
 const REC_KPI=[
-  {label:'Open reqs',   val:'18',  sub:'6 priority',       color:'#fff',  subColor:'#5AC8FA'},
-  {label:'Sourced',     val:'642', sub:'↑ 9%',             color:'#fff',  subColor:'#2DD4BF'},
-  {label:'Submittals',  val:'96',  sub:'15% of sourced',   color:'#fff',  subColor:'#7E8DB5'},
-  {label:'Interviews',  val:'41',  sub:'43% advance',      color:'#5AC8FA',subColor:'#2DD4BF'},
-  {label:'Placements',  val:'12',  sub:'this week',        color:'#fff',  subColor:'#7E8DB5'},
-  {label:'Time-to-Fill',val:'22d', sub:'avg days',         color:'#A5B4FC',subColor:'#7E8DB5',highlight:true},
-];
-const REC_ROWS=[
-  {name:'Sarah M.',role:'CET Designer',client:'Steelcase',   midStage:'Phone Screen', midA:5, midT:5, endStage:'Client Interview', endA:4, endT:8,  note:'On track mid-week', noteColor:'#7E8DB5'},
-  {name:'James T.',role:'Sales Coordinator',client:'MillerKnoll',midStage:'Submission',midA:3,midT:6, endStage:'Offer',            endA:1, endT:6,  note:'Behind on end goal',noteColor:'#7E8DB5'},
-  {name:'Priya N.',role:'RCM Analyst',client:'HCA Health',   midStage:'Sourcing',     midA:12,midT:10,endStage:'Submission',        endA:5, endT:5,  note:'Ahead of pace',     noteColor:'#2DD4BF'},
+  {label:'Open Recs',                          val:'18',    sub:'6 priority',              color:'#fff',   subColor:'#5AC8FA'},
+  {label:'Sourced Candidates',                 val:'642',   sub:'↑ 9%',                    color:'#fff',   subColor:'#2DD4BF'},
+  {label:'Emails Sent',                        val:'1,422', sub:'this week',               color:'#fff',   subColor:'#7E8DB5'},
+  {label:'CR Sent',                            val:'470',   sub:'connection requests',     color:'#fff',   subColor:'#7E8DB5'},
+  {label:'Recruiter Interviews Scheduled',     val:'41',    sub:'43% advance',             color:'#5AC8FA',subColor:'#2DD4BF'},
+  {label:'Hiring Manager Interviews Scheduled',val:'19',    sub:'46% advance',             color:'#5AC8FA',subColor:'#2DD4BF'},
+  {label:'Client Ready Candidates',            val:'9',     sub:'awaiting client review',  color:'#A5B4FC',subColor:'#7E8DB5',highlight:true},
 ];
 function pBar(a,t,h=4){
   const pct=t?Math.min(100,Math.round((a/t)*100)):0;
@@ -4045,14 +4041,70 @@ function pBar(a,t,h=4){
   return {pct,col};
 }
 const STAGE_MID={color:'#818CF8',bg:'rgba(129,140,248,.14)'};
+// ─── Recruiter goal-tracker: live SMT (recruiters schema) data helpers ───────
+function rtEST(d){ return new Date(d.toLocaleString('en-US',{timeZone:'America/New_York'})); }
+function rtFmt(d){ const y=d.getFullYear(),m=String(d.getMonth()+1).padStart(2,'0'),dd=String(d.getDate()).padStart(2,'0'); return `${y}-${m}-${dd}`; }
+function rtRange(type){
+  const now=rtEST(new Date());
+  let start=new Date(now),end=new Date(now);
+  if (type==='Today'){ start.setHours(0,0,0,0); end.setHours(23,59,59,999); }
+  else if (type==='Weekly'){
+    const day=now.getDay();
+    start.setDate(now.getDate()-day); start.setHours(0,0,0,0);
+    end.setDate(now.getDate()+(6-day)); end.setHours(23,59,59,999);
+  } else {
+    start=new Date(now.getFullYear(),now.getMonth(),1);
+    end=new Date(now.getFullYear(),now.getMonth()+1,0); end.setHours(23,59,59,999);
+  }
+  return {start:rtFmt(start),end:rtFmt(end)};
+}
+function RecDrillModal({title,rows,onClose}){
+  return (
+    <div style={{position:'fixed',inset:0,zIndex:9999,background:'rgba(0,0,0,.75)',backdropFilter:'blur(6px)',display:'flex',alignItems:'center',justifyContent:'center',padding:16}}
+      onClick={e=>e.target===e.currentTarget&&onClose()}>
+      <div style={{background:'#0B1642',border:'1px solid rgba(255,255,255,.1)',borderRadius:16,width:'95vw',maxWidth:900,maxHeight:'85vh',display:'flex',flexDirection:'column',overflow:'hidden'}}>
+        <div style={{padding:'16px 22px',borderBottom:'1px solid rgba(255,255,255,.08)',display:'flex',alignItems:'center',gap:12}}>
+          <div style={{flex:1,font:'700 13px Inter,sans-serif',color:'#EAF0FF'}}>{title}</div>
+          <span onClick={onClose} style={{width:28,height:28,display:'flex',alignItems:'center',justifyContent:'center',borderRadius:'50%',border:'1px solid rgba(255,255,255,.12)',color:'#7E8DB5',cursor:'pointer'}}>×</span>
+        </div>
+        <div style={{flex:1,overflowY:'auto'}}>
+          {rows===null ? (
+            <div style={{textAlign:'center',padding:40,color:'#7E8DB5',font:'12px Inter,sans-serif'}}>Loading activities…</div>
+          ) : rows.length===0 ? (
+            <div style={{textAlign:'center',padding:40,color:'#7E8DB5',font:'12px Inter,sans-serif'}}>No activities recorded.</div>
+          ) : (
+            <table style={{width:'100%',borderCollapse:'collapse',font:'11px Inter,sans-serif'}}>
+              <thead>
+                <tr style={{background:'rgba(255,255,255,.03)'}}>
+                  {['Date','Candidate','Stage','Period','Status','Notes'].map(h=>(
+                    <th key={h} style={{padding:'8px 12px',textAlign:'left',font:'700 9px Inter,sans-serif',letterSpacing:'.05em',textTransform:'uppercase',color:'#7E8DB5',borderBottom:'1px solid rgba(255,255,255,.08)',whiteSpace:'nowrap'}}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((r,i)=>(
+                  <tr key={r.id||i} style={{borderBottom:'1px solid rgba(255,255,255,.04)'}}>
+                    <td style={{padding:'8px 12px',color:'#9FB0D8'}}>{r.created_at?new Date(r.created_at).toLocaleString('en-US',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}):'—'}</td>
+                    <td style={{padding:'8px 12px',color:'#EAF0FF'}}>{r.candidate_name||'—'}</td>
+                    <td style={{padding:'8px 12px',color:'#9FB0D8'}}>{r.stage||'—'}</td>
+                    <td style={{padding:'8px 12px',color:'#9FB0D8'}}>{r.goal_period||'—'}</td>
+                    <td style={{padding:'8px 12px',color:'#9FB0D8'}}>{r.status||'—'}</td>
+                    <td style={{padding:'8px 12px',color:'#7E8DB5',maxWidth:260,wordBreak:'break-word'}}>{r.notes||''}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+        <div style={{padding:'9px 22px',borderTop:'1px solid rgba(255,255,255,.08)',display:'flex',justifyContent:'flex-end'}}>
+          <span onClick={onClose} style={{font:'700 11px Inter,sans-serif',color:'#7E8DB5',padding:'6px 16px',borderRadius:8,border:'1px solid rgba(255,255,255,.12)',cursor:'pointer'}}>Close</span>
+        </div>
+      </div>
+    </div>
+  );
+}
 const STAGE_END={color:'#5AC8FA',bg:'rgba(90,200,250,.14)'};
-const REC_CAMP_COLS='1fr 1.7fr 1.2fr 1.1fr .7fr .7fr .8fr .7fr';
-const REC_CAMPS=[
-  {date:'Jun 30',campaign:'CET Designer Outreach',     account:'Steelcase',   rec:'Sarah M.',  recColor:'#A5B4FC',cr:142,email:418,inmail:96},
-  {date:'Jun 29',campaign:'Sales Coordinator Sourcing',account:'MillerKnoll', rec:'James T.',  recColor:'#5AC8FA',cr:98, email:305,inmail:61},
-  {date:'Jun 28',campaign:'RCM Analyst Pipeline',      account:'HCA Health',  rec:'Priya N.',  recColor:'#2DD4BF',cr:176,email:512,inmail:88},
-  {date:'Jun 28',campaign:'ERP Consultant Search',     account:'Mercury Z',   rec:'Marco D.',  recColor:'#F5B945',cr:54, email:187,inmail:33},
-];
+const REC_CAMP_COLS='1.5fr 1.2fr 1.1fr .8fr .8fr .8fr .9fr';
 
 // ─── Date range filter (period pills + calendar) — same UX as SDR performance summary ──
 function DateRangeFilter() {
@@ -4177,10 +4229,671 @@ function DateRangeFilter() {
   );
 }
 
+// ─── Recruiting Campaign Brief — own state/table, mirrors Sales tab's Campaign Brief ───
+function RecruitingCampaignBriefSection(){
+  const [recBriefs,setRecBriefs]=useState([]);
+  const [recBriefsLoading,setRecBriefsLoading]=useState(true);
+  const [recPerson,setRecPerson]=useState('All');
+  const [recCampIdx,setRecCampIdx]=useState(0);
+  const [recReorderMode,setRecReorderMode]=useState(false);
+  const [recDragIdx,setRecDragIdx]=useState(null);
+  const [recDragOverIdx,setRecDragOverIdx]=useState(null);
+  const [recBriefEditOpen,setRecBriefEditOpen]=useState(false);
+  const [recBriefNewOpen,setRecBriefNewOpen]=useState(false);
+  const [recBriefToDelete,setRecBriefToDelete]=useState(null);
+
+  const REC_BRIEF_COLORS=['#818CF8','#A78BFA','#8B5CF6','#6366F1','#C4B5FD','#A5B4FC','#9F7AEA','#7C86FF','#C084FC','#93C5FD'];
+  const DEFAULT_REC_SEQUENCE=[
+    {title:'LinkedIn InMail',meta:'Day 1',subject:'',body:'Personalized note referencing their current role and the skills we\'re sourcing for.',color:'#818CF8'},
+    {title:'Email follow-up',meta:'Day 3 · role one-pager',subject:'Role details - [Role] at [Client]',body:'Share comp range, engagement model, and team.',color:'#A78BFA'},
+    {title:'Screening call',meta:'Day 5 · 20 min',subject:'',body:'Skills, availability, portfolio walkthrough.',color:'#5AC8FA'},
+    {title:'Submit to client',meta:'Day 7 · with notes',subject:'',body:'Package profile + screen notes to client.',color:'#2DD4BF'},
+  ];
+  const BLANK_FORM={
+    assignee:'',title:'',sub:'',channel:'LinkedIn + Email',activity:'',
+    icp:'',personas:'',signals:'',hook:'',valueProp:'',
+    sequence:DEFAULT_REC_SEQUENCE.map(s=>({...s})),
+  };
+
+  const listToText=arr=>(arr||[]).join('\n');
+  const textToList=txt=>(txt||'').split('\n').filter(Boolean);
+  const icpToText=arr=>(arr||[]).map(o=>`${o.label}: ${o.value}`).join('\n');
+  const textToIcp=txt=>(txt||'').split('\n').filter(Boolean).map(line=>{
+    const idx=line.indexOf(':'); if(idx<0) return {label:line,value:''};
+    return {label:line.slice(0,idx).trim(),value:line.slice(idx+1).trim()};
+  });
+
+  const loadRecBriefs=()=>{
+    setRecBriefsLoading(true);
+    fetch('/api/recruiting-campaign-briefs',{headers:authHeaders()})
+      .then(r=>r.ok?r.json():null)
+      .then(j=>{
+        if(!j?.briefs) return;
+        const loaded=j.briefs.map((b,i)=>{
+          const brief=b.brief_json||{};
+          return {
+            _dbId:      b.campaign_id,
+            num:        i+1,
+            sdr:        b.assignee||brief.sdr||'Unassigned',
+            assignee:   b.assignee||brief.sdr||'Unassigned',
+            title:      b.campaign_name,
+            sub:        b.target_icp||brief.sub||'',
+            channel:    b.channel||brief.channel||'',
+            activity:   b.activity||brief.activity||'',
+            color:      brief.color||REC_BRIEF_COLORS[i%REC_BRIEF_COLORS.length],
+            sort_order: b.sort_order,
+            ...brief,
+          };
+        });
+        setRecBriefs(loaded);
+      })
+      .catch(()=>{})
+      .finally(()=>setRecBriefsLoading(false));
+  };
+
+  useEffect(()=>{ loadRecBriefs(); },[]);
+  useEffect(()=>{
+    const first=recPerson==='All'?0:recBriefs.findIndex(c=>(c.sdr||c.assignee)===recPerson);
+    setRecCampIdx(first>=0?first:0);
+  },[recPerson]);
+
+  const filteredRecBriefs=(recPerson==='All'?recBriefs.map((c,i)=>({...c,_gi:i}))
+    :recBriefs.map((c,i)=>({...c,_gi:i})).filter(c=>(c.sdr||c.assignee)===recPerson))
+    .map((c,displayIdx)=>({...c,num:displayIdx+1}));
+
+  const camp=recBriefs[recCampIdx]||{title:'No role briefs yet',sub:'Add a brief to get started',color:'#818CF8'};
+  const campContent={...camp};
+  if(!campContent.sequence) campContent.sequence=DEFAULT_REC_SEQUENCE;
+
+  const OVL={position:'fixed',inset:0,zIndex:9100,background:'rgba(2,8,32,.72)',backdropFilter:'blur(6px)',
+    display:'flex',alignItems:'center',justifyContent:'center',padding:20};
+  const fi={width:'100%',boxSizing:'border-box',background:'rgba(255,255,255,.04)',
+    border:'1px solid rgba(255,255,255,.1)',borderRadius:8,color:'#EAF0FF',
+    font:'13px/1.6 Inter,sans-serif',padding:'9px 13px',outline:'none',resize:'vertical'};
+  const inp={...fi,resize:'none'};
+  const lbl={font:'600 10px Inter,sans-serif',letterSpacing:'.07em',textTransform:'uppercase',color:'#7E8DB5',marginBottom:6,display:'block'};
+  const field=(label,node)=>(<div style={{display:'flex',flexDirection:'column',gap:0}}><label style={lbl}>{label}</label>{node}</div>);
+  const XBTN={width:28,height:28,borderRadius:'50%',border:'1px solid rgba(255,255,255,.12)',background:'rgba(255,255,255,.04)',
+    color:'#9FB0D8',font:'16px Inter,sans-serif',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center'};
+
+  const toEditForm=c=>({
+    assignee: c.assignee||c.sdr||'',
+    title:    c.title||'',
+    sub:      c.sub||'',
+    channel:  c.channel||'LinkedIn + Email',
+    activity: c.activity||'',
+    icp:      icpToText(c.icp),
+    personas: listToText(c.personas),
+    signals:  listToText(c.signals),
+    hook:     c.hook||'',
+    valueProp:c.valueProp||'',
+    sequence: (c.sequence&&c.sequence.length?c.sequence:DEFAULT_REC_SEQUENCE).map(s=>({...s})),
+  });
+
+  const buildBriefContent=(form,color)=>({
+    sdr:form.assignee||'Unassigned', color,
+    title:form.title, sub:form.sub, channel:form.channel, activity:form.activity,
+    hook:form.hook, valueProp:form.valueProp,
+    personas:textToList(form.personas),
+    signals:textToList(form.signals),
+    icp:textToIcp(form.icp),
+    sequence:form.sequence,
+  });
+
+  const handleCreate=async(form)=>{
+    const color=REC_BRIEF_COLORS[recBriefs.length%REC_BRIEF_COLORS.length];
+    const briefContent=buildBriefContent(form,color);
+    const res=await fetch('/api/recruiting-campaign-briefs',{
+      method:'POST',
+      headers:{...authHeaders(),'Content-Type':'application/json'},
+      body:JSON.stringify({
+        campaign_name:form.title, target_icp:form.sub, channel:form.channel,
+        activity:form.activity, assignee:form.assignee||'Unassigned', brief_json:briefContent,
+      }),
+    });
+    const j=await res.json();
+    if(!j.ok) throw new Error(j.error||'Save failed.');
+    setRecBriefNewOpen(false);
+    setRecCampIdx(recBriefs.length);
+    loadRecBriefs();
+  };
+
+  const handleUpdate=async(form)=>{
+    const dbId=recBriefs[recCampIdx]?._dbId;
+    if(!dbId){ setRecBriefEditOpen(false); return; }
+    const color=camp.color||REC_BRIEF_COLORS[recCampIdx%REC_BRIEF_COLORS.length];
+    const briefContent=buildBriefContent(form,color);
+    const res=await fetch(`/api/recruiting-campaign-briefs/${dbId}`,{
+      method:'PATCH',
+      headers:{...authHeaders(),'Content-Type':'application/json'},
+      body:JSON.stringify({
+        campaign_name:form.title, target_icp:form.sub, channel:form.channel,
+        activity:form.activity, assignee:form.assignee||'Unassigned', brief_json:briefContent,
+      }),
+    });
+    const j=await res.json();
+    if(!j.ok) throw new Error(j.error||'Save failed.');
+    setRecBriefEditOpen(false);
+    loadRecBriefs();
+  };
+
+  // ═ Shared brief form (new + edit) ═
+  const BriefForm=({initial,heading,subheading,onCancel,onSave})=>{
+    const [form,setForm]=useState(initial);
+    const [tab,setTab]=useState('brief');
+    const [seqTab,setSeqTab]=useState(0);
+    const [saving,setSaving]=useState(false);
+    const [saveErr,setSaveErr]=useState('');
+    const setStep=(i,key,val)=>setForm(f=>({...f,sequence:f.sequence.map((s,j)=>j===i?{...s,[key]:val}:s)}));
+    const curStep=form.sequence[seqTab]||{};
+    const doSave=async()=>{
+      if(!form.title.trim()) return;
+      setSaving(true); setSaveErr('');
+      try{ await onSave(form); }
+      catch(err){ setSaveErr(err.message||'Save failed.'); }
+      finally{ setSaving(false); }
+    };
+    return (
+      <div style={OVL} onClick={onCancel}>
+        <div style={{width:'100%',maxWidth:980,maxHeight:'92vh',background:'#0d0a2a',
+          border:'1px solid rgba(129,140,248,.25)',borderRadius:16,display:'flex',
+          flexDirection:'column',boxShadow:'0 40px 100px rgba(0,0,0,.7)',overflow:'hidden'}}
+          onClick={e=>e.stopPropagation()}>
+          <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',
+            padding:'18px 28px',borderBottom:'1px solid rgba(255,255,255,.07)',flexShrink:0}}>
+            <div>
+              <div style={{font:'700 16px Inter,sans-serif',color:'#fff'}}>{heading}</div>
+              <div style={{font:'12px Inter,sans-serif',color:'#7E8DB5',marginTop:3}}>{subheading}</div>
+            </div>
+            <div style={{display:'flex',alignItems:'center',gap:10}}>
+              {['brief','sequence'].map(t=>(
+                <button key={t} onClick={()=>setTab(t)} style={{
+                  padding:'6px 16px',borderRadius:20,border:'none',cursor:'pointer',
+                  background:tab===t?'rgba(129,140,248,.18)':'transparent',
+                  color:tab===t?'#A5B4FC':'#7E8DB5',
+                  font:`${tab===t?700:400} 12px Inter,sans-serif`,transition:'all .15s'}}>
+                  {t==='brief'?'Brief':'Outreach'}
+                </button>
+              ))}
+              <div style={{width:1,height:20,background:'rgba(255,255,255,.1)',margin:'0 4px'}}/>
+              <button style={XBTN} onClick={onCancel}>×</button>
+            </div>
+          </div>
+          <div style={{overflowY:'auto',flex:1,padding:'24px 28px'}}>
+            {tab==='brief'&&(
+              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:20}}>
+                <div style={{display:'flex',flexDirection:'column',gap:16}}>
+                  <div style={{display:'grid',gridTemplateColumns:'1fr 2fr',gap:12,alignItems:'end'}}>
+                    {field('Assignee (Recruiter)',
+                      <input value={form.assignee} onChange={e=>setForm(f=>({...f,assignee:e.target.value}))} style={inp} placeholder="e.g. Sarah M."/>)}
+                    {field('Role / campaign title',
+                      <input value={form.title} onChange={e=>setForm(f=>({...f,title:e.target.value}))} style={inp} placeholder="e.g. CET Designer / Space Planning Specialist"/>)}
+                  </div>
+                  {field('Req details / subtitle',
+                    <input value={form.sub} onChange={e=>setForm(f=>({...f,sub:e.target.value}))} style={inp} placeholder="Open req · Steelcase · 6 submitted of 8 target"/>)}
+                  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
+                    {field('Channel',
+                      <input value={form.channel} onChange={e=>setForm(f=>({...f,channel:e.target.value}))} style={inp} placeholder="LinkedIn + Email"/>)}
+                    {field('Activity',
+                      <input value={form.activity} onChange={e=>setForm(f=>({...f,activity:e.target.value}))} style={inp} placeholder="Sourcing / Screening / Submitted"/>)}
+                  </div>
+                  {field('Ideal candidate profile',
+                    <div>
+                      <div style={{font:'11px Inter,sans-serif',color:'#4a5568',marginBottom:6}}>One per line · format: Label: Value</div>
+                      <textarea rows={6} value={form.icp} onChange={e=>setForm(f=>({...f,icp:e.target.value}))} style={fi} placeholder={"Core skills: CET · 20-20 · AutoCAD\nExperience: 3-5 years"}/>
+                    </div>)}
+                </div>
+                <div style={{display:'flex',flexDirection:'column',gap:16}}>
+                  {field('Must-have qualifications',
+                    <div>
+                      <div style={{font:'11px Inter,sans-serif',color:'#4a5568',marginBottom:6}}>One per line</div>
+                      <textarea rows={5} value={form.personas} onChange={e=>setForm(f=>({...f,personas:e.target.value}))} style={fi} placeholder="Hands-on CET Designer / 20-20"/>
+                    </div>)}
+                  {field('Sourcing channels',
+                    <div>
+                      <div style={{font:'11px Inter,sans-serif',color:'#4a5568',marginBottom:6}}>One per line</div>
+                      <textarea rows={4} value={form.signals} onChange={e=>setForm(f=>({...f,signals:e.target.value}))} style={fi} placeholder="LinkedIn Recruiter: CET Designer"/>
+                    </div>)}
+                  {field('Candidate pitch',
+                    <textarea rows={3} value={form.hook} onChange={e=>setForm(f=>({...f,hook:e.target.value}))} style={fi}/>)}
+                  {field('Why Bold Business',
+                    <textarea rows={3} value={form.valueProp} onChange={e=>setForm(f=>({...f,valueProp:e.target.value}))} style={fi}/>)}
+                </div>
+              </div>
+            )}
+            {tab==='sequence'&&(
+              <div style={{display:'grid',gridTemplateColumns:'200px 1fr',gap:20,minHeight:400}}>
+                <div style={{display:'flex',flexDirection:'column',gap:6}}>
+                  {form.sequence.map((step,i)=>(
+                    <button key={i} onClick={()=>setSeqTab(i)} style={{
+                      display:'flex',alignItems:'center',gap:10,padding:'10px 14px',
+                      borderRadius:10,border:`1px solid ${seqTab===i?(step.color||'#818CF8')+'55':'rgba(255,255,255,.07)'}`,
+                      background:seqTab===i?`${step.color||'#818CF8'}12`:'rgba(255,255,255,.02)',
+                      cursor:'pointer',textAlign:'left',transition:'all .15s'}}>
+                      <span style={{width:24,height:24,borderRadius:'50%',
+                        background:step.color||'#818CF8',color:'#0a0f22',flexShrink:0,
+                        display:'flex',alignItems:'center',justifyContent:'center',
+                        font:'800 11px Inter,sans-serif'}}>{i+1}</span>
+                      <div style={{minWidth:0}}>
+                        <div style={{font:`${seqTab===i?700:500} 12px Inter,sans-serif`,
+                          color:seqTab===i?(step.color||'#818CF8'):'#cdd6ee',
+                          whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{step.title||`Step ${i+1}`}</div>
+                        <div style={{font:'10px Inter,sans-serif',color:'#7E8DB5'}}>{step.meta}</div>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+                <div style={{display:'flex',flexDirection:'column',gap:14,
+                  background:'rgba(255,255,255,.02)',border:'1px solid rgba(255,255,255,.07)',
+                  borderRadius:12,padding:'20px 22px'}}>
+                  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
+                    {field('Step title',
+                      <input value={curStep.title||''} onChange={e=>setStep(seqTab,'title',e.target.value)}
+                        style={inp} placeholder="e.g. LinkedIn InMail"/>)}
+                    {field('Timing',
+                      <input value={curStep.meta||''} onChange={e=>setStep(seqTab,'meta',e.target.value)}
+                        style={inp} placeholder="e.g. Day 1"/>)}
+                  </div>
+                  {field(
+                    <span>Subject line <span style={{color:'#4a5568',fontWeight:400,textTransform:'none',letterSpacing:0}}>· email steps only</span></span>,
+                    <input value={curStep.subject||''} onChange={e=>setStep(seqTab,'subject',e.target.value)}
+                      style={inp} placeholder="Leave blank for LinkedIn steps"/>)}
+                  {field('Message body',
+                    <textarea rows={10} value={curStep.body||''}
+                      onChange={e=>setStep(seqTab,'body',e.target.value)} style={fi}
+                      placeholder="Write the full candidate outreach message here..."/>)}
+                </div>
+              </div>
+            )}
+          </div>
+          <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',
+            padding:'16px 28px',borderTop:'1px solid rgba(255,255,255,.07)',flexShrink:0}}>
+            <span style={{font:'12px Inter,sans-serif',color:saveErr?'#F2667A':'#4a5568'}}>{saveErr||'Changes apply immediately to the role brief card'}</span>
+            <div style={{display:'flex',gap:10}}>
+              <button onClick={onCancel}
+                style={{padding:'9px 20px',borderRadius:8,border:'1px solid rgba(255,255,255,.1)',
+                  background:'none',color:'#9FB0D8',font:'600 13px Inter,sans-serif',cursor:'pointer'}}>Discard</button>
+              <button onClick={doSave} disabled={saving}
+                style={{padding:'9px 24px',borderRadius:8,border:'none',background:saving?'rgba(129,140,248,.4)':'#818CF8',
+                  color:'#0a0f22',font:'700 13px Inter,sans-serif',cursor:saving?'default':'pointer',letterSpacing:'.01em'}}>{saving?'Saving...':'Save changes'}</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  return (
+    <>
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:12}}>
+        <div className="cc-sect-label-purple" style={{marginBottom:0}}>Campaign brief</div>
+      </div>
+
+      {/* Role brief selector — list of brief cards, mirrors Sales tab's Campaign Brief selector */}
+      <div style={{background:'rgba(255,255,255,.03)',border:'1px solid rgba(129,140,248,.15)',borderRadius:12,padding:'18px 20px',marginBottom:14}}>
+        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:12,flexWrap:'wrap',marginBottom:16}}>
+          <div style={{font:'700 13px Inter,sans-serif',letterSpacing:'.09em',textTransform:'uppercase',color:'#9FB0D8'}}>
+            {recPerson==='All'?'All Role Briefs':`${recPerson}'s Role Briefs`}
+            {recReorderMode&&<span style={{marginLeft:10,font:'500 11px Inter,sans-serif',color:'#F5B945',textTransform:'none',letterSpacing:'normal'}}>‹ drag cards to reorder ›</span>}
+          </div>
+          <div style={{display:'flex',gap:7,flexWrap:'wrap',alignItems:'center'}}>
+            {(['All',...Array.from(new Set(recBriefs.map(c=>c.assignee||c.sdr).filter(Boolean))).sort()]).map(p=>{
+              const active=recPerson===p;
+              return <button key={p} onClick={()=>setRecPerson(p)} style={{
+                padding:'5px 12px',borderRadius:20,cursor:'pointer',
+                border:active?'none':'1px solid rgba(255,255,255,.12)',
+                background:active?'#818CF8':'transparent',
+                font:`${active?700:400} 11px/1 Inter,sans-serif`,
+                color:active?'#0a0f22':'#7E8DB5',transition:'all .15s'}}>
+                {p}
+              </button>;
+            })}
+            <button onClick={()=>setRecReorderMode(m=>!m)} style={{
+              padding:'4px 10px',borderRadius:6,cursor:'pointer',
+              border:`1px solid ${recReorderMode?'rgba(245,185,69,.5)':'rgba(255,255,255,.12)'}`,
+              background:recReorderMode?'rgba(245,185,69,.1)':'transparent',
+              font:'600 10px Inter,sans-serif',
+              color:recReorderMode?'#F5B945':'#7E8DB5',transition:'all .15s'}}>
+              {recReorderMode?'Done':'⠿ Reorder'}
+            </button>
+          </div>
+        </div>
+        <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:12}}>
+          {filteredRecBriefs.map((c,di)=>{
+            const active=recCampIdx===c._gi;
+            const isDragging=recDragIdx===di;
+            const isDragOver=recDragOverIdx===di&&recDragIdx!==di;
+            return <div key={c._gi}
+              draggable={recReorderMode}
+              onDragStart={recReorderMode?(e)=>{ e.dataTransfer.effectAllowed='move'; setRecDragIdx(di); }:undefined}
+              onDragEnter={recReorderMode?()=>setRecDragOverIdx(di):undefined}
+              onDragOver={recReorderMode?(e)=>{ e.preventDefault(); e.dataTransfer.dropEffect='move'; }:undefined}
+              onDragLeave={recReorderMode?()=>setRecDragOverIdx(null):undefined}
+              onDrop={recReorderMode?async(e)=>{
+                e.preventDefault();
+                if(recDragIdx===null||recDragIdx===di){ setRecDragIdx(null); setRecDragOverIdx(null); return; }
+                const fromGi=filteredRecBriefs[recDragIdx]?._gi;
+                const toGi=filteredRecBriefs[di]?._gi;
+                if(fromGi===undefined||toGi===undefined){ setRecDragIdx(null); setRecDragOverIdx(null); return; }
+                const newAll=[...recBriefs];
+                const [moved]=newAll.splice(fromGi,1);
+                newAll.splice(toGi,0,moved);
+                const renumbered=newAll.map((c,i)=>({...c,num:i+1,sort_order:i+1}));
+                setRecBriefs(renumbered);
+                if(recCampIdx===fromGi) setRecCampIdx(toGi);
+                else if(fromGi<toGi&&recCampIdx>fromGi&&recCampIdx<=toGi) setRecCampIdx(recCampIdx-1);
+                else if(fromGi>toGi&&recCampIdx<fromGi&&recCampIdx>=toGi) setRecCampIdx(recCampIdx+1);
+                setRecDragIdx(null); setRecDragOverIdx(null);
+                const orderPayload=renumbered.map((c,i)=>({id:c._dbId,sort_order:i+1})).filter(x=>x.id!=null);
+                fetch('/api/recruiting-campaign-briefs/reorder',{
+                  method:'POST',
+                  headers:{...authHeaders(),'Content-Type':'application/json'},
+                  body:JSON.stringify({order:orderPayload}),
+                }).catch(()=>{});
+              }:undefined}
+              onDragEnd={recReorderMode?()=>{ setRecDragIdx(null); setRecDragOverIdx(null); }:undefined}
+              onClick={!recReorderMode?()=>setRecCampIdx(c._gi):undefined}
+              className="brief-card"
+              style={{
+                position:'relative',
+                padding:'12px 14px',borderRadius:10,
+                cursor:recReorderMode?'grab':'pointer',
+                background:isDragOver?`${c.color}22`:active?`${c.color}12`:'rgba(255,255,255,.025)',
+                border:`1px solid ${isDragOver?c.color:active?c.color+'55':'rgba(255,255,255,.08)'}`,
+                transition:'all .15s',opacity:isDragging?0.4:1,
+                transform:isDragOver?'scale(1.02)':'none',
+                userSelect:'none'}}>
+              {!recReorderMode&&(
+                <button
+                  onClick={e=>{ e.stopPropagation(); setRecBriefToDelete({_gi:c._gi,_dbId:c._dbId,title:c.title}); }}
+                  title="Delete brief"
+                  className="brief-card-delete"
+                  style={{
+                    position:'absolute',top:7,right:7,
+                    width:18,height:18,borderRadius:'50%',
+                    border:'1px solid rgba(242,102,122,.5)',
+                    background:'rgba(13,26,66,.9)',
+                    color:'#F2667A',cursor:'pointer',
+                    fontSize:12,lineHeight:'16px',padding:0,
+                    display:'flex',alignItems:'center',justifyContent:'center',
+                    opacity:0,transition:'opacity .15s',flexShrink:0,
+                    backdropFilter:'blur(4px)',
+                  }}
+                >×</button>
+              )}
+              <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:5}}>
+                <span style={{font:'700 10px Inter,sans-serif',padding:'2px 7px',borderRadius:20,
+                  background:`${c.color}18`,color:c.color,textTransform:'uppercase',letterSpacing:'.04em'}}>
+                  {c.num}. {c.sdr||c.assignee||'Unassigned'}
+                </span>
+                {recReorderMode&&<span style={{color:'#7E8DB5',fontSize:14,lineHeight:1,cursor:'grab'}}>::</span>}
+              </div>
+              <div style={{font:'700 13px/1.35 Inter,sans-serif',color:active?c.color:'#EAF0FF',marginBottom:2}}>{c.title}</div>
+              <div style={{font:'11px/1.5 Inter,sans-serif',color:active?c.color+'cc':'#9FB0D8',overflow:'hidden',display:'-webkit-box',WebkitLineClamp:2,WebkitBoxOrient:'vertical'}}>{c.sub}</div>
+            </div>;
+          })}
+          {!recReorderMode&&<div onClick={()=>setRecBriefNewOpen(true)} style={{
+            padding:'12px 14px',borderRadius:10,cursor:'pointer',
+            background:'rgba(255,255,255,.015)',
+            border:'1px dashed rgba(129,140,248,.3)',transition:'all .15s',
+            display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:6,minHeight:64}}
+            onMouseEnter={e=>{e.currentTarget.style.background='rgba(129,140,248,.08)';e.currentTarget.style.borderColor='rgba(129,140,248,.5)';}}
+            onMouseLeave={e=>{e.currentTarget.style.background='rgba(255,255,255,.015)';e.currentTarget.style.borderColor='rgba(129,140,248,.3)';}}
+          >
+            <span style={{font:'22px Inter,sans-serif',color:'rgba(255,255,255,.25)',lineHeight:1}}>+</span>
+            <span style={{font:'600 11px Inter,sans-serif',color:'rgba(255,255,255,.3)'}}>New brief</span>
+          </div>}
+          {!recBriefsLoading&&recBriefs.length===0&&<div style={{gridColumn:'1/-1',font:'12px Inter,sans-serif',color:'#7E8DB5',padding:'8px 2px'}}>No role briefs yet — add one to get started.</div>}
+        </div>
+      </div>
+
+      {/* Action buttons */}
+      <div style={{display:'flex',justifyContent:'flex-end',gap:8,marginBottom:12}}>
+        <span onClick={()=>recBriefs[recCampIdx]&&setRecBriefEditOpen(true)} style={{font:'600 10px Inter,sans-serif',color:'#9FB0D8',padding:'5px 11px',
+          border:'1px solid rgba(255,255,255,.12)',borderRadius:8,cursor:recBriefs[recCampIdx]?'pointer':'default',opacity:recBriefs[recCampIdx]?1:.4}}>✎ Edit</span>
+      </div>
+
+      {/* Delete confirm modal */}
+      {recBriefToDelete&&(
+        <div style={OVL} onClick={()=>setRecBriefToDelete(null)}>
+          <div style={{background:'#0d1a42',border:'1px solid rgba(242,102,122,.3)',borderRadius:14,
+            padding:'32px 28px',maxWidth:420,width:'100%',boxShadow:'0 24px 80px rgba(0,0,0,.7)'}}
+            onClick={e=>e.stopPropagation()}>
+            <div style={{width:44,height:44,borderRadius:'50%',background:'rgba(242,102,122,.12)',
+              border:'1px solid rgba(242,102,122,.3)',display:'flex',alignItems:'center',
+              justifyContent:'center',marginBottom:16,fontSize:20}}>&#x26A0;&#xFE0F;</div>
+            <div style={{font:'700 16px Inter,sans-serif',color:'#fff',marginBottom:8}}>Delete role brief?</div>
+            <div style={{font:'13px/1.6 Inter,sans-serif',color:'#9FB0D8',marginBottom:24}}>
+              <strong style={{color:'#EAF0FF'}}>{recBriefToDelete.title}</strong> will be permanently removed.
+              This cannot be undone.
+            </div>
+            <div style={{display:'flex',gap:10,justifyContent:'flex-end'}}>
+              <button onClick={()=>setRecBriefToDelete(null)}
+                style={{padding:'9px 20px',borderRadius:8,border:'1px solid rgba(255,255,255,.15)',
+                  background:'none',color:'#9FB0D8',font:'600 13px Inter,sans-serif',cursor:'pointer'}}>
+                Cancel
+              </button>
+              <button onClick={async()=>{
+                const {_gi,_dbId}=recBriefToDelete;
+                setRecBriefToDelete(null);
+                if(recCampIdx===_gi) setRecCampIdx(0);
+                if(_dbId) await fetch(`/api/recruiting-campaign-briefs/${_dbId}`,{method:'DELETE',headers:authHeaders()}).catch(()=>{});
+                loadRecBriefs();
+              }}
+                style={{padding:'9px 24px',borderRadius:8,border:'none',
+                  background:'#F2667A',color:'#fff',font:'700 13px Inter,sans-serif',cursor:'pointer'}}>
+                Yes, delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* New brief modal */}
+      {recBriefNewOpen&&(
+        <BriefForm
+          initial={{...BLANK_FORM}}
+          heading="New Role Brief"
+          subheading="Fill in the brief details and candidate outreach sequence"
+          onCancel={()=>setRecBriefNewOpen(false)}
+          onSave={handleCreate}
+        />
+      )}
+
+      {/* Edit brief modal */}
+      {recBriefEditOpen&&recBriefs[recCampIdx]&&(
+        <BriefForm
+          initial={toEditForm(recBriefs[recCampIdx])}
+          heading="Edit Role Brief"
+          subheading={recBriefs[recCampIdx].title}
+          onCancel={()=>setRecBriefEditOpen(false)}
+          onSave={handleUpdate}
+        />
+      )}
+
+      {/* Brief detail card */}
+      <div style={{position:'relative',background:'rgba(255,255,255,.03)',border:'1px solid rgba(129,140,248,.15)',
+        borderRadius:12,padding:22,overflow:'hidden'}}>
+        <div style={{position:'absolute',top:0,left:0,right:0,height:3,background:camp.color||'#818CF8'}}/>
+        <div style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',marginBottom:20,flexWrap:'wrap',gap:12}}>
+          <div>
+            <div style={{font:'700 18px Inter,sans-serif',color:'#fff'}}>{camp.title}</div>
+            <div style={{font:'12px Inter,sans-serif',color:'#9FB0D8',marginTop:3}}>
+              {camp.channel||'—'} · {camp.sdr||camp.assignee||'Unassigned'} · {camp.sub}
+            </div>
+          </div>
+          <span style={{font:'700 10px Inter,sans-serif',padding:'4px 11px',borderRadius:20,
+            background:`${(camp.color||'#818CF8')}16`,color:camp.color||'#A5B4FC',textTransform:'uppercase',letterSpacing:'.04em',whiteSpace:'nowrap'}}>
+            {camp.activity||'Priority req'}
+          </span>
+        </div>
+        <div style={{font:'600 10px Inter,sans-serif',letterSpacing:'.1em',textTransform:'uppercase',color:'#7E8DB5',marginBottom:10}}>
+          Ideal candidate profile
+        </div>
+        <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:10,marginBottom:20}}>
+          {(campContent.icp||[]).length===0&&<div style={{font:'12px Inter,sans-serif',color:'#7E8DB5'}}>No candidate profile fields yet.</div>}
+          {(campContent.icp||[]).map(({label,value})=>(
+            <div key={label} style={{background:'rgba(255,255,255,.03)',borderRadius:8,padding:11}}>
+              <div style={{font:'600 9px Inter,sans-serif',letterSpacing:'.05em',textTransform:'uppercase',color:'#7E8DB5'}}>{label}</div>
+              <div style={{font:'600 12px Inter,sans-serif',color:'#EAF0FF',marginTop:3}}>{value}</div>
+            </div>
+          ))}
+        </div>
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:20,marginBottom:20}}>
+          <div>
+            <div style={{font:'600 10px Inter,sans-serif',letterSpacing:'.1em',textTransform:'uppercase',color:'#7E8DB5',marginBottom:10}}>
+              Must-have qualifications
+            </div>
+            {(campContent.personas||[]).map(p=>(
+              <div key={p} style={{font:'13px/1.95 Inter,sans-serif',color:'#cdd6ee'}}>• {p}</div>
+            ))}
+          </div>
+          <div>
+            <div style={{font:'600 10px Inter,sans-serif',letterSpacing:'.1em',textTransform:'uppercase',color:'#7E8DB5',marginBottom:10}}>
+              Sourcing channels
+            </div>
+            {(campContent.signals||[]).map(s=>(
+              <div key={s} style={{font:'13px/1.75 Inter,sans-serif',color:'#cdd6ee'}}>→ {s}</div>
+            ))}
+          </div>
+        </div>
+        {campContent.hook&&(
+          <div style={{background:'rgba(129,140,248,.08)',borderLeft:'3px solid rgba(129,140,248,.6)',
+            borderRadius:'0 8px 8px 0',padding:'13px 15px',marginBottom:12,font:'13px/1.6 Inter,sans-serif',color:'#cdd6ee'}}>
+            <strong style={{color:'#fff'}}>Candidate pitch.</strong>{' '}
+            {campContent.hook}
+          </div>
+        )}
+        {campContent.valueProp&&(
+          <div style={{background:'rgba(168,85,247,.1)',borderLeft:'3px solid rgba(168,85,247,.6)',
+            borderRadius:'0 8px 8px 0',padding:'13px 15px',marginBottom:20,font:'13px/1.6 Inter,sans-serif',color:'#cdd6ee'}}>
+            <strong style={{color:'#fff'}}>Why Bold Business.</strong>{' '}
+            {campContent.valueProp}
+          </div>
+        )}
+        <div style={{font:'600 10px Inter,sans-serif',letterSpacing:'.1em',textTransform:'uppercase',color:'#7E8DB5',marginBottom:12}}>
+          4-touch candidate outreach
+        </div>
+        <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:10}}>
+          {(campContent.sequence||DEFAULT_REC_SEQUENCE).map((s,i)=>(
+            <div key={i} style={{background:'rgba(255,255,255,.03)',borderRadius:8,padding:13}}>
+              <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:8}}>
+                <span style={{width:22,height:22,borderRadius:'50%',background:s.color||'#818CF8',color:'#0a0f22',
+                  display:'flex',alignItems:'center',justifyContent:'center',font:'800 11px Inter,sans-serif',flexShrink:0}}>
+                  {i+1}
+                </span>
+                <div>
+                  <div style={{font:'700 11px Inter,sans-serif',color:'#fff'}}>{s.title}</div>
+                  <div style={{font:'9px Inter,sans-serif',color:'#7E8DB5'}}>{s.meta}</div>
+                </div>
+              </div>
+              <div style={{font:'11px/1.5 Inter,sans-serif',color:'#9FB0D8'}}>{s.body}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </>
+  );
+}
+
 function RecruitingTab({ setModalAgent }) {
   const [filter,setFilter]=useState('Weekly');
   const recGridCols='1fr 1.1fr 1fr 1.1fr .95fr 1.1fr .95fr 1.2fr';
   const hdr9={font:'600 9px Inter,sans-serif',letterSpacing:'.05em',textTransform:'uppercase',color:'#7E8DB5'};
+
+  // ── Live recruiter goal-tracker data (SMT DB — recruiters schema) ──────────
+  const [goals,setGoals]=useState([]);
+  const [recNames,setRecNames]=useState([]);
+  const [selRec,setSelRec]=useState('All');
+  const [goalsLoading,setGoalsLoading]=useState(true);
+  const [goalsPending,setGoalsPending]=useState(false);
+  const [drill,setDrill]=useState(null);
+  const range=useMemo(()=>rtRange(filter),[filter]);
+
+  const loadGoals=useCallback(()=>{
+    setGoalsLoading(true);
+    const qs=new URLSearchParams({start:range.start,end:range.end});
+    if (selRec!=='All') qs.set('recruiter',selRec);
+    Promise.all([
+      fetch(`/api/smt/recruiter/goals?${qs}`,{headers:authHeaders()}).then(r=>r.json()),
+      fetch('/api/smt/recruiter/names',{headers:authHeaders()}).then(r=>r.json()),
+    ]).then(([gd,rd])=>{
+      setGoalsPending(!!gd.pending);
+      setGoals(gd.goals||[]);
+      setRecNames(rd.recruiters||[]);
+      setGoalsLoading(false);
+    }).catch(()=>setGoalsLoading(false));
+  },[range,selRec]);
+
+  useEffect(()=>{ loadGoals(); },[loadGoals]);
+
+  const openRecDrill=async(g,period)=>{
+    const title=`${g.recruiter_name} — ${g.role} (${period==='mid'?'Mid-Week':'End-Week'}: ${period==='mid'?g.mid_week_stage:g.end_week_stage})`;
+    setDrill({title,rows:null});
+    const qs=new URLSearchParams({
+      start:range.start,end:range.end,
+      recruiter:g.recruiter_name,role:g.role,client:g.client,
+      period,stage:period==='mid'?g.mid_week_stage:g.end_week_stage,
+    });
+    const d=await fetch(`/api/smt/recruiter/activities?${qs}`,{headers:authHeaders()}).then(r=>r.json());
+    setDrill({title,rows:d.activities||[]});
+  };
+
+  // ── Live recruiting-campaigns data (SMT DB — recruiters.campaigns) ─────────
+  const [camps,setCamps]=useState([]);
+  const [campsLoading,setCampsLoading]=useState(true);
+  const [campsPending,setCampsPending]=useState(false);
+  const [campSelRec,setCampSelRec]=useState('All');
+  const [campSearch,setCampSearch]=useState('');
+  const [addCampOpen,setAddCampOpen]=useState(false);
+  const [addCampSaving,setAddCampSaving]=useState(false);
+  const [addCampErr,setAddCampErr]=useState('');
+  const BLANK_CAMP_FORM={campaign_name:'',recruiter_name:'',account_used:'',cr_sent:'',email_sent:'',inmail_sent:'',date:new Date().toISOString().slice(0,10)};
+  const [campForm,setCampForm]=useState(BLANK_CAMP_FORM);
+
+  const loadCamps=useCallback(()=>{
+    setCampsLoading(true);
+    const qs=new URLSearchParams({start:range.start,end:range.end});
+    if (campSelRec!=='All') qs.set('recruiter',campSelRec);
+    fetch(`/api/smt/recruiter/campaigns?${qs}`,{headers:authHeaders()}).then(r=>r.json()).then(cd=>{
+      setCampsPending(!!cd.pending);
+      setCamps(cd.campaigns||[]);
+      setCampsLoading(false);
+    }).catch(()=>setCampsLoading(false));
+  },[range,campSelRec]);
+
+  useEffect(()=>{ loadCamps(); },[loadCamps]);
+
+  const filteredCamps=useMemo(()=>{
+    const q=campSearch.trim().toLowerCase();
+    if (!q) return camps;
+    return camps.filter(c=>(c.campaign_name||'').toLowerCase().includes(q)||(c.recruiter_name||'').toLowerCase().includes(q));
+  },[camps,campSearch]);
+
+  const campTotals=useMemo(()=>camps.reduce((acc,c)=>({
+    cr:    acc.cr    + (Number(c.cr_sent)    ||0),
+    email: acc.email + (Number(c.email_sent) ||0),
+    inmail:acc.inmail+ (Number(c.inmail_sent) ||0),
+  }),{cr:0,email:0,inmail:0}),[camps]);
+
+  const submitCamp=async()=>{
+    setAddCampErr('');
+    if (!campForm.campaign_name.trim() || !campForm.recruiter_name.trim()) {
+      setAddCampErr('Campaign name and recruiter are required.'); return;
+    }
+    setAddCampSaving(true);
+    try {
+      const r=await fetch('/api/smt/recruiter/campaigns',{
+        method:'POST', headers:{...authHeaders(),'Content-Type':'application/json'},
+        body:JSON.stringify(campForm),
+      }).then(r=>r.json());
+      if (!r.ok) { setAddCampErr(r.error||'Failed to save campaign.'); setAddCampSaving(false); return; }
+      setAddCampOpen(false); setCampForm(BLANK_CAMP_FORM); setAddCampSaving(false);
+      loadCamps();
+    } catch (e) {
+      setAddCampErr(e.message); setAddCampSaving(false);
+    }
+  };
 
   const REC_AGENTS = [
     { id:'zara',    label:'Zara',    initial:'Z', role:'BB · Healthcare', color:'#f43f5e', bg:'rgba(244,63,94,.16)',  border:'rgba(244,63,94,.5)',  grad:'linear-gradient(90deg,#9f1239,#f43f5e)', width:'55%', cardBorder:'rgba(244,63,94,.25)',  status:'active', task:'RCM Specialist sourcing' },
@@ -4189,20 +4902,51 @@ function RecruitingTab({ setModalAgent }) {
 
   return (
     <div style={{maxWidth:1380,margin:'0 auto',padding:'18px 24px 40px'}}>
+      {drill && <RecDrillModal title={drill.title} rows={drill.rows} onClose={()=>setDrill(null)}/>}
 
-      {/* KPI strip */}
+      {/* KPI strip — single consolidated card, same layout as Sales overview's key-metrics card */}
       <div className="cc-sect-label-purple">Recruiting overview · last 7 days</div>
-      <div style={{display:'grid',gridTemplateColumns:'repeat(6,1fr)',gap:12,marginBottom:26}}>
-        {REC_KPI.map((k,i)=>(
-          <div key={i} style={{
-            background:k.highlight?'linear-gradient(135deg,rgba(129,140,248,.25),rgba(129,140,248,.08))':'rgba(255,255,255,.035)',
-            border:`1px solid ${k.highlight?'rgba(129,140,248,.4)':'rgba(255,255,255,.08)'}`,
-            borderRadius:12,padding:14}}>
-            <div style={{font:'600 10px Inter,sans-serif',letterSpacing:'.08em',textTransform:'uppercase',color:'#7E8DB5'}}>{k.label}</div>
-            <div style={{font:`700 24px Inter,sans-serif`,color:k.color,marginTop:5}}>{k.val}</div>
-            <div style={{font:'11px Inter,sans-serif',color:k.subColor,marginTop:3}}>{k.sub}</div>
-          </div>
-        ))}
+      <div style={{background:'linear-gradient(135deg,rgba(99,102,241,.24),rgba(168,85,247,.08))',
+        border:'1px solid rgba(129,140,248,.3)',borderRadius:12,padding:'18px 22px',marginBottom:26,overflowX:'auto'}}>
+        {/* CSS-grid layout: 7 equal columns, 3 fixed rows (label / value / sub)
+             so every number sits on the exact same baseline regardless of label length
+             Indigo/purple gradient (vs. Sales tab's blue/cyan) to keep the two tabs visually distinct */}
+        <div style={{
+          display:'grid',
+          gridTemplateColumns:'repeat(7,1fr)',
+          gridTemplateRows:'36px 56px 20px',
+          columnGap:0,
+          minWidth:860,
+        }}>
+          {REC_KPI.flatMap((m,i)=>[
+            /* Row 1 - label */
+            <div key={`l${i}`} style={{
+              gridRow:1, gridColumn:i+1,
+              padding:'0 18px',
+              borderLeft:i>0?'1px solid rgba(255,255,255,.1)':'none',
+              font:'600 11px Inter,sans-serif',letterSpacing:'.06em',textTransform:'uppercase',
+              color:'#8FA9CC',lineHeight:1.25,
+              display:'flex',alignItems:'flex-start',
+            }}>{m.label}</div>,
+            /* Row 2 - value */
+            <div key={`v${i}`} style={{
+              gridRow:2, gridColumn:i+1,
+              padding:'0 18px',
+              borderLeft:i>0?'1px solid rgba(255,255,255,.1)':'none',
+              display:'flex',alignItems:'center',
+            }}>
+              <div style={{font:'700 46px/1 Inter,sans-serif',color:m.color||'#fff'}}>{m.val}</div>
+            </div>,
+            /* Row 3 - sub */
+            <div key={`s${i}`} style={{
+              gridRow:3, gridColumn:i+1,
+              padding:'0 18px',
+              borderLeft:i>0?'1px solid rgba(255,255,255,.1)':'none',
+              font:'12px Inter,sans-serif',color:m.subColor||'#2DD4BF',
+              display:'flex',alignItems:'flex-start',
+            }}>{m.sub||''}</div>,
+          ])}
+        </div>
       </div>
 
       {/* Recruiter performance tracker */}
@@ -4210,11 +4954,14 @@ function RecruitingTab({ setModalAgent }) {
       <div style={{background:'rgba(255,255,255,.025)',border:'1px solid rgba(255,255,255,.08)',borderRadius:12,padding:16,marginBottom:26}}>
         {/* Controls */}
         <div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap',marginBottom:14}}>
-          <span style={{display:'inline-flex',alignItems:'center',gap:6,minWidth:150,font:'600 11px Inter,sans-serif',
-            color:'#EAF0FF',padding:'6px 11px',border:'1px solid rgba(255,255,255,.12)',borderRadius:8,background:'rgba(255,255,255,.05)'}}>
-            All recruiters ▾
-          </span>
-          <span style={{width:30,height:30,display:'flex',alignItems:'center',justifyContent:'center',
+          <select value={selRec} onChange={e=>setSelRec(e.target.value)} style={{
+            display:'inline-flex',alignItems:'center',gap:6,minWidth:150,font:'600 11px Inter,sans-serif',
+            color:'#EAF0FF',padding:'6px 11px',border:'1px solid rgba(255,255,255,.12)',borderRadius:8,
+            background:'rgba(255,255,255,.05)',cursor:'pointer'}}>
+            <option value="All">All recruiters</option>
+            {recNames.map(n=><option key={n} value={n}>{n}</option>)}
+          </select>
+          <span onClick={loadGoals} style={{width:30,height:30,display:'flex',alignItems:'center',justifyContent:'center',
             border:'1px solid rgba(255,255,255,.12)',borderRadius:8,color:'#7E8DB5',fontSize:13,cursor:'pointer'}}>↻</span>
           <div style={{marginLeft:'auto',display:'flex',gap:4}}>
             {['Today','Weekly','Monthly'].map(t=>{
@@ -4228,6 +4975,9 @@ function RecruitingTab({ setModalAgent }) {
             })}
           </div>
           <DateRangeFilter/>
+          <span style={{width:'100%',font:'10px monospace',color:'#7E8DB5',textAlign:'right'}}>
+            {range.start} → {range.end} · {goals.length} goal{goals.length!==1?'s':''}
+          </span>
         </div>
         {/* Table header */}
         <div style={{display:'grid',gridTemplateColumns:recGridCols,paddingBottom:9,borderBottom:'1px solid rgba(255,255,255,.08)'}}>
@@ -4241,22 +4991,32 @@ function RecruitingTab({ setModalAgent }) {
           <span style={hdr9}>Notes</span>
         </div>
         {/* Rows */}
-        {REC_ROWS.map((r,i)=>{
-          const mid=pBar(r.midA,r.midT); const end=pBar(r.endA,r.endT);
+        {goalsPending ? (
+          <div style={{textAlign:'center',padding:32,color:'#7E8DB5',font:'12px Inter,sans-serif'}}>
+            Recruiter tables not yet created in the SMT DB (recruiters.goals / recruiters.activities).
+          </div>
+        ) : goalsLoading ? (
+          <div style={{textAlign:'center',padding:32,color:'#7E8DB5',font:'12px Inter,sans-serif'}}>Loading…</div>
+        ) : goals.length===0 ? (
+          <div style={{textAlign:'center',padding:32,color:'#7E8DB5',font:'12px Inter,sans-serif'}}>No goals found for this period.</div>
+        ) : goals.map((g,i)=>{
+          const midA=Number(g.mid_actual)||0, midT=Number(g.mid_week_target)||0;
+          const endA=Number(g.end_actual)||0, endT=Number(g.weekly_target)||0;
+          const mid=pBar(midA,midT); const end=pBar(endA,endT);
           return (
-            <div key={i} style={{display:'grid',gridTemplateColumns:recGridCols,alignItems:'center',
+            <div key={g.id||i} style={{display:'grid',gridTemplateColumns:recGridCols,alignItems:'center',
               padding:'11px 0',borderBottom:'1px solid rgba(255,255,255,.05)'}}>
-              <span style={{font:'600 12px Inter,sans-serif',color:'#fff'}}>{r.name}</span>
-              <span style={{font:'12px Inter,sans-serif',color:'#9FB0D8'}}>{r.role}</span>
-              <span style={{font:'12px Inter,sans-serif',color:'#9FB0D8'}}>{r.client}</span>
+              <span style={{font:'600 12px Inter,sans-serif',color:'#fff'}}>{g.recruiter_name}</span>
+              <span style={{font:'12px Inter,sans-serif',color:'#9FB0D8'}}>{g.role}</span>
+              <span style={{font:'12px Inter,sans-serif',color:'#9FB0D8'}}>{g.client}</span>
               <span>
                 <span style={{font:'700 9px Inter,sans-serif',textTransform:'uppercase',padding:'3px 8px',
-                  borderRadius:6,background:STAGE_MID.bg,color:STAGE_MID.color}}>{r.midStage}</span>
+                  borderRadius:6,background:STAGE_MID.bg,color:STAGE_MID.color}}>{g.mid_week_stage||'—'}</span>
               </span>
-              <span style={{textAlign:'center'}}>
+              <span style={{textAlign:'center',cursor:'pointer'}} onClick={()=>openRecDrill(g,'mid')}>
                 <div style={{font:'12px monospace',color:mid.col}}>
-                  <strong style={{font:'800 13px Inter,sans-serif'}}>{r.midA}</strong>{' '}
-                  <span style={{color:'#7E8DB5'}}>/ {r.midT}</span>
+                  <strong style={{font:'800 13px Inter,sans-serif'}}>{midA}</strong>{' '}
+                  <span style={{color:'#7E8DB5'}}>/ {midT}</span>
                 </div>
                 <div style={{height:4,background:'rgba(255,255,255,.06)',borderRadius:2,overflow:'hidden',margin:'3px auto 0',maxWidth:60}}>
                   <div style={{height:'100%',width:`${mid.pct}%`,background:mid.col}}/>
@@ -4265,19 +5025,19 @@ function RecruitingTab({ setModalAgent }) {
               </span>
               <span>
                 <span style={{font:'700 9px Inter,sans-serif',textTransform:'uppercase',padding:'3px 8px',
-                  borderRadius:6,background:STAGE_END.bg,color:STAGE_END.color}}>{r.endStage}</span>
+                  borderRadius:6,background:STAGE_END.bg,color:STAGE_END.color}}>{g.end_week_stage||'—'}</span>
               </span>
-              <span style={{textAlign:'center'}}>
+              <span style={{textAlign:'center',cursor:'pointer'}} onClick={()=>openRecDrill(g,'end')}>
                 <div style={{font:'12px monospace',color:end.col}}>
-                  <strong style={{font:'800 13px Inter,sans-serif'}}>{r.endA}</strong>{' '}
-                  <span style={{color:'#7E8DB5'}}>/ {r.endT}</span>
+                  <strong style={{font:'800 13px Inter,sans-serif'}}>{endA}</strong>{' '}
+                  <span style={{color:'#7E8DB5'}}>/ {endT}</span>
                 </div>
                 <div style={{height:4,background:'rgba(255,255,255,.06)',borderRadius:2,overflow:'hidden',margin:'3px auto 0',maxWidth:60}}>
                   <div style={{height:'100%',width:`${end.pct}%`,background:end.col}}/>
                 </div>
                 <div style={{font:'9px Inter,sans-serif',color:'#7E8DB5',marginTop:2}}>{end.pct}%</div>
               </span>
-              <span style={{font:'11px Inter,sans-serif',color:r.noteColor}}>{r.note}</span>
+              <span style={{font:'11px Inter,sans-serif',color:'#7E8DB5'}}>{g.notes||''}</span>
             </div>
           );
         })}
@@ -4292,6 +5052,48 @@ function RecruitingTab({ setModalAgent }) {
           ))}
         </div>
       </div>
+
+      {addCampOpen && (
+        <div style={{position:'fixed',inset:0,zIndex:9999,background:'rgba(0,0,0,.75)',backdropFilter:'blur(6px)',display:'flex',alignItems:'center',justifyContent:'center',padding:16}}
+          onClick={e=>e.target===e.currentTarget&&setAddCampOpen(false)}>
+          <div style={{background:'#0B1642',border:'1px solid rgba(255,255,255,.1)',borderRadius:16,width:'95vw',maxWidth:480,maxHeight:'90vh',overflowY:'auto'}}>
+            <div style={{padding:'18px 22px',borderBottom:'1px solid rgba(255,255,255,.08)',display:'flex',alignItems:'center',gap:12}}>
+              <div style={{flex:1,font:'700 14px Inter,sans-serif',color:'#EAF0FF'}}>Add Recruiting Campaign</div>
+              <span onClick={()=>setAddCampOpen(false)} style={{width:28,height:28,display:'flex',alignItems:'center',justifyContent:'center',borderRadius:'50%',border:'1px solid rgba(255,255,255,.12)',color:'#7E8DB5',cursor:'pointer'}}>×</span>
+            </div>
+            <div style={{padding:'20px 22px',display:'flex',flexDirection:'column',gap:14}}>
+              {[
+                ['campaign_name','Campaign name *','text'],
+                ['recruiter_name','Recruiter *','text'],
+                ['account_used','Account used','text'],
+                ['date','Date','date'],
+                ['cr_sent','CR sent','number'],
+                ['email_sent','Email sent','number'],
+                ['inmail_sent','InMail / LinkedIn msgs sent','number'],
+              ].map(([key,label,type])=>(
+                <div key={key} style={{display:'flex',flexDirection:'column',gap:5}}>
+                  <label style={{font:'600 10px Inter,sans-serif',letterSpacing:'.06em',textTransform:'uppercase',color:'#7E8DB5'}}>{label}</label>
+                  {key==='recruiter_name' ? (
+                    <input list="rec-camp-names" value={campForm[key]} onChange={e=>setCampForm({...campForm,[key]:e.target.value})}
+                      style={{background:'rgba(255,255,255,.04)',border:'1px solid rgba(255,255,255,.1)',borderRadius:8,color:'#EAF0FF',font:'13px Inter,sans-serif',padding:'9px 12px',outline:'none'}}/>
+                  ) : (
+                    <input type={type} value={campForm[key]} onChange={e=>setCampForm({...campForm,[key]:e.target.value})}
+                      style={{background:'rgba(255,255,255,.04)',border:'1px solid rgba(255,255,255,.1)',borderRadius:8,color:'#EAF0FF',font:'13px Inter,sans-serif',padding:'9px 12px',outline:'none'}}/>
+                  )}
+                </div>
+              ))}
+              <datalist id="rec-camp-names">{recNames.map(n=><option key={n} value={n}/>)}</datalist>
+              {addCampErr && <div style={{font:'12px Inter,sans-serif',color:'#F2667A'}}>{addCampErr}</div>}
+            </div>
+            <div style={{padding:'14px 22px',borderTop:'1px solid rgba(255,255,255,.08)',display:'flex',justifyContent:'flex-end',gap:10}}>
+              <span onClick={()=>setAddCampOpen(false)} style={{font:'700 11px Inter,sans-serif',color:'#7E8DB5',padding:'8px 16px',borderRadius:8,border:'1px solid rgba(255,255,255,.12)',cursor:'pointer'}}>Cancel</span>
+              <span onClick={addCampSaving?undefined:submitCamp} style={{font:'700 11px Inter,sans-serif',color:'#fff',padding:'8px 18px',borderRadius:8,cursor:addCampSaving?'default':'pointer',opacity:addCampSaving?.6:1,background:'linear-gradient(135deg,#4446DB,#003BDF)'}}>
+                {addCampSaving?'Saving…':'Save campaign'}
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Recruiting Campaigns header */}
       <div style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',gap:16,flexWrap:'wrap',marginBottom:16}}>
@@ -4312,15 +5114,20 @@ function RecruitingTab({ setModalAgent }) {
             })}
           </div>
           <DateRangeFilter/>
+          <span onClick={()=>{setCampForm(BLANK_CAMP_FORM);setAddCampErr('');setAddCampOpen(true);}} style={{
+            display:'inline-flex',alignItems:'center',gap:7,font:'700 11px Inter,sans-serif',color:'#fff',
+            padding:'8px 16px',borderRadius:10,cursor:'pointer',background:'linear-gradient(135deg,#4446DB,#003BDF)'}}>
+            + Add Campaign
+          </span>
         </div>
       </div>
 
       {/* Summary stat cards */}
       <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:14,marginBottom:16}}>
         {[
-          {title:'Total CR Sent',   val:'1,284',color:'#06E5EC',grad:'linear-gradient(135deg,rgba(0,59,223,.18),rgba(6,229,236,.08))',border:'rgba(6,229,236,.2)'},
-          {title:'Total Emails Sent',val:'3,910',color:'#4D8DFF',grad:'linear-gradient(135deg,rgba(77,141,255,.16),rgba(77,141,255,.05))',border:'rgba(77,141,255,.2)'},
-          {title:'Total InMail / LinkedIn',val:'742',color:'#A5B4FC',grad:'linear-gradient(135deg,rgba(129,140,248,.18),rgba(129,140,248,.05))',border:'rgba(129,140,248,.22)'},
+          {title:'Total CR Sent',   val:campTotals.cr.toLocaleString(),    color:'#06E5EC',grad:'linear-gradient(135deg,rgba(0,59,223,.18),rgba(6,229,236,.08))',border:'rgba(6,229,236,.2)'},
+          {title:'Total Emails Sent',val:campTotals.email.toLocaleString(),color:'#4D8DFF',grad:'linear-gradient(135deg,rgba(77,141,255,.16),rgba(77,141,255,.05))',border:'rgba(77,141,255,.2)'},
+          {title:'Total InMail / LinkedIn',val:campTotals.inmail.toLocaleString(),color:'#A5B4FC',grad:'linear-gradient(135deg,rgba(129,140,248,.18),rgba(129,140,248,.05))',border:'rgba(129,140,248,.22)'},
         ].map((c,i)=>(
           <div key={i} style={{background:c.grad,border:`1px solid ${c.border}`,borderRadius:12,padding:'18px 20px'}}>
             <div style={{font:'600 11px Inter,sans-serif',letterSpacing:'.04em',color:'#9FB0D8'}}>{c.title}</div>
@@ -4335,32 +5142,44 @@ function RecruitingTab({ setModalAgent }) {
           <span style={{flex:1,minWidth:200,display:'flex',alignItems:'center',gap:9,padding:'9px 13px',
             border:'1px solid rgba(255,255,255,.12)',borderRadius:10,color:'#7E8DB5',font:'13px Inter,sans-serif'}}>
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
-            Search by campaign or recruiter...
+            <input value={campSearch} onChange={e=>setCampSearch(e.target.value)} placeholder="Search by campaign or recruiter..."
+              style={{flex:1,background:'transparent',border:'none',outline:'none',color:'#EAF0FF',font:'13px Inter,sans-serif'}}/>
           </span>
-          <span style={{display:'inline-flex',alignItems:'center',gap:10,font:'600 12px Inter,sans-serif',
+          <select value={campSelRec} onChange={e=>setCampSelRec(e.target.value)} style={{
+            display:'inline-flex',alignItems:'center',gap:10,font:'600 12px Inter,sans-serif',
             color:'#EAF0FF',padding:'9px 14px',border:'1px solid rgba(255,255,255,.12)',borderRadius:10,
             background:'rgba(255,255,255,.04)',minWidth:170,cursor:'pointer'}}>
-            All Recruiters <span style={{marginLeft:'auto',color:'#7E8DB5'}}>▾</span>
-          </span>
+            <option value="All">All Recruiters</option>
+            {recNames.map(n=><option key={n} value={n}>{n}</option>)}
+          </select>
+          <span onClick={loadCamps} style={{width:32,height:32,display:'flex',alignItems:'center',justifyContent:'center',
+            border:'1px solid rgba(255,255,255,.12)',borderRadius:8,color:'#7E8DB5',fontSize:13,cursor:'pointer'}}>↻</span>
         </div>
         {/* Header */}
         <div style={{display:'grid',gridTemplateColumns:REC_CAMP_COLS,paddingBottom:10,borderBottom:'1px solid rgba(255,255,255,.08)'}}>
-          {['Date','Campaign','Account','Recruiter','CR','Email','InMail','Actions'].map((h,i)=>(
+          {['Campaign Name','Recruiter','Account Used','Date','CR Sent','Email Sent','LinkedIn InMails/ Msgs Sent'].map((h,i)=>(
             <span key={h} style={{font:'600 9px Inter,sans-serif',letterSpacing:'.06em',textTransform:'uppercase',
-              color:'#7E8DB5',textAlign:i>=4?'right':'left'}}>{h}</span>
+              color:'#7E8DB5',textAlign:i>=3?'right':'left'}}>{h}</span>
           ))}
         </div>
-        {REC_CAMPS.map((r,i)=>(
-          <div key={i} style={{display:'grid',gridTemplateColumns:REC_CAMP_COLS,alignItems:'center',
-            padding:'12px 0',borderBottom:i<REC_CAMPS.length-1?'1px solid rgba(255,255,255,.05)':'none'}}>
-            <span style={{font:'11px monospace',color:'#9FB0D8'}}>{r.date}</span>
-            <span style={{font:'600 12px Inter,sans-serif',color:'#EAF0FF'}}>{r.campaign}</span>
-            <span style={{font:'12px Inter,sans-serif',color:'#9FB0D8'}}>{r.account}</span>
-            <span style={{font:'12px Inter,sans-serif',color:r.recColor}}>{r.rec}</span>
-            <span style={{font:'12px monospace',color:'#06E5EC',textAlign:'right'}}>{r.cr}</span>
-            <span style={{font:'12px monospace',color:'#4D8DFF',textAlign:'right'}}>{r.email}</span>
-            <span style={{font:'12px monospace',color:'#A5B4FC',textAlign:'right'}}>{r.inmail}</span>
-            <span style={{textAlign:'right',font:'13px Inter,sans-serif',color:'#7E8DB5',cursor:'pointer'}}>✎ ⨯</span>
+        {campsPending ? (
+          <div style={{textAlign:'center',padding:32,color:'#7E8DB5',font:'12px Inter,sans-serif'}}>
+            recruiters.campaigns table not found in the SMT DB.
+          </div>
+        ) : campsLoading ? (
+          <div style={{textAlign:'center',padding:32,color:'#7E8DB5',font:'12px Inter,sans-serif'}}>Loading…</div>
+        ) : filteredCamps.length===0 ? (
+          <div style={{textAlign:'center',padding:32,color:'#7E8DB5',font:'12px Inter,sans-serif'}}>No campaigns found for this period.</div>
+        ) : filteredCamps.map((r,i)=>(
+          <div key={r.id||i} style={{display:'grid',gridTemplateColumns:REC_CAMP_COLS,alignItems:'center',
+            padding:'12px 0',borderBottom:i<filteredCamps.length-1?'1px solid rgba(255,255,255,.05)':'none'}}>
+            <span style={{font:'600 12px Inter,sans-serif',color:'#EAF0FF'}}>{r.campaign_name}</span>
+            <span style={{font:'12px Inter,sans-serif',color:'#9FB0D8'}}>{r.recruiter_name}</span>
+            <span style={{font:'12px Inter,sans-serif',color:'#9FB0D8'}}>{r.account_used||'—'}</span>
+            <span style={{font:'11px monospace',color:'#7E8DB5',textAlign:'right'}}>{r.date?new Date(r.date).toLocaleDateString('en-US',{month:'short',day:'numeric'}):'—'}</span>
+            <span style={{font:'12px monospace',color:'#06E5EC',textAlign:'right'}}>{r.cr_sent||0}</span>
+            <span style={{font:'12px monospace',color:'#4D8DFF',textAlign:'right'}}>{r.email_sent||0}</span>
+            <span style={{font:'12px monospace',color:'#A5B4FC',textAlign:'right'}}>{r.inmail_sent||0}</span>
           </div>
         ))}
       </div>
@@ -4384,92 +5203,8 @@ function RecruitingTab({ setModalAgent }) {
         ))}
       </div>
 
-      {/* Role brief */}
-      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:12}}>
-        <div className="cc-sect-label-purple" style={{marginBottom:0}}>Role brief</div>
-        <div style={{display:'flex',gap:8}}>
-          {['✎ Edit','⠿ Reorder','⎙ Print'].map(b=>(
-            <span key={b} style={{font:'600 10px Inter,sans-serif',color:'#9FB0D8',padding:'5px 11px',
-              border:'1px solid rgba(255,255,255,.12)',borderRadius:8,cursor:'pointer'}}>{b}</span>
-          ))}
-        </div>
-      </div>
-      <div style={{background:'rgba(255,255,255,.03)',borderTop:'3px solid #818CF8',border:'1px solid rgba(255,255,255,.08)',borderRadius:12,padding:22}}>
-        <div style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',marginBottom:20,flexWrap:'wrap',gap:12}}>
-          <div>
-            <div style={{font:'700 18px Inter,sans-serif',color:'#fff'}}>CET Designer / Space Planning Specialist</div>
-            <div style={{font:'12px Inter,sans-serif',color:'#9FB0D8',marginTop:3}}>Open req · Steelcase · Sarah M. · 6 submitted of 8 target</div>
-          </div>
-          <span style={{font:'700 10px Inter,sans-serif',padding:'4px 11px',borderRadius:20,
-            background:'rgba(129,140,248,.16)',color:'#A5B4FC',textTransform:'uppercase',letterSpacing:'.04em'}}>
-            Priority req
-          </span>
-        </div>
-        <div style={{font:'600 10px Inter,sans-serif',letterSpacing:'.1em',textTransform:'uppercase',color:'#7E8DB5',marginBottom:10}}>Ideal candidate profile</div>
-        <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:10,marginBottom:20}}>
-          {[['Core skills','CET · 20-20 · AutoCAD'],['Experience','3 - 5 years'],['Location','US · Remote'],
-            ['Comp range','$65K - $85K'],['Engagement','Full-time · Managed'],['Start','Within 30 days']].map(([l,v])=>(
-            <div key={l} style={{background:'rgba(255,255,255,.03)',borderRadius:8,padding:11}}>
-              <div style={{font:'600 9px Inter,sans-serif',letterSpacing:'.05em',textTransform:'uppercase',color:'#7E8DB5'}}>{l}</div>
-              <div style={{font:'600 12px Inter,sans-serif',color:'#EAF0FF',marginTop:3}}>{v}</div>
-            </div>
-          ))}
-        </div>
-        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:20,marginBottom:20}}>
-          <div>
-            <div style={{font:'600 10px Inter,sans-serif',letterSpacing:'.1em',textTransform:'uppercase',color:'#7E8DB5',marginBottom:10}}>Must-have qualifications</div>
-            <div style={{font:'13px/2 Inter,sans-serif',color:'#cdd6ee'}}>
-              • Hands-on CET Designer / 20-20 <span style={{color:'#7E8DB5'}}>(required)</span><br/>
-              • Commercial furniture / dealer experience<br/>
-              • Space planning &amp; rendering portfolio<br/>
-              • English fluency · client-facing<br/>
-              • Available US business hours
-            </div>
-          </div>
-          <div>
-            <div style={{font:'600 10px Inter,sans-serif',letterSpacing:'.1em',textTransform:'uppercase',color:'#7E8DB5',marginBottom:10}}>Sourcing channels</div>
-            <div style={{font:'13px/1.7 Inter,sans-serif',color:'#cdd6ee'}}>
-              → LinkedIn Recruiter: "CET Designer", "20-20"<br/>
-              → Apollo: skills = CET, space planning<br/>
-              → Internal referral network<br/>
-              → Niche AEC / interiors job boards
-            </div>
-          </div>
-        </div>
-        <div style={{background:'rgba(129,140,248,.08)',borderLeft:'3px solid rgba(129,140,248,.6)',
-          borderRadius:'0 8px 8px 0',padding:'13px 15px',marginBottom:12,font:'13px/1.6 Inter,sans-serif',color:'#cdd6ee'}}>
-          <strong style={{color:'#fff'}}>Candidate pitch.</strong>{' '}
-          Stable, fully-managed engagement with a US dealer - consistent CET / space-planning work, modern tooling, and a team that invests in your growth. No agency churn.
-        </div>
-        <div style={{background:'rgba(0,59,223,.1)',borderLeft:'3px solid rgba(77,141,255,.6)',
-          borderRadius:'0 8px 8px 0',padding:'13px 15px',marginBottom:20,font:'13px/1.6 Inter,sans-serif',color:'#cdd6ee'}}>
-          <strong style={{color:'#fff'}}>Why Bold Business.</strong>{' '}
-          We place specialists into long-term embedded roles - not one-off contracts - with managed support, fair comp, and real career progression.
-        </div>
-        <div style={{font:'600 10px Inter,sans-serif',letterSpacing:'.1em',textTransform:'uppercase',color:'#7E8DB5',marginBottom:12}}>4-touch candidate outreach</div>
-        <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:10}}>
-          {[
-            {n:'1',title:'LinkedIn InMail',   meta:'Day 1',                color:'#818CF8',body:"Personalized note on their CET / 20-20 work."},
-            {n:'2',title:'Email follow-up',   meta:'Day 3 · role one-pager',color:'#5AC8FA',body:'Share comp range, engagement model, team.'},
-            {n:'3',title:'Screening call',    meta:'Day 5 · 20 min',        color:'#2DD4BF',body:'Skills, availability, portfolio walkthrough.'},
-            {n:'4',title:'Submit to client',  meta:'Day 7 · with notes',    color:'#F5B945',body:'Package profile + screen notes to Steelcase.'},
-          ].map((s,i)=>(
-            <div key={i} style={{background:'rgba(255,255,255,.03)',borderRadius:8,padding:13}}>
-              <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:8}}>
-                <span style={{width:22,height:22,borderRadius:'50%',background:s.color,color:'#0a0f22',
-                  display:'flex',alignItems:'center',justifyContent:'center',font:'800 11px Inter,sans-serif',flexShrink:0}}>
-                  {s.n}
-                </span>
-                <div>
-                  <div style={{font:'700 11px Inter,sans-serif',color:'#fff'}}>{s.title}</div>
-                  <div style={{font:'9px Inter,sans-serif',color:'#7E8DB5'}}>{s.meta}</div>
-                </div>
-              </div>
-              <div style={{font:'11px/1.5 Inter,sans-serif',color:'#9FB0D8'}}>{s.body}</div>
-            </div>
-          ))}
-        </div>
-      </div>
+      {/* Campaign Brief (Recruiting) */}
+      <RecruitingCampaignBriefSection/>
     </div>
   );
 }
