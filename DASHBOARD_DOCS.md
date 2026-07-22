@@ -59,7 +59,7 @@ Google SSO via `@boldbusiness.com` account. Token returned as a session token st
 | `pgPool` | BB Agents RDS (us-east-2) | `laura` (local EC2) | Activities, tasks, cost snapshots, chat sessions |
 | `bbPool` | `bb-agents-shared-db.cpsqyxgezuwr.us-east-2.rds.amazonaws.com` | `bb_agents` | Multi-agent shared DB (Laura, Darren, Zara, Camilla tasks + activities) |
 | `smtPool` | `smt-db.c5vzhv0mqgjy.us-east-1.rds.amazonaws.com` | `smt_db` | Recruiter goals, activities (read-only) |
-| `smtAdminPool` | same smt-db host | `smt_db` | Sales campaigns, briefs, call records, user tasks (full write access) |
+| `smtAdminPool` | same smt-db host | `smt_db` | Sales campaigns, briefs, call records, user tasks (full write access). **`sales.dashboard_campaigns` is also written to directly by `smt-api`'s own scheduled Skylead sync — see §9 point 8 before assuming this app's code is the only writer.** |
 
 ### 3.2 External APIs
 
@@ -67,7 +67,7 @@ Google SSO via `@boldbusiness.com` account. Token returned as a session token st
 |---|---|---|
 | **Skylead** | LinkedIn outreach stats sync | Hardcoded in server.js: `ad7f28c6-58f1-4312-a133-10e34cc1b4b4` |
 | **HubSpot** | Follow-up CRM data | `HUBSPOT_TOKEN` env var · Portal ID: `40970945` |
-| **Anthropic Admin API** | Cost tracking / usage reports | `ANTHROPIC_ADMIN_API_KEY` in `/var/www/laura-dashboard/api-server/.env` |
+| **Anthropic Admin API** | Cost tracking / usage reports | `ANTHROPIC_ADMIN_API_KEY` in `/var/www/laura-dashboard/api/.env` |
 | **Google Sheets** | Contact data sync (CET, Estimators, BIM, SC/PM tabs) | `gog` CLI · account: `lpetersen@boldbusiness.com` |
 | **Google OAuth** | User authentication | `GOOGLE_CLIENT_ID` env var |
 
@@ -75,7 +75,7 @@ Google SSO via `@boldbusiness.com` account. Token returned as a session token st
 
 | Table | Database | Purpose |
 |---|---|---|
-| `sales.dashboard_campaigns` | smt_db | Skylead campaign stats (synced automatically) + manually-added sandbox campaigns (negative IDs) |
+| `sales.dashboard_campaigns` | smt_db | Skylead campaign stats (synced automatically) + manually-added sandbox campaigns (`is_manual = true`, `campaign_id` ≥ 1,000,000,000) — shared with `smt-api`, see §9 |
 | `sales.campaign_briefs` | smt_db | Campaign brief planning content (ICP, personas, hook, value prop, sequence steps) |
 | `sales.dashboard_call_records` | smt_db | Call logs tied to campaigns |
 | `sales.dashboard_skylead_ids` | smt_db | SDR account ID → name mapping (Skylead accounts) |
@@ -105,7 +105,7 @@ Every section is listed below with exactly where it pulls its data from.
 | **SDR performance table** | `GET /api/skylead/sdr-summary` | `smt_db → sales.dashboard_campaigns` JOIN `sales.dashboard_skylead_ids` |
 | **Meetings breakdown** | `GET /api/skylead/meetings-breakdown` | `smt_db → sales.dashboard_campaigns` + `sales.dashboard_call_records` |
 | **HubSpot follow-ups** | `GET /api/hubspot/followups` | HubSpot CRM API (live, not cached in DB) |
-| **Campaign performance sandbox** | `GET /api/skylead/sandbox` | `smt_db → sales.dashboard_campaigns` (Skylead positive IDs) + manually-added (negative IDs) JOIN `sales.dashboard_skylead_ids` + `sales.dashboard_call_records` |
+| **Campaign performance sandbox** | `GET /api/skylead/sandbox` | `smt_db → sales.dashboard_campaigns` (Skylead rows + manually-added rows, distinguished by `is_manual`) JOIN `sales.dashboard_skylead_ids` + `sales.dashboard_call_records` |
 | **Campaign briefs** | `GET /api/campaign-briefs` | `smt_db → sales.campaign_briefs` (dedicated table — separate from performance data) |
 | **Task list** | `GET /api/user-tasks` | `smt_db → users.user_tasks` JOIN `users.users` (scoped to logged-in user email) |
 
@@ -351,8 +351,11 @@ Body: {
   "emails_sent": 150,                       // optional
   "created_at": "2026-07-10"               // optional, defaults to today
 }
-→ { campaign_id: -1, campaign_name: "...", ... }
+→ { campaign_id: 1000000010, campaign_name: "...", is_manual: true, ... }
 ```
+Manual campaigns get a `campaign_id` from `sales.manual_campaign_id_seq` (starts at 1,000,000,000 —
+well above any real Skylead ID, which stays in the ~300k–450k range) and are flagged `is_manual =
+true`. See §9 and §10 below — this is enforced at the database level, not just by convention.
 
 **SDR Account IDs:**
 | SDR | account_id |
@@ -921,12 +924,13 @@ They need:
 ## 9. Notes for Agent Developers
 
 1. **Always use `x-agent-secret` header** — never try to simulate a Google login
-2. **Campaign performance data is read-only** — Skylead syncs it automatically; you can only ADD manual campaigns (negative IDs), not overwrite Skylead data
+2. **Campaign performance data is read-only** — Skylead syncs it automatically (both from this app's own `POST /api/skylead/trigger-sync` and from `smt-api`'s scheduled sync — see §10); you can only ADD manual campaigns, not overwrite Skylead data
 3. **Campaign briefs are fully editable** — they live in `sales.campaign_briefs`, completely separate from performance data
 4. **Task list is per-user** — the API resolves `user_id` from the session email; agent-created tasks will be owned by the agent session user
 5. **Activity logging is mandatory** — after any meaningful action, POST to `/api/activities` so it shows in the dashboard feed
 6. **Soft deletes on briefs** — deleted briefs set `is_deleted = true`, they don't actually disappear from the DB
-7. **Negative campaign IDs** — manually-added sandbox campaigns always get negative `campaign_id` values; Skylead campaigns always have positive IDs
+7. **Manual campaigns are identified by `is_manual = true` and a `campaign_id` from `sales.manual_campaign_id_seq`** (starts at 1,000,000,000 — well above any real Skylead ID, which stays in the ~300k–450k range). *(Correction, 2026-07: earlier revisions of this doc said manual campaigns get a negative `campaign_id` — that was never true of the live schema and caused real confusion when a separate service, `smt-api`, keyed off that assumption. Always check `is_manual`, not the sign of the ID.)*
+8. **Manual campaigns are protected at the database level, not just by app code** — a `BEFORE DELETE` trigger (`trg_protect_manual_campaigns`) on `sales.dashboard_campaigns` rejects deleting any `is_manual = true` row unless the deleting transaction explicitly sets `SET LOCAL app.allow_manual_campaign_delete = 'true'` first. Only this app's own `DELETE /api/sales-dashboard/campaigns/:id` sets that flag. This exists because `sales.dashboard_campaigns` is a table shared with `smt-api`, whose own Skylead-sync job was unconditionally wiping and re-inserting every campaign row per account (including manually-added ones) on every scheduled run — see `docs/ARCHITECTURE.md` for the full incident writeup.
 
 ---
 
@@ -950,9 +954,13 @@ psql "host=bb-agents-shared-db.cpsqyxgezuwr.us-east-2.rds.amazonaws.com port=543
 
 ### Key schemas and tables to know
 ```sql
--- Campaign performance (Skylead sync + manual adds)
-SELECT * FROM sales.dashboard_campaigns WHERE campaign_id < 0;  -- manual only
-SELECT * FROM sales.dashboard_campaigns WHERE campaign_id > 0;  -- Skylead only
+-- Campaign performance (Skylead sync + manual adds) — shared with smt-api, see §9 point 8
+SELECT * FROM sales.dashboard_campaigns WHERE is_manual = true;   -- manual only
+SELECT * FROM sales.dashboard_campaigns WHERE is_manual IS NOT TRUE;  -- Skylead only
+
+-- Who deleted a manual campaign, and when (populated by our DELETE endpoint only —
+-- a delete rejected by trg_protect_manual_campaigns never reaches this table)
+SELECT * FROM sales.dashboard_campaigns_audit ORDER BY deleted_at DESC LIMIT 20;
 
 -- Campaign briefs (planning content)
 SELECT id, title, assignee, sort_order FROM sales.campaign_briefs WHERE is_deleted = false;

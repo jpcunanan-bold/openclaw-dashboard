@@ -256,7 +256,7 @@ Token usage is on individual message objects within the `messages` array, not on
 |---------|-------|-----|
 | Plugin not loading | Not in `openclaw.json` | Add to `plugins.entries` + `load.paths` |
 | "plugins.allow is empty" warning | No allowlist configured | Safe to ignore, or set `plugins.allow: ["laura-tracker"]` |
-| Messages not captured | API server down | Check `systemctl --user status laura-api-server` |
+| Messages not captured | API server down | Check `sudo systemctl status laura-dashboard-api` |
 | session_key is "unknown" | Event shape changed | Enable DEBUG, check logs, update field mapping |
 | Tokens showing as 0 | Usage not on expected path | Enable DEBUG, check `agent_end.messages[*].usage` |
 | Content has thinking blocks | extractText() not filtering | Check content block types |
