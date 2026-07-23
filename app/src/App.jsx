@@ -178,6 +178,20 @@ function AuthenticatedApp() {
   // Recruiting tab routes to whichever agent is selected (zara or camilla)
   const effectiveTopTab = topTab === 'recruiting' ? recruitingSub : topTab;
   const ctx = getActiveContext(effectiveTopTab, lauraSub, darrenSub, zaraSub, camillaSub, overviewSub);
+  const chatDashboardScope = ['recruiting', 'zara', 'camilla'].includes(topTab)
+    ? 'Recruiting Dashboard'
+    : topTab === 'overview'
+      ? 'Command Center Dashboard'
+      : 'Sales Dashboard';
+  const chatAgentForTab =
+    topTab === 'recruiting' ? recruitingSub :
+    topTab === 'darren'  ? 'darren'  :
+    topTab === 'zara'    ? 'zara'    :
+    topTab === 'camilla' ? 'camilla' :
+    topTab === 'lola'    ? 'lola'    :
+    topTab === 'ava'     ? 'ava'     :
+    topTab === 'brio'    ? 'brio'    :
+    topTab === 'overview'? 'overview': 'laura';
   const breadcrumb = topTab === 'recruiting'
     ? `Recruiting · ${recruitingSub === 'zara' ? 'Zara (Healthcare)' : 'Camilla (Finance)'}`
     : getBreadcrumb(topTab, lauraSub, darrenSub, zaraSub, camillaSub, overviewSub, lolaSub, avaSub, brioSub);
@@ -353,32 +367,16 @@ function AuthenticatedApp() {
       <FloatingChatButton
         onClick={() => setChatOpen(o => !o)}
         isOpen={chatOpen}
-        activeAgent={
-          topTab === 'darren'  ? 'darren'  :
-          topTab === 'zara'    ? 'zara'    :
-          topTab === 'camilla' ? 'camilla' :
-          topTab === 'lola'    ? 'lola'    :
-          topTab === 'ava'     ? 'ava'     :
-          topTab === 'brio'    ? 'brio'    :
-          topTab === 'overview'? 'overview': 'laura'
-        }
+        activeAgent={chatAgentForTab}
       />
 
       {/* AgentChat — always mounted so state is preserved */}
       <AgentChat
         taskRef={ctx.ref}
-        taskContext={`Viewing ${ctx.label} in the Sales Dashboard.`}
+        taskContext={`Viewing ${ctx.label} in the ${chatDashboardScope}.`}
         isOpen={chatOpen}
         onToggle={() => setChatOpen(o => !o)}
-        defaultAgent={
-          topTab === 'darren'  ? 'darren'  :
-          topTab === 'zara'    ? 'zara'    :
-          topTab === 'camilla' ? 'camilla' :
-          topTab === 'lola'    ? 'lola'    :
-          topTab === 'ava'     ? 'ava'     :
-          topTab === 'brio'    ? 'brio'    :
-          topTab === 'overview'? 'overview': 'laura'
-        }
+        defaultAgent={chatAgentForTab}
       />
     </div>
   );

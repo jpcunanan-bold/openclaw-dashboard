@@ -98,9 +98,11 @@ jobs:
           npm install --silent
           npm run build
 
-      - name: Copy build to web root
+      - name: Copy build to web roots
         run: |
           cp -r /var/www/laura-dashboard/app/dist/* /var/www/laura-dashboard/
+          mkdir -p /var/www/laura-dashboard/react-dashboard/dist
+          rsync -a --delete /var/www/laura-dashboard/app/dist/ /var/www/laura-dashboard/react-dashboard/dist/
 
       - name: Restart API
         # A backgrounded `nohup ... &` here gets killed by the runner's own post-job orphan-process

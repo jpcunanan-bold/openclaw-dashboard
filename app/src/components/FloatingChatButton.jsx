@@ -37,13 +37,13 @@ export default function FloatingChatButton({ onClick, unread = 0, activeAgent = 
       onClick={onClick}
       title={`Chat with ${label}`}
       style={{
-        position: 'fixed', bottom: 24, right: 24, zIndex: 8000,
-        width: 56, height: 56, borderRadius: '50%',
+        position: 'fixed', bottom: 20, right: 20, zIndex: 8000,
+        width: 68, height: 68, borderRadius: '50%',
         background: `radial-gradient(circle at 35% 35%, ${color}33, #0B0B1E 70%)`,
-        border: `2px solid ${color}70`,
+        border: `2.5px solid ${color}80`,
         boxShadow: isOpen
-          ? `0 0 0 4px ${color}25, 0 6px 28px ${color}60`
-          : `0 4px 20px ${color}40`,
+          ? `0 0 0 5px ${color}25, 0 8px 34px ${color}60`
+          : `0 6px 24px ${color}45`,
         cursor: 'pointer',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         padding: 0, overflow: 'hidden',
@@ -51,13 +51,13 @@ export default function FloatingChatButton({ onClick, unread = 0, activeAgent = 
       }}
       onMouseEnter={e => {
         e.currentTarget.style.transform = 'scale(1.08)';
-        e.currentTarget.style.boxShadow = `0 0 0 4px ${color}30, 0 8px 32px ${color}70`;
+        e.currentTarget.style.boxShadow = `0 0 0 5px ${color}30, 0 10px 38px ${color}70`;
       }}
       onMouseLeave={e => {
         e.currentTarget.style.transform = 'scale(1)';
         e.currentTarget.style.boxShadow = isOpen
-          ? `0 0 0 4px ${color}25, 0 6px 28px ${color}60`
-          : `0 4px 20px ${color}40`;
+          ? `0 0 0 5px ${color}25, 0 8px 34px ${color}60`
+          : `0 6px 24px ${color}45`;
       }}
     >
       {/* Agent avatar */}
@@ -70,7 +70,7 @@ export default function FloatingChatButton({ onClick, unread = 0, activeAgent = 
         />
       ) : (
         /* Fallback: colored initial */
-        <span style={{ fontSize: 20, fontWeight: 800, color, lineHeight: 1 }}>
+        <span style={{ fontSize: 24, fontWeight: 800, color, lineHeight: 1 }}>
           {label[0]}
         </span>
       )}
@@ -78,10 +78,10 @@ export default function FloatingChatButton({ onClick, unread = 0, activeAgent = 
       {/* Unread badge */}
       {unread > 0 && (
         <span style={{
-          position: 'absolute', top: 1, right: 1,
-          width: 18, height: 18, borderRadius: '50%',
+          position: 'absolute', top: 0, right: 0,
+          width: 22, height: 22, borderRadius: '50%',
           background: '#EF4444', border: '2px solid #0B0B1E',
-          fontSize: 9, fontWeight: 800, color: '#fff',
+          fontSize: 11, fontWeight: 800, color: '#fff',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           lineHeight: 1,
         }}>
@@ -92,7 +92,7 @@ export default function FloatingChatButton({ onClick, unread = 0, activeAgent = 
       {/* Pulse ring when open */}
       {isOpen && (
         <span style={{
-          position: 'absolute', inset: -4,
+          position: 'absolute', inset: -5,
           borderRadius: '50%',
           border: `2px solid ${color}50`,
           animation: 'pulse-ring 1.5s ease-out infinite',

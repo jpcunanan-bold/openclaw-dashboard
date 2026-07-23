@@ -265,6 +265,7 @@ const SEQUENCE = [
 ];
 
 const PERIODS=[{id:'today',label:'Today'},{id:'7d',label:'Last 7 days'},{id:'30d',label:'Last 30 days'},{id:'all',label:'All time'}];
+const RECRUITER_TRACKER_PERIODS=[{id:'today',label:'Today'},{id:'week',label:'This Week'},{id:'30d',label:'Last 30 days'},{id:'all',label:'All time'}];
 
 // ─── Task List Section ─────────────────────────────────────────────────────
 const STATUS_CFG={
@@ -402,7 +403,7 @@ function AssigneeMultiSelect({ users, selectedIds, onChange }) {
   );
 }
 
-function TaskListSection({authHeaders}){
+function TaskListSection({authHeaders, endpoint='/api/dashboard-tasks', labelClass='cc-sect-label'}){
   const [tasks,setTasks]=useState([]);
   const [loading,setLoading]=useState(true);
   const [filterStatus,setFilterStatus]=useState('all');
@@ -424,7 +425,7 @@ function TaskListSection({authHeaders}){
 
   const load=()=>{
     setLoading(true);
-    fetch('/api/dashboard-tasks',{headers:authHeaders()})
+    fetch(endpoint,{headers:authHeaders()})
       .then(r=>r.ok?r.json():null)
       .then(j=>{ if(j?.tasks) setTasks(j.tasks); })
       .catch(()=>{})
@@ -455,7 +456,7 @@ function TaskListSection({authHeaders}){
         assigned_to:form.assigned_to||[],
       };
       const isEdit=modal.mode==='edit';
-      const res=await fetch(isEdit?`/api/dashboard-tasks/${modal.task.id}`:'/api/dashboard-tasks',{
+      const res=await fetch(isEdit?`${endpoint}/${modal.task.id}`:endpoint,{
         method:isEdit?'PATCH':'POST',
         headers:{...authHeaders(),'Content-Type':'application/json'},
         body:JSON.stringify(body),
@@ -466,13 +467,13 @@ function TaskListSection({authHeaders}){
 
   const handleDelete=async(id)=>{
     if(!window.confirm('Delete this task?')) return;
-    await fetch(`/api/dashboard-tasks/${id}`,{method:'DELETE',headers:authHeaders()});
+    await fetch(`${endpoint}/${id}`,{method:'DELETE',headers:authHeaders()});
     setTasks(prev=>prev.filter(t=>t.id!==id));
   };
 
   const handleStatusToggle=async(task)=>{
     const next=task.status==='done'?'pending':'done';
-    await fetch(`/api/dashboard-tasks/${task.id}`,{
+    await fetch(`${endpoint}/${task.id}`,{
       method:'PATCH',
       headers:{...authHeaders(),'Content-Type':'application/json'},
       body:JSON.stringify({status:next}),
@@ -538,7 +539,7 @@ function TaskListSection({authHeaders}){
     <div style={{marginTop:32,marginBottom:32}}>
       {/* Header */}
       <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:14}}>
-        <div className="cc-sect-label" style={{marginBottom:0}}>Task list</div>
+        <div className={labelClass} style={{marginBottom:0}}>Task list</div>
         <div style={{display:'flex',alignItems:'center',gap:8}}>
           <div style={{position:'relative'}}>
             <svg style={{position:'absolute',left:9,top:'50%',transform:'translateY(-50%)',pointerEvents:'none'}} width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#7E8DB5" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
@@ -739,7 +740,12 @@ const LINK_TYPES = [
   { value: 'other',       label: 'Other',       icon: '🔗', color: '#8B7CF6' },
 ];
 
-function LibrarySection({ authHeaders }) {
+function LibrarySection({
+  authHeaders,
+  endpoint = '/api/library-links',
+  labelClass = 'cc-sect-label',
+  accentColor = '#06E5EC',
+}) {
   const [links, setLinks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [modal, setModal] = useState(null); // null | {mode:'add'} | {mode:'edit', link}
@@ -750,13 +756,13 @@ function LibrarySection({ authHeaders }) {
 
   const load = () => {
     setLoading(true);
-    fetch('/api/library-links', { headers: authHeaders() })
+    fetch(endpoint, { headers: authHeaders() })
       .then(r => r.ok ? r.json() : null)
       .then(j => { if (j?.links) setLinks(j.links); })
       .catch(() => {})
       .finally(() => setLoading(false));
   };
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, [endpoint]);
 
   const openAdd = () => { setForm(BLANK); setModal({ mode: 'add' }); };
   const openEdit = (l) => {
@@ -769,7 +775,7 @@ function LibrarySection({ authHeaders }) {
     try {
       const isEdit = modal.mode === 'edit';
       const res = await fetch(
-        isEdit ? `/api/library-links/${modal.link.id}` : '/api/library-links',
+        isEdit ? `${endpoint}/${modal.link.id}` : endpoint,
         {
           method: isEdit ? 'PATCH' : 'POST',
           headers: { ...authHeaders(), 'Content-Type': 'application/json' },
@@ -783,7 +789,7 @@ function LibrarySection({ authHeaders }) {
   const handleDelete = async (id) => {
     if (!window.confirm('Remove this link from the library?')) return;
     setDeleting(id);
-    await fetch(`/api/library-links/${id}`, { method: 'DELETE', headers: authHeaders() });
+    await fetch(`${endpoint}/${id}`, { method: 'DELETE', headers: authHeaders() });
     setLinks(prev => prev.filter(l => l.id !== id));
     setDeleting(null);
   };
@@ -808,11 +814,11 @@ function LibrarySection({ authHeaders }) {
     <div style={{ marginTop: 32, marginBottom: 32 }}>
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-        <div className="cc-sect-label" style={{ marginBottom: 0 }}>Library</div>
+        <div className={labelClass} style={{ marginBottom: 0 }}>Library</div>
         <button onClick={openAdd} style={{
           display: 'inline-flex', alignItems: 'center', gap: 6, height: 32, padding: '0 14px',
-          borderRadius: 8, border: '1px solid rgba(6,229,236,.4)', background: 'rgba(6,229,236,.08)',
-          color: '#06E5EC', font: '600 12px Inter,sans-serif', cursor: 'pointer',
+          borderRadius: 8, border: `1px solid ${accentColor}66`, background: `${accentColor}14`,
+          color: accentColor, font: '600 12px Inter,sans-serif', cursor: 'pointer',
         }}>
           <span style={{ fontSize: 16, lineHeight: 1 }}>+</span> Add Link
         </button>
@@ -1015,7 +1021,7 @@ function LibrarySection({ authHeaders }) {
                 }}>Cancel</button>
                 <button type="submit" disabled={saving} style={{
                   padding: '9px 24px', borderRadius: 8, border: 'none',
-                  background: saving ? 'rgba(6,229,236,.4)' : '#06E5EC',
+                  background: saving ? `${accentColor}66` : accentColor,
                   color: '#000814', font: '700 13px Inter,sans-serif', cursor: saving ? 'default' : 'pointer',
                 }}>{saving ? 'Saving...' : modal.mode === 'edit' ? 'Save Changes' : 'Add Link'}</button>
               </div>
@@ -1024,6 +1030,101 @@ function LibrarySection({ authHeaders }) {
         </div>
       )}
     </div>
+  );
+}
+
+const EMAIL_DOMAIN_COMPANIES = [
+  {
+    name: 'Mercury Z',
+    color: '#06E5EC',
+    bg: 'rgba(6,229,236,.08)',
+    border: 'rgba(6,229,236,.25)',
+    domains: [
+      { domain: 'mzintl.com', label: 'Mercury Z International' },
+      { domain: 'mzglobal.net', label: 'Mercury Z Global' },
+    ],
+  },
+  {
+    name: 'Bold Business',
+    color: '#8B7CF6',
+    bg: 'rgba(139,124,246,.08)',
+    border: 'rgba(139,124,246,.25)',
+    domains: [
+      { domain: 'boldbusiness.com', label: 'Bold Business' },
+      { domain: 'team.boldconnect.co', label: 'Bold Connect Team' },
+      { domain: 'boldbusinessglobal.com', label: 'Bold Business Global' },
+      { domain: 'contact.boldbusinessglobal.co', label: 'Bold Business Global Contact' },
+      { domain: 'boldbusinessglobal.co', label: 'Bold Business Global' },
+      { domain: 'sales.boldbusiness.co', label: 'Bold Business Sales' },
+      { domain: 'boldconnect.co', label: 'Bold Connect' },
+      { domain: 'contact.boldbusinessglobal.com', label: 'Bold Business Global Contact' },
+      { domain: 'contact.boldconnect.co', label: 'Bold Connect Contact' },
+      { domain: 'partners.boldbusinessglobal.co', label: 'Bold Business Global Partners' },
+      { domain: 'partners.boldbusinessglobal.com', label: 'Bold Business Global Partners' },
+      { domain: 'partners.boldconnect.co', label: 'Bold Connect Partners' },
+      { domain: 'team.boldbusinessglobal.co', label: 'Bold Business Global Team' },
+      { domain: 'team.boldbusinessglobal.com', label: 'Bold Business Global Team' },
+    ],
+  },
+];
+
+function EmailDomainsSection({ labelClass = 'cc-sect-label' }) {
+  const [openCo, setOpenCo] = useState(null);
+
+  return (
+    <>
+      <div className={labelClass} style={{ marginTop: 32 }}>Email sending domains</div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 14, marginBottom: 32 }}>
+        {EMAIL_DOMAIN_COMPANIES.map(co => {
+          const isOpen = openCo === co.name;
+          return (
+            <div key={co.name}
+              onClick={() => setOpenCo(isOpen ? null : co.name)}
+              style={{
+                background: isOpen ? co.bg : 'rgba(255,255,255,.03)',
+                border: `1px solid ${isOpen ? co.border : 'rgba(255,255,255,.08)'}`,
+                borderRadius: 12, padding: '18px 20px', position: 'relative', overflow: 'hidden',
+                cursor: 'pointer', transition: 'all .18s',
+              }}
+              onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-1px)'; e.currentTarget.style.boxShadow = `0 4px 20px ${co.color}22`; }}
+              onMouseLeave={e => { e.currentTarget.style.transform = ''; e.currentTarget.style.boxShadow = ''; }}
+            >
+              <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, background: co.color }} />
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div>
+                  <div style={{ font: '700 15px Inter,sans-serif', color: co.color, marginBottom: 4 }}>{co.name}</div>
+                  <div style={{ font: '11px Inter,sans-serif', color: '#7E8DB5' }}>{co.domains.length} domain{co.domains.length !== 1 ? 's' : ''}</div>
+                </div>
+                <span style={{
+                  color: '#7E8DB5', fontSize: 12, transition: 'transform .18s',
+                  display: 'inline-block', transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+                }}>▼</span>
+              </div>
+              {isOpen && (
+                <div style={{ marginTop: 14, display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  {co.domains.map(d => (
+                    <div key={d.domain} style={{
+                      background: 'rgba(255,255,255,.04)', borderRadius: 8,
+                      padding: '12px 14px', border: '1px solid rgba(255,255,255,.07)',
+                    }}>
+                      <div style={{
+                        font: '600 9px Inter,sans-serif', letterSpacing: '.1em',
+                        textTransform: 'uppercase', color: '#7E8DB5', marginBottom: 5,
+                      }}>{d.label}</div>
+                      <div style={{ font: '700 15px Inter,sans-serif', color: co.color, fontFamily: 'monospace' }}>{d.domain}</div>
+                      <div style={{ marginTop: 7, display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#2DD4BF', display: 'inline-block' }} />
+                        <span style={{ font: '11px Inter,sans-serif', color: '#2DD4BF' }}>Active</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </>
   );
 }
 
@@ -3948,93 +4049,31 @@ function SalesTab({modalAgent,setModalAgent}) {
       <LibrarySection authHeaders={authHeaders}/>
 
       {/* ── Email Domains ── */}
-      {(()=>{
-        const COMPANIES=[
-          {
-            name:'Mercury Z',
-            color:'#06E5EC',
-            bg:'rgba(6,229,236,.08)',
-            border:'rgba(6,229,236,.25)',
-            domains:[
-              {domain:'mzintl.com',  label:'Mercury Z International'},
-              {domain:'mzglobal.net',label:'Mercury Z Global'},
-            ],
-          },
-          {
-            name:'Bold Business',
-            color:'#8B7CF6',
-            bg:'rgba(139,124,246,.08)',
-            border:'rgba(139,124,246,.25)',
-            domains:[
-              {domain:'boldbusiness.com',label:'Bold Business'},
-            ],
-          },
-        ];
-        const [openCo,setOpenCo]=useState(null);
-        return (
-          <>
-            <div className="cc-sect-label" style={{marginTop:32}}>Email sending domains</div>
-            <div style={{display:'grid',gridTemplateColumns:'repeat(2,1fr)',gap:14,marginBottom:32}}>
-              {COMPANIES.map(co=>{
-                const isOpen=openCo===co.name;
-                return (
-                  <div key={co.name}
-                    onClick={()=>setOpenCo(isOpen?null:co.name)}
-                    style={{background:isOpen?co.bg:'rgba(255,255,255,.03)',border:`1px solid ${isOpen?co.border:'rgba(255,255,255,.08)'}`,
-                      borderRadius:12,padding:'18px 20px',position:'relative',overflow:'hidden',
-                      cursor:'pointer',transition:'all .18s'}}
-                    onMouseEnter={e=>{e.currentTarget.style.transform='translateY(-1px)';e.currentTarget.style.boxShadow=`0 4px 20px ${co.color}22`;}}
-                    onMouseLeave={e=>{e.currentTarget.style.transform='';e.currentTarget.style.boxShadow='';}}>
-                    {/* accent bar */}
-                    <div style={{position:'absolute',top:0,left:0,right:0,height:3,background:co.color}}/>
-                    {/* header */}
-                    <div style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
-                      <div>
-                        <div style={{font:'700 15px Inter,sans-serif',color:co.color,marginBottom:4}}>{co.name}</div>
-                        <div style={{font:'11px Inter,sans-serif',color:'#7E8DB5'}}>{co.domains.length} domain{co.domains.length!==1?'s':''}</div>
-                      </div>
-                      <span style={{color:'#7E8DB5',fontSize:12,transition:'transform .18s',
-                        display:'inline-block',transform:isOpen?'rotate(180deg)':'rotate(0deg)'}}>▼</span>
-                    </div>
-                    {/* expanded domain list */}
-                    {isOpen&&(
-                      <div style={{marginTop:14,display:'flex',flexDirection:'column',gap:10}}>
-                        {co.domains.map(d=>(
-                          <div key={d.domain} style={{background:'rgba(255,255,255,.04)',borderRadius:8,
-                            padding:'12px 14px',border:'1px solid rgba(255,255,255,.07)'}}>
-                            <div style={{font:'600 9px Inter,sans-serif',letterSpacing:'.1em',textTransform:'uppercase',
-                              color:'#7E8DB5',marginBottom:5}}>{d.label}</div>
-                            <div style={{font:'700 15px Inter,sans-serif',color:co.color,fontFamily:'monospace'}}>{d.domain}</div>
-                            <div style={{marginTop:7,display:'flex',alignItems:'center',gap:6}}>
-                              <span style={{width:7,height:7,borderRadius:'50%',background:'#2DD4BF',display:'inline-block'}}/>
-                              <span style={{font:'11px Inter,sans-serif',color:'#2DD4BF'}}>Active</span>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          </>
-        );
-      })()}
+      <EmailDomainsSection/>
 
     </div>
   );
 }
 
 // ─── Recruiting Tab ───────────────────────────────────────────────────────────
-const REC_KPI=[
-  {label:'Open Recs',                          val:'18',    sub:'6 priority',              color:'#fff',   subColor:'#5AC8FA'},
-  {label:'Sourced Candidates',                 val:'642',   sub:'↑ 9%',                    color:'#fff',   subColor:'#2DD4BF'},
-  {label:'Emails Sent',                        val:'1,422', sub:'this week',               color:'#fff',   subColor:'#7E8DB5'},
-  {label:'CR Sent',                            val:'470',   sub:'connection requests',     color:'#fff',   subColor:'#7E8DB5'},
-  {label:'Recruiter Interviews Scheduled',     val:'41',    sub:'43% advance',             color:'#5AC8FA',subColor:'#2DD4BF'},
-  {label:'Hiring Manager Interviews Scheduled',val:'19',    sub:'46% advance',             color:'#5AC8FA',subColor:'#2DD4BF'},
-  {label:'Client Ready Candidates',            val:'9',     sub:'awaiting client review',  color:'#A5B4FC',subColor:'#7E8DB5',highlight:true},
-];
+const EMPTY_REC_OVERVIEW={
+  open_recs:0, sourced_candidates:0, emails_sent:0, cr_sent:0,
+  recruiter_interviews_scheduled:0, hiring_manager_interviews_scheduled:0,
+  client_ready_candidates:0, goal_count:0, campaign_count:0, activity_count:0,
+};
+function recKpisFromOverview(data,loading=false,pending=false){
+  const o={...EMPTY_REC_OVERVIEW,...(data||{})};
+  const val=k=>loading?'...':fmtN(Number(o[k])||0);
+  return [
+    {label:'Open Recs',                          val:val('open_recs'),                          sub:pending?'SMT tables pending':`${fmtN(Number(o.goal_count)||0)} goals tracked`,      color:'#fff',   subColor:'#5AC8FA'},
+    {label:'Sourced Candidates',                 val:val('sourced_candidates'),                 sub:`${fmtN(Number(o.activity_count)||0)} activities`,       color:'#fff',   subColor:'#2DD4BF'},
+    {label:'Emails Sent',                        val:val('emails_sent'),                        sub:`${fmtN(Number(o.campaign_count)||0)} campaign rows`,    color:'#fff',   subColor:'#7E8DB5'},
+    {label:'CR Sent',                            val:val('cr_sent'),                            sub:'connection requests',                                  color:'#fff',   subColor:'#7E8DB5'},
+    {label:'Recruiter Interviews Scheduled',     val:val('recruiter_interviews_scheduled'),     sub:'calls + recruiter screens',                             color:'#5AC8FA',subColor:'#2DD4BF'},
+    {label:'Hiring Manager Interviews Scheduled',val:val('hiring_manager_interviews_scheduled'),sub:'HM interview stage',                                    color:'#5AC8FA',subColor:'#2DD4BF'},
+    {label:'Client Ready Candidates',            val:val('client_ready_candidates'),            sub:'client ready stage',                                     color:'#A5B4FC',subColor:'#7E8DB5',highlight:true},
+  ];
+}
 function pBar(a,t,h=4){
   const pct=t?Math.min(100,Math.round((a/t)*100)):0;
   const col=pct>=100?'#2DD4BF':pct>=50?'#F5B945':'#F2667A';
@@ -4044,19 +4083,22 @@ const STAGE_MID={color:'#818CF8',bg:'rgba(129,140,248,.14)'};
 // ─── Recruiter goal-tracker: live SMT (recruiters schema) data helpers ───────
 function rtEST(d){ return new Date(d.toLocaleString('en-US',{timeZone:'America/New_York'})); }
 function rtFmt(d){ const y=d.getFullYear(),m=String(d.getMonth()+1).padStart(2,'0'),dd=String(d.getDate()).padStart(2,'0'); return `${y}-${m}-${dd}`; }
-function rtRange(type){
-  const now=rtEST(new Date());
-  let start=new Date(now),end=new Date(now);
-  if (type==='Today'){ start.setHours(0,0,0,0); end.setHours(23,59,59,999); }
-  else if (type==='Weekly'){
-    const day=now.getDay();
-    start.setDate(now.getDate()-day); start.setHours(0,0,0,0);
-    end.setDate(now.getDate()+(6-day)); end.setHours(23,59,59,999);
-  } else {
-    start=new Date(now.getFullYear(),now.getMonth(),1);
-    end=new Date(now.getFullYear(),now.getMonth()+1,0); end.setHours(23,59,59,999);
+function dateRangeFilterBounds(period,start,end){
+  if(start&&end) return {start,end};
+  if(period==='all') return {start:null,end:null};
+  const rangeEnd=rtEST(new Date());
+  rangeEnd.setHours(23,59,59,999);
+  const rangeStart=new Date(rangeEnd);
+  if(period==='today') rangeStart.setHours(0,0,0,0);
+  else if(period==='week'){
+    const day=rangeEnd.getDay();
+    rangeStart.setDate(rangeEnd.getDate()-day);
+    rangeEnd.setDate(rangeEnd.getDate()+(6-day));
   }
-  return {start:rtFmt(start),end:rtFmt(end)};
+  else if(period==='30d') rangeStart.setDate(rangeEnd.getDate()-30);
+  else rangeStart.setDate(rangeEnd.getDate()-7);
+  rangeStart.setHours(0,0,0,0);
+  return {start:rtFmt(rangeStart),end:rtFmt(rangeEnd)};
 }
 function RecDrillModal({title,rows,onClose}){
   return (
@@ -4106,17 +4148,31 @@ function RecDrillModal({title,rows,onClose}){
 const STAGE_END={color:'#5AC8FA',bg:'rgba(90,200,250,.14)'};
 const REC_CAMP_COLS='1.5fr 1.2fr 1.1fr .8fr .8fr .8fr .9fr';
 
-// ─── Date range filter (period pills + calendar) — same UX as SDR performance summary ──
-function DateRangeFilter() {
+// ─── Date range filter (period pills + calendar) — same UX as Sales overview ──
+function DateRangeFilter({period:controlledPeriod,start:controlledStart,end:controlledEnd,onChange,periods=PERIODS,defaultPeriod}={}) {
+  const controlled=typeof onChange==='function';
+  const periodOptions=periods&&periods.length?periods:PERIODS;
+  const fallbackPeriod=defaultPeriod||periodOptions[1]?.id||periodOptions[0]?.id||'7d';
   const today=new Date();
-  const [period,setPeriod]=useState('7d');
+  const [localPeriod,setLocalPeriod]=useState(fallbackPeriod);
+  const [localStart,setLocalStart]=useState(null);
+  const [localEnd,setLocalEnd]=useState(null);
   const [open,setOpen]=useState(false);
   const [y,setY]=useState(today.getFullYear());
   const [m,setM]=useState(today.getMonth());
-  const [start,setStart]=useState(null);
-  const [end,setEnd]=useState(null);
   const [phase,setPhase]=useState('start');
   const ref=useRef();
+  const period=controlled?(controlledPeriod||fallbackPeriod):localPeriod;
+  const start=controlled?controlledStart:localStart;
+  const end=controlled?controlledEnd:localEnd;
+  const setRange=next=>{
+    if(controlled) onChange({period,start,end,...next});
+    else {
+      if(Object.prototype.hasOwnProperty.call(next,'period')) setLocalPeriod(next.period);
+      if(Object.prototype.hasOwnProperty.call(next,'start')) setLocalStart(next.start);
+      if(Object.prototype.hasOwnProperty.call(next,'end')) setLocalEnd(next.end);
+    }
+  };
 
   useEffect(()=>{
     if(!open)return;
@@ -4142,8 +4198,8 @@ function DateRangeFilter() {
   const pickDay=day=>{
     if(!day)return;
     const iso=`${y}-${String(m+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
-    if(phase==='start'){ setStart(iso); setEnd(null); setPhase('end'); }
-    else{ if(iso<start){ setStart(iso); setPhase('end'); } else{ setEnd(iso); setPhase('start'); setOpen(false); } }
+    if(phase==='start'){ setRange({start:iso,end:null}); setPhase('end'); }
+    else{ if(iso<start){ setRange({start:iso,end:null}); setPhase('end'); } else{ setRange({period:'all',end:iso}); setPhase('start'); setOpen(false); } }
   };
 
   const dayStyle=day=>{
@@ -4163,10 +4219,10 @@ function DateRangeFilter() {
   return (
     <div style={{display:'flex',alignItems:'center',gap:8}}>
       <div style={{display:'flex',gap:4,background:'rgba(255,255,255,.04)',border:'1px solid rgba(124,124,245,.25)',borderRadius:10,padding:4}}>
-        {PERIODS.map(p=>{
+        {periodOptions.map(p=>{
           const active=period===p.id&&!(start&&end);
           return(
-            <button key={p.id} onClick={()=>{ setPeriod(p.id); setStart(null); setEnd(null); setPhase('start'); }} style={{
+            <button key={p.id} onClick={()=>{ setRange({period:p.id,start:null,end:null}); setPhase('start'); }} style={{
               padding:'5px 12px',border:'none',cursor:'pointer',borderRadius:7,
               background:active?'rgba(124,124,245,.3)':'transparent',
               font:`${active?700:500} 11px/1 Inter,sans-serif`,
@@ -4178,18 +4234,18 @@ function DateRangeFilter() {
       </div>
       <div style={{position:'relative'}} ref={ref}>
         <div onClick={()=>setOpen(o=>!o)}
-          style={{display:'inline-flex',alignItems:'center',gap:10,padding:'8px 14px',
+          style={{display:'inline-flex',alignItems:'center',gap:8,padding:'7px 13px',
             background:(start&&end)?'rgba(124,124,245,.18)':'rgba(255,255,255,.04)',
             border:(start&&end)?'1px solid rgba(124,124,245,.7)':'1px solid rgba(124,124,245,.45)',
-            borderRadius:10,color:'#EAF0FF',font:'600 14px/1 monospace',cursor:'pointer'}}>
-          <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="#818CF8" strokeWidth={2}>
+            borderRadius:10,color:'#EAF0FF',font:'600 13px/1 Inter,sans-serif',cursor:'pointer'}}>
+          <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#818CF8" strokeWidth={2}>
             <rect x={3} y={4} width={18} height={18} rx={2}/>
             <path d="M16 2v4M8 2v4M3 10h18"/>
           </svg>
           {label}
         </div>
         {open&&(
-          <div style={{position:'absolute',top:'calc(100% + 8px)',right:0,zIndex:60,width:320,
+          <div style={{position:'absolute',top:'calc(100% + 8px)',right:0,zIndex:60,width:310,
             background:'#fff',borderRadius:16,boxShadow:'0 24px 60px rgba(2,8,32,.45)',padding:18}}>
             <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:14}}>
               <div onClick={()=>{ if(m===0){setM(11);setY(v=>v-1);}else setM(v=>v-1); }}
@@ -4216,9 +4272,9 @@ function DateRangeFilter() {
             ))}
             <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',
               marginTop:12,paddingTop:12,borderTop:'1px solid #EEF1F6'}}>
-              <span onClick={()=>{ setStart(null);setEnd(null);setPhase('start');setOpen(false);setPeriod('7d'); }}
+              <span onClick={()=>{ setRange({period:fallbackPeriod,start:null,end:null});setPhase('start');setOpen(false); }}
                 style={{cursor:'pointer',font:'700 14px Inter,sans-serif',letterSpacing:'.04em',color:'#4446DB'}}>CLEAR</span>
-              <span style={{font:'italic 400 14px Inter,sans-serif',color:'#9AA3B8'}}>
+              <span style={{font:'italic 400 13px Inter,sans-serif',color:'#9AA3B8'}}>
                 {phase==='start'?'Click a start date':'Click an end date'}
               </span>
             </div>
@@ -4244,14 +4300,24 @@ function RecruitingCampaignBriefSection(){
 
   const REC_BRIEF_COLORS=['#818CF8','#A78BFA','#8B5CF6','#6366F1','#C4B5FD','#A5B4FC','#9F7AEA','#7C86FF','#C084FC','#93C5FD'];
   const DEFAULT_REC_SEQUENCE=[
-    {title:'LinkedIn InMail',meta:'Day 1',subject:'',body:'Personalized note referencing their current role and the skills we\'re sourcing for.',color:'#818CF8'},
-    {title:'Email follow-up',meta:'Day 3 · role one-pager',subject:'Role details - [Role] at [Client]',body:'Share comp range, engagement model, and team.',color:'#A78BFA'},
-    {title:'Screening call',meta:'Day 5 · 20 min',subject:'',body:'Skills, availability, portfolio walkthrough.',color:'#5AC8FA'},
-    {title:'Submit to client',meta:'Day 7 · with notes',subject:'',body:'Package profile + screen notes to client.',color:'#2DD4BF'},
+    {title:'LinkedIn CR Note',meta:'Step 1',subject:'',body:'Send a concise connection request note referencing the role, client, and candidate fit.',color:'#818CF8'},
+    {title:'Email/InMail',meta:'Step 2',subject:'',body:'Send the main outreach message with role context and a clear reply CTA.',color:'#A78BFA'},
+    {title:'Email/LinkedIn follow-up',meta:'Step 3',subject:'',body:'Follow up with one useful nudge through email or LinkedIn.',color:'#5AC8FA'},
   ];
+  const normalizeRecSequence=sequence=>{
+    const incoming=Array.isArray(sequence)?sequence:[];
+    return DEFAULT_REC_SEQUENCE.map((fallback,i)=>{
+      const existing=incoming[i]||{};
+      const titleMatches=existing.title===fallback.title;
+      return {
+        ...fallback,
+        subject:titleMatches&&existing.subject!==undefined?existing.subject:fallback.subject,
+        body:titleMatches&&existing.body!==undefined?existing.body:fallback.body,
+      };
+    });
+  };
   const BLANK_FORM={
-    assignee:'',title:'',sub:'',channel:'LinkedIn + Email',activity:'',
-    icp:'',personas:'',signals:'',hook:'',valueProp:'',
+    title:'',
     sequence:DEFAULT_REC_SEQUENCE.map(s=>({...s})),
   };
 
@@ -4283,6 +4349,7 @@ function RecruitingCampaignBriefSection(){
             color:      brief.color||REC_BRIEF_COLORS[i%REC_BRIEF_COLORS.length],
             sort_order: b.sort_order,
             ...brief,
+            sequence:   normalizeRecSequence(brief.sequence),
           };
         });
         setRecBriefs(loaded);
@@ -4303,7 +4370,7 @@ function RecruitingCampaignBriefSection(){
 
   const camp=recBriefs[recCampIdx]||{title:'No role briefs yet',sub:'Add a brief to get started',color:'#818CF8'};
   const campContent={...camp};
-  if(!campContent.sequence) campContent.sequence=DEFAULT_REC_SEQUENCE;
+  campContent.sequence=normalizeRecSequence(campContent.sequence);
 
   const OVL={position:'fixed',inset:0,zIndex:9100,background:'rgba(2,8,32,.72)',backdropFilter:'blur(6px)',
     display:'flex',alignItems:'center',justifyContent:'center',padding:20};
@@ -4317,27 +4384,15 @@ function RecruitingCampaignBriefSection(){
     color:'#9FB0D8',font:'16px Inter,sans-serif',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center'};
 
   const toEditForm=c=>({
-    assignee: c.assignee||c.sdr||'',
     title:    c.title||'',
-    sub:      c.sub||'',
-    channel:  c.channel||'LinkedIn + Email',
-    activity: c.activity||'',
-    icp:      icpToText(c.icp),
-    personas: listToText(c.personas),
-    signals:  listToText(c.signals),
-    hook:     c.hook||'',
-    valueProp:c.valueProp||'',
-    sequence: (c.sequence&&c.sequence.length?c.sequence:DEFAULT_REC_SEQUENCE).map(s=>({...s})),
+    sequence: normalizeRecSequence(c.sequence),
   });
 
   const buildBriefContent=(form,color)=>({
-    sdr:form.assignee||'Unassigned', color,
-    title:form.title, sub:form.sub, channel:form.channel, activity:form.activity,
-    hook:form.hook, valueProp:form.valueProp,
-    personas:textToList(form.personas),
-    signals:textToList(form.signals),
-    icp:textToIcp(form.icp),
-    sequence:form.sequence,
+    sdr:'Unassigned',
+    color,
+    title:form.title,
+    sequence:normalizeRecSequence(form.sequence),
   });
 
   const handleCreate=async(form)=>{
@@ -4347,8 +4402,12 @@ function RecruitingCampaignBriefSection(){
       method:'POST',
       headers:{...authHeaders(),'Content-Type':'application/json'},
       body:JSON.stringify({
-        campaign_name:form.title, target_icp:form.sub, channel:form.channel,
-        activity:form.activity, assignee:form.assignee||'Unassigned', brief_json:briefContent,
+        campaign_name:form.title,
+        target_icp:null,
+        channel:null,
+        activity:null,
+        assignee:'Unassigned',
+        brief_json:briefContent,
       }),
     });
     const j=await res.json();
@@ -4367,8 +4426,12 @@ function RecruitingCampaignBriefSection(){
       method:'PATCH',
       headers:{...authHeaders(),'Content-Type':'application/json'},
       body:JSON.stringify({
-        campaign_name:form.title, target_icp:form.sub, channel:form.channel,
-        activity:form.activity, assignee:form.assignee||'Unassigned', brief_json:briefContent,
+        campaign_name:form.title,
+        target_icp:null,
+        channel:null,
+        activity:null,
+        assignee:recBriefs[recCampIdx]?.assignee||recBriefs[recCampIdx]?.sdr||'Unassigned',
+        brief_json:briefContent,
       }),
     });
     const j=await res.json();
@@ -4379,15 +4442,17 @@ function RecruitingCampaignBriefSection(){
 
   // ═ Shared brief form (new + edit) ═
   const BriefForm=({initial,heading,subheading,onCancel,onSave})=>{
-    const [form,setForm]=useState(initial);
-    const [tab,setTab]=useState('brief');
+    const [form,setForm]=useState({...initial,sequence:normalizeRecSequence(initial.sequence)});
     const [seqTab,setSeqTab]=useState(0);
     const [saving,setSaving]=useState(false);
     const [saveErr,setSaveErr]=useState('');
     const setStep=(i,key,val)=>setForm(f=>({...f,sequence:f.sequence.map((s,j)=>j===i?{...s,[key]:val}:s)}));
     const curStep=form.sequence[seqTab]||{};
     const doSave=async()=>{
-      if(!form.title.trim()) return;
+      if(!form.title.trim()){
+        setSaveErr('Brief name is required.');
+        return;
+      }
       setSaving(true); setSaveErr('');
       try{ await onSave(form); }
       catch(err){ setSaveErr(err.message||'Save failed.'); }
@@ -4406,62 +4471,14 @@ function RecruitingCampaignBriefSection(){
               <div style={{font:'12px Inter,sans-serif',color:'#7E8DB5',marginTop:3}}>{subheading}</div>
             </div>
             <div style={{display:'flex',alignItems:'center',gap:10}}>
-              {['brief','sequence'].map(t=>(
-                <button key={t} onClick={()=>setTab(t)} style={{
-                  padding:'6px 16px',borderRadius:20,border:'none',cursor:'pointer',
-                  background:tab===t?'rgba(129,140,248,.18)':'transparent',
-                  color:tab===t?'#A5B4FC':'#7E8DB5',
-                  font:`${tab===t?700:400} 12px Inter,sans-serif`,transition:'all .15s'}}>
-                  {t==='brief'?'Brief':'Outreach'}
-                </button>
-              ))}
-              <div style={{width:1,height:20,background:'rgba(255,255,255,.1)',margin:'0 4px'}}/>
               <button style={XBTN} onClick={onCancel}>×</button>
             </div>
           </div>
           <div style={{overflowY:'auto',flex:1,padding:'24px 28px'}}>
-            {tab==='brief'&&(
-              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:20}}>
-                <div style={{display:'flex',flexDirection:'column',gap:16}}>
-                  <div style={{display:'grid',gridTemplateColumns:'1fr 2fr',gap:12,alignItems:'end'}}>
-                    {field('Assignee (Recruiter)',
-                      <input value={form.assignee} onChange={e=>setForm(f=>({...f,assignee:e.target.value}))} style={inp} placeholder="e.g. Sarah M."/>)}
-                    {field('Role / campaign title',
-                      <input value={form.title} onChange={e=>setForm(f=>({...f,title:e.target.value}))} style={inp} placeholder="e.g. CET Designer / Space Planning Specialist"/>)}
-                  </div>
-                  {field('Req details / subtitle',
-                    <input value={form.sub} onChange={e=>setForm(f=>({...f,sub:e.target.value}))} style={inp} placeholder="Open req · Steelcase · 6 submitted of 8 target"/>)}
-                  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
-                    {field('Channel',
-                      <input value={form.channel} onChange={e=>setForm(f=>({...f,channel:e.target.value}))} style={inp} placeholder="LinkedIn + Email"/>)}
-                    {field('Activity',
-                      <input value={form.activity} onChange={e=>setForm(f=>({...f,activity:e.target.value}))} style={inp} placeholder="Sourcing / Screening / Submitted"/>)}
-                  </div>
-                  {field('Ideal candidate profile',
-                    <div>
-                      <div style={{font:'11px Inter,sans-serif',color:'#4a5568',marginBottom:6}}>One per line · format: Label: Value</div>
-                      <textarea rows={6} value={form.icp} onChange={e=>setForm(f=>({...f,icp:e.target.value}))} style={fi} placeholder={"Core skills: CET · 20-20 · AutoCAD\nExperience: 3-5 years"}/>
-                    </div>)}
-                </div>
-                <div style={{display:'flex',flexDirection:'column',gap:16}}>
-                  {field('Must-have qualifications',
-                    <div>
-                      <div style={{font:'11px Inter,sans-serif',color:'#4a5568',marginBottom:6}}>One per line</div>
-                      <textarea rows={5} value={form.personas} onChange={e=>setForm(f=>({...f,personas:e.target.value}))} style={fi} placeholder="Hands-on CET Designer / 20-20"/>
-                    </div>)}
-                  {field('Sourcing channels',
-                    <div>
-                      <div style={{font:'11px Inter,sans-serif',color:'#4a5568',marginBottom:6}}>One per line</div>
-                      <textarea rows={4} value={form.signals} onChange={e=>setForm(f=>({...f,signals:e.target.value}))} style={fi} placeholder="LinkedIn Recruiter: CET Designer"/>
-                    </div>)}
-                  {field('Candidate pitch',
-                    <textarea rows={3} value={form.hook} onChange={e=>setForm(f=>({...f,hook:e.target.value}))} style={fi}/>)}
-                  {field('Why Bold Business',
-                    <textarea rows={3} value={form.valueProp} onChange={e=>setForm(f=>({...f,valueProp:e.target.value}))} style={fi}/>)}
-                </div>
-              </div>
-            )}
-            {tab==='sequence'&&(
+            <div style={{display:'flex',flexDirection:'column',gap:18}}>
+              {field('Brief name',
+                <input value={form.title} onChange={e=>setForm(f=>({...f,title:e.target.value}))}
+                  style={inp} placeholder="e.g. Healthcare recruiter 3-step outreach"/>)}
               <div style={{display:'grid',gridTemplateColumns:'200px 1fr',gap:20,minHeight:400}}>
                 <div style={{display:'flex',flexDirection:'column',gap:6}}>
                   {form.sequence.map((step,i)=>(
@@ -4488,11 +4505,11 @@ function RecruitingCampaignBriefSection(){
                   borderRadius:12,padding:'20px 22px'}}>
                   <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
                     {field('Step title',
-                      <input value={curStep.title||''} onChange={e=>setStep(seqTab,'title',e.target.value)}
-                        style={inp} placeholder="e.g. LinkedIn InMail"/>)}
-                    {field('Timing',
-                      <input value={curStep.meta||''} onChange={e=>setStep(seqTab,'meta',e.target.value)}
-                        style={inp} placeholder="e.g. Day 1"/>)}
+                      <input value={curStep.title||''} readOnly
+                        style={{...inp,color:'#9FB0D8',background:'rgba(255,255,255,.025)',cursor:'default'}} />)}
+                    {field('Step',
+                      <input value={curStep.meta||''} readOnly
+                        style={{...inp,color:'#9FB0D8',background:'rgba(255,255,255,.025)',cursor:'default'}} />)}
                   </div>
                   {field(
                     <span>Subject line <span style={{color:'#4a5568',fontWeight:400,textTransform:'none',letterSpacing:0}}>· email steps only</span></span>,
@@ -4504,11 +4521,11 @@ function RecruitingCampaignBriefSection(){
                       placeholder="Write the full candidate outreach message here..."/>)}
                 </div>
               </div>
-            )}
+            </div>
           </div>
           <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',
             padding:'16px 28px',borderTop:'1px solid rgba(255,255,255,.07)',flexShrink:0}}>
-            <span style={{font:'12px Inter,sans-serif',color:saveErr?'#F2667A':'#4a5568'}}>{saveErr||'Changes apply immediately to the role brief card'}</span>
+            <span style={{font:'12px Inter,sans-serif',color:saveErr?'#F2667A':'#4a5568'}}>{saveErr||'Only the 3-step outreach is saved to the role brief card'}</span>
             <div style={{display:'flex',gap:10}}>
               <button onClick={onCancel}
                 style={{padding:'9px 20px',borderRadius:8,border:'1px solid rgba(255,255,255,.1)',
@@ -4694,7 +4711,7 @@ function RecruitingCampaignBriefSection(){
         <BriefForm
           initial={{...BLANK_FORM}}
           heading="New Role Brief"
-          subheading="Fill in the brief details and candidate outreach sequence"
+          subheading="Brief name plus the required 3-step outreach"
           onCancel={()=>setRecBriefNewOpen(false)}
           onSave={handleCreate}
         />
@@ -4705,7 +4722,7 @@ function RecruitingCampaignBriefSection(){
         <BriefForm
           initial={toEditForm(recBriefs[recCampIdx])}
           heading="Edit Role Brief"
-          subheading={recBriefs[recCampIdx].title}
+          subheading="Brief name plus the required 3-step outreach"
           onCancel={()=>setRecBriefEditOpen(false)}
           onSave={handleUpdate}
         />
@@ -4727,55 +4744,11 @@ function RecruitingCampaignBriefSection(){
             {camp.activity||'Priority req'}
           </span>
         </div>
-        <div style={{font:'600 10px Inter,sans-serif',letterSpacing:'.1em',textTransform:'uppercase',color:'#7E8DB5',marginBottom:10}}>
-          Ideal candidate profile
-        </div>
-        <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:10,marginBottom:20}}>
-          {(campContent.icp||[]).length===0&&<div style={{font:'12px Inter,sans-serif',color:'#7E8DB5'}}>No candidate profile fields yet.</div>}
-          {(campContent.icp||[]).map(({label,value})=>(
-            <div key={label} style={{background:'rgba(255,255,255,.03)',borderRadius:8,padding:11}}>
-              <div style={{font:'600 9px Inter,sans-serif',letterSpacing:'.05em',textTransform:'uppercase',color:'#7E8DB5'}}>{label}</div>
-              <div style={{font:'600 12px Inter,sans-serif',color:'#EAF0FF',marginTop:3}}>{value}</div>
-            </div>
-          ))}
-        </div>
-        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:20,marginBottom:20}}>
-          <div>
-            <div style={{font:'600 10px Inter,sans-serif',letterSpacing:'.1em',textTransform:'uppercase',color:'#7E8DB5',marginBottom:10}}>
-              Must-have qualifications
-            </div>
-            {(campContent.personas||[]).map(p=>(
-              <div key={p} style={{font:'13px/1.95 Inter,sans-serif',color:'#cdd6ee'}}>• {p}</div>
-            ))}
-          </div>
-          <div>
-            <div style={{font:'600 10px Inter,sans-serif',letterSpacing:'.1em',textTransform:'uppercase',color:'#7E8DB5',marginBottom:10}}>
-              Sourcing channels
-            </div>
-            {(campContent.signals||[]).map(s=>(
-              <div key={s} style={{font:'13px/1.75 Inter,sans-serif',color:'#cdd6ee'}}>→ {s}</div>
-            ))}
-          </div>
-        </div>
-        {campContent.hook&&(
-          <div style={{background:'rgba(129,140,248,.08)',borderLeft:'3px solid rgba(129,140,248,.6)',
-            borderRadius:'0 8px 8px 0',padding:'13px 15px',marginBottom:12,font:'13px/1.6 Inter,sans-serif',color:'#cdd6ee'}}>
-            <strong style={{color:'#fff'}}>Candidate pitch.</strong>{' '}
-            {campContent.hook}
-          </div>
-        )}
-        {campContent.valueProp&&(
-          <div style={{background:'rgba(168,85,247,.1)',borderLeft:'3px solid rgba(168,85,247,.6)',
-            borderRadius:'0 8px 8px 0',padding:'13px 15px',marginBottom:20,font:'13px/1.6 Inter,sans-serif',color:'#cdd6ee'}}>
-            <strong style={{color:'#fff'}}>Why Bold Business.</strong>{' '}
-            {campContent.valueProp}
-          </div>
-        )}
         <div style={{font:'600 10px Inter,sans-serif',letterSpacing:'.1em',textTransform:'uppercase',color:'#7E8DB5',marginBottom:12}}>
-          4-touch candidate outreach
+          3-step outreach
         </div>
-        <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:10}}>
-          {(campContent.sequence||DEFAULT_REC_SEQUENCE).map((s,i)=>(
+        <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:10}}>
+          {campContent.sequence.map((s,i)=>(
             <div key={i} style={{background:'rgba(255,255,255,.03)',borderRadius:8,padding:13}}>
               <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:8}}>
                 <span style={{width:22,height:22,borderRadius:'50%',background:s.color||'#818CF8',color:'#0a0f22',
@@ -4797,9 +4770,50 @@ function RecruitingCampaignBriefSection(){
 }
 
 function RecruitingTab({ setModalAgent }) {
-  const [filter,setFilter]=useState('Weekly');
   const recGridCols='1fr 1.1fr 1fr 1.1fr .95fr 1.1fr .95fr 1.2fr';
   const hdr9={font:'600 9px Inter,sans-serif',letterSpacing:'.05em',textTransform:'uppercase',color:'#7E8DB5'};
+
+  // ── Live recruiting overview KPIs (SMT DB — recruiters schema) ────────────
+  const [overviewPeriod,setOverviewPeriod]=useState('7d');
+  const [overviewStart,setOverviewStart]=useState(null);
+  const [overviewEnd,setOverviewEnd]=useState(null);
+  const [overview,setOverview]=useState(null);
+  const [overviewLoading,setOverviewLoading]=useState(true);
+  const [overviewPending,setOverviewPending]=useState(false);
+
+  const overviewQuery=useMemo(()=>{
+    const qs=new URLSearchParams({period:overviewPeriod});
+    if (overviewStart&&overviewEnd) {
+      qs.set('startDate',overviewStart);
+      qs.set('endDate',overviewEnd);
+    }
+    return qs.toString();
+  },[overviewPeriod,overviewStart,overviewEnd]);
+
+  const handleOverviewRangeChange=useCallback(({period,start,end})=>{
+    setOverviewPeriod(period||'7d');
+    setOverviewStart(start||null);
+    setOverviewEnd(end||null);
+  },[]);
+
+  useEffect(()=>{
+    let cancelled=false;
+    setOverviewLoading(true);
+    fetch(`/api/smt/recruiter/overview?${overviewQuery}`,{headers:authHeaders()})
+      .then(r=>r.json())
+      .then(j=>{
+        if(cancelled) return;
+        setOverviewPending(!!j.pending);
+        setOverview(j&&j.ok?j:null);
+        setOverviewLoading(false);
+      })
+      .catch(()=>{
+        if(cancelled) return;
+        setOverview(null);
+        setOverviewLoading(false);
+      });
+    return()=>{ cancelled=true; };
+  },[overviewQuery]);
 
   // ── Live recruiter goal-tracker data (SMT DB — recruiters schema) ──────────
   const [goals,setGoals]=useState([]);
@@ -4808,11 +4822,22 @@ function RecruitingTab({ setModalAgent }) {
   const [goalsLoading,setGoalsLoading]=useState(true);
   const [goalsPending,setGoalsPending]=useState(false);
   const [drill,setDrill]=useState(null);
-  const range=useMemo(()=>rtRange(filter),[filter]);
+  const [goalPeriod,setGoalPeriod]=useState('week');
+  const [goalStart,setGoalStart]=useState(null);
+  const [goalEnd,setGoalEnd]=useState(null);
+  const range=useMemo(()=>dateRangeFilterBounds(goalPeriod,goalStart,goalEnd),[goalPeriod,goalStart,goalEnd]);
+  const goalRangeLabel=range.start&&range.end?`${range.start} → ${range.end}`:'All time';
+  const handleGoalRangeChange=useCallback(({period,start,end})=>{
+    setGoalPeriod(period||'week');
+    setGoalStart(start||null);
+    setGoalEnd(end||null);
+  },[]);
 
   const loadGoals=useCallback(()=>{
     setGoalsLoading(true);
-    const qs=new URLSearchParams({start:range.start,end:range.end});
+    const qs=new URLSearchParams();
+    if (range.start) qs.set('start',range.start);
+    if (range.end) qs.set('end',range.end);
     if (selRec!=='All') qs.set('recruiter',selRec);
     Promise.all([
       fetch(`/api/smt/recruiter/goals?${qs}`,{headers:authHeaders()}).then(r=>r.json()),
@@ -4830,11 +4855,16 @@ function RecruitingTab({ setModalAgent }) {
   const openRecDrill=async(g,period)=>{
     const title=`${g.recruiter_name} — ${g.role} (${period==='mid'?'Mid-Week':'End-Week'}: ${period==='mid'?g.mid_week_stage:g.end_week_stage})`;
     setDrill({title,rows:null});
+    const continuesCount=period==='end'
+      && (g.mid_week_stage||'').trim().toLowerCase()===(g.end_week_stage||'').trim().toLowerCase();
+    const goalStart=(g.created_at||'').slice(0,10);
     const qs=new URLSearchParams({
       start:range.start,end:range.end,
       recruiter:g.recruiter_name,role:g.role,client:g.client,
       period,stage:period==='mid'?g.mid_week_stage:g.end_week_stage,
+      continue:String(continuesCount),
     });
+    if (goalStart) qs.set('goalStart',goalStart);
     const d=await fetch(`/api/smt/recruiter/activities?${qs}`,{headers:authHeaders()}).then(r=>r.json());
     setDrill({title,rows:d.activities||[]});
   };
@@ -4845,22 +4875,33 @@ function RecruitingTab({ setModalAgent }) {
   const [campsPending,setCampsPending]=useState(false);
   const [campSelRec,setCampSelRec]=useState('All');
   const [campSearch,setCampSearch]=useState('');
+  const [campPeriod,setCampPeriod]=useState('7d');
+  const [campStart,setCampStart]=useState(null);
+  const [campEnd,setCampEnd]=useState(null);
   const [addCampOpen,setAddCampOpen]=useState(false);
   const [addCampSaving,setAddCampSaving]=useState(false);
   const [addCampErr,setAddCampErr]=useState('');
   const BLANK_CAMP_FORM={campaign_name:'',recruiter_name:'',account_used:'',cr_sent:'',email_sent:'',inmail_sent:'',date:new Date().toISOString().slice(0,10)};
   const [campForm,setCampForm]=useState(BLANK_CAMP_FORM);
+  const campRange=useMemo(()=>dateRangeFilterBounds(campPeriod,campStart,campEnd),[campPeriod,campStart,campEnd]);
+  const handleCampRangeChange=useCallback(({period,start,end})=>{
+    setCampPeriod(period||'7d');
+    setCampStart(start||null);
+    setCampEnd(end||null);
+  },[]);
 
   const loadCamps=useCallback(()=>{
     setCampsLoading(true);
-    const qs=new URLSearchParams({start:range.start,end:range.end});
+    const qs=new URLSearchParams();
+    if(campRange.start) qs.set('start',campRange.start);
+    if(campRange.end) qs.set('end',campRange.end);
     if (campSelRec!=='All') qs.set('recruiter',campSelRec);
     fetch(`/api/smt/recruiter/campaigns?${qs}`,{headers:authHeaders()}).then(r=>r.json()).then(cd=>{
       setCampsPending(!!cd.pending);
       setCamps(cd.campaigns||[]);
       setCampsLoading(false);
     }).catch(()=>setCampsLoading(false));
-  },[range,campSelRec]);
+  },[campRange,campSelRec]);
 
   useEffect(()=>{ loadCamps(); },[loadCamps]);
 
@@ -4905,7 +4946,15 @@ function RecruitingTab({ setModalAgent }) {
       {drill && <RecDrillModal title={drill.title} rows={drill.rows} onClose={()=>setDrill(null)}/>}
 
       {/* KPI strip — single consolidated card, same layout as Sales overview's key-metrics card */}
-      <div className="cc-sect-label-purple">Recruiting overview · last 7 days</div>
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:12,flexWrap:'wrap',marginBottom:12}}>
+        <div className="cc-sect-label-purple" style={{marginBottom:0}}>Recruiting overview</div>
+        <DateRangeFilter
+          period={overviewPeriod}
+          start={overviewStart}
+          end={overviewEnd}
+          onChange={handleOverviewRangeChange}
+        />
+      </div>
       <div style={{background:'linear-gradient(135deg,rgba(99,102,241,.24),rgba(168,85,247,.08))',
         border:'1px solid rgba(129,140,248,.3)',borderRadius:12,padding:'18px 22px',marginBottom:26,overflowX:'auto'}}>
         {/* CSS-grid layout: 7 equal columns, 3 fixed rows (label / value / sub)
@@ -4918,7 +4967,7 @@ function RecruitingTab({ setModalAgent }) {
           columnGap:0,
           minWidth:860,
         }}>
-          {REC_KPI.flatMap((m,i)=>[
+          {recKpisFromOverview(overview,overviewLoading,overviewPending).flatMap((m,i)=>[
             /* Row 1 - label */
             <div key={`l${i}`} style={{
               gridRow:1, gridColumn:i+1,
@@ -4963,20 +5012,18 @@ function RecruitingTab({ setModalAgent }) {
           </select>
           <span onClick={loadGoals} style={{width:30,height:30,display:'flex',alignItems:'center',justifyContent:'center',
             border:'1px solid rgba(255,255,255,.12)',borderRadius:8,color:'#7E8DB5',fontSize:13,cursor:'pointer'}}>↻</span>
-          <div style={{marginLeft:'auto',display:'flex',gap:4}}>
-            {['Today','Weekly','Monthly'].map(t=>{
-              const active=filter===t;
-              return <span key={t} onClick={()=>setFilter(t)} style={{
-                font:'800 10px Inter,sans-serif',letterSpacing:'.05em',textTransform:'uppercase',cursor:'pointer',
-                padding:'5px 12px',borderRadius:20,
-                ...(active?{color:'#fff',background:'linear-gradient(135deg,#4446DB,#003BDF)'}:{color:'#7E8DB5',border:'1px solid rgba(255,255,255,.1)'})}}>
-                {t}
-              </span>;
-            })}
+          <div style={{marginLeft:'auto'}}>
+            <DateRangeFilter
+              period={goalPeriod}
+              start={goalStart}
+              end={goalEnd}
+              onChange={handleGoalRangeChange}
+              periods={RECRUITER_TRACKER_PERIODS}
+              defaultPeriod="week"
+            />
           </div>
-          <DateRangeFilter/>
           <span style={{width:'100%',font:'10px monospace',color:'#7E8DB5',textAlign:'right'}}>
-            {range.start} → {range.end} · {goals.length} goal{goals.length!==1?'s':''}
+            {goalRangeLabel} · {goals.length} goal{goals.length!==1?'s':''}
           </span>
         </div>
         {/* Table header */}
@@ -5096,24 +5143,15 @@ function RecruitingTab({ setModalAgent }) {
       )}
 
       {/* Recruiting Campaigns header */}
-      <div style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',gap:16,flexWrap:'wrap',marginBottom:16}}>
-        <div>
-          <div style={{font:'700 22px Inter,sans-serif',color:'#fff',letterSpacing:'-.01em'}}>Recruiting Campaigns</div>
-          <div style={{font:'13px Inter,sans-serif',color:'#9FB0D8',marginTop:3}}>Track reach and engagement across your recruitment campaigns.</div>
-        </div>
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:16,flexWrap:'wrap',marginBottom:12}}>
+        <div className="cc-sect-label-purple" style={{marginBottom:0}}>Recruiting campaigns</div>
         <div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap'}}>
-          <div style={{display:'flex',gap:3,background:'rgba(255,255,255,.05)',border:'1px solid rgba(255,255,255,.08)',borderRadius:20,padding:3}}>
-            {['Today','Weekly','Monthly'].map(t=>{
-              const active=filter===t;
-              return <span key={t} onClick={()=>setFilter(t)} style={{
-                font:'800 10px Inter,sans-serif',letterSpacing:'.05em',textTransform:'uppercase',cursor:'pointer',
-                padding:'6px 13px',borderRadius:18,
-                ...(active?{color:'#fff',background:'linear-gradient(135deg,#4446DB,#003BDF)'}:{color:'#7E8DB5'})}}>
-                {t}
-              </span>;
-            })}
-          </div>
-          <DateRangeFilter/>
+          <DateRangeFilter
+            period={campPeriod}
+            start={campStart}
+            end={campEnd}
+            onChange={handleCampRangeChange}
+          />
           <span onClick={()=>{setCampForm(BLANK_CAMP_FORM);setAddCampErr('');setAddCampOpen(true);}} style={{
             display:'inline-flex',alignItems:'center',gap:7,font:'700 11px Inter,sans-serif',color:'#fff',
             padding:'8px 16px',borderRadius:10,cursor:'pointer',background:'linear-gradient(135deg,#4446DB,#003BDF)'}}>
@@ -5185,7 +5223,7 @@ function RecruitingTab({ setModalAgent }) {
       </div>
 
       {/* ── Recruiting Agent Fleet (same cards as Sales tab) — under Recruiting Campaigns ── */}
-      <div className="cc-sect-label">Agent fleet · live status</div>
+      <div className="cc-sect-label-purple">Agent fleet · live status</div>
       <div style={{display:'grid',gridTemplateColumns:'repeat(2,1fr)',gap:12,marginBottom:26}}>
         {REC_AGENTS.map(ag=>(
           <div key={ag.id} onClick={()=>setModalAgent(ag)}
@@ -5205,6 +5243,24 @@ function RecruitingTab({ setModalAgent }) {
 
       {/* Campaign Brief (Recruiting) */}
       <RecruitingCampaignBriefSection/>
+
+      {/* ── Recruiter Task List ── */}
+      <TaskListSection
+        authHeaders={authHeaders}
+        endpoint="/api/smt/recruiter/dashboard-tasks"
+        labelClass="cc-sect-label-purple"
+      />
+
+      {/* ── Recruiting Library ── */}
+      <LibrarySection
+        authHeaders={authHeaders}
+        endpoint="/api/smt/recruiter/dashboard-library"
+        labelClass="cc-sect-label-purple"
+        accentColor="#8B7CF6"
+      />
+
+      {/* ── Recruiting Email Domains ── */}
+      <EmailDomainsSection labelClass="cc-sect-label-purple"/>
     </div>
   );
 }

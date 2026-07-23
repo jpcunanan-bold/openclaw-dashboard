@@ -1649,7 +1649,12 @@ const OPENCLAW_GATEWAY_TOKEN = process.env.OPENCLAW_GATEWAY_TOKEN || '';
  * dashboard chat session maps to its own isolated gateway session.
  * Returns the agent reply text, or null on failure.
  */
-async function callGateway(sessionId, taskRef, userMessage, agentName = 'laura') {
+function looksLikeDashboardChangeRequest(message) {
+  return /\b(add|create|new|change|update|rename|remove|delete|move|reorder|fix|make|set)\b/i.test(message || '')
+    && /\b(dashboard|tab|section|card|table|brief|campaign|task|library|filter|button|widget|recruiting|recruiter|sales)\b/i.test(message || '');
+}
+
+async function callGateway(sessionId, taskRef, taskContext, userMessage, agentName = 'laura') {
   if (!OPENCLAW_GATEWAY_TOKEN) return null;
 
   const agentId = agentName === 'darren' ? 'darren' : 'main';
@@ -1658,8 +1663,20 @@ async function callGateway(sessionId, taskRef, userMessage, agentName = 'laura')
 
   // Prefix the message with dashboard page context so the agent knows where the user is
   let enrichedMessage = userMessage;
-  if (taskRef) {
-    enrichedMessage = `[Dashboard — ${taskRef} page]\n\n${userMessage}`;
+  if (taskRef || taskContext) {
+    enrichedMessage = `[Dashboard — ${taskRef || 'GLOBAL'} page]\n${taskContext ? `Context: ${taskContext}\n` : ''}\n${userMessage}`;
+  }
+
+  if (looksLikeDashboardChangeRequest(userMessage)) {
+    enrichedMessage = [
+      '[Dashboard change request]',
+      'The user is asking from the OpenClaw dashboard chat widget. If the request is a clear dashboard data or UI change, execute it end to end instead of only explaining it.',
+      'Dashboard task-list changes must use the visible dashboard task sources: Sales uses sales.dashboard_tasks through /api/dashboard-tasks, and Recruiting uses recruiters.dashboard_tasks through /api/smt/recruiter/dashboard-tasks. Do not use /api/tracker-tasks for Sales or Recruiting dashboard task-list changes.',
+      'Use the existing dashboard codebase at /var/www/laura-dashboard, preserve existing patterns, rebuild/verify after source changes, and report only confirmed results.',
+      'For outreach sends or sequence enrollment, follow the send approval gate and do not send without approval.',
+      '',
+      enrichedMessage,
+    ].join('\n');
   }
 
   try {
@@ -1756,7 +1773,7 @@ async function callLauraInline(sessionId, taskRef, taskContext, userMessage, age
 
     // ── Route through full OpenClaw gateway ─────────────────────────────────
     console.log(`[chat] routing to gateway (agent=${agentName}, taskRef=${taskRef})`);
-    let reply = await callGateway(sessionId, taskRef, userMessage, agentName);
+    let reply = await callGateway(sessionId, taskRef, taskContext, userMessage, agentName);
 
     // ── Fallback to Haiku if gateway unavailable ─────────────────────────────
     if (!reply) {
@@ -4204,7 +4221,107 @@ app.get('/api/camilla/candidates/tabs', (_req, res) => {
 // Tables: recruiters.goals + recruiters.activities (lola_readonly — smtReadPool)
 // ══════════════════════════════════════════════════════════════════════════════
 
-/** GET /api/smt/recruiter/goals — goals with pre-computed mid/end actuals via DB join */
+/** GET /api/smt/recruiter/overview — Recruiting overview KPIs */
+app.get('/api/smt/recruiter/overview', async (req, res) => {
+  try {
+    const period    = req.query.period    || '7d';
+    const startDate = req.query.startDate || null;
+    const endDate   = req.query.endDate   || null;
+
+    let goalWhere = '';
+    let activityWhere = '';
+    let campaignWhere = '';
+    let params = [];
+
+    if (startDate && endDate) {
+      params = [startDate, endDate];
+      goalWhere     = 'WHERE created_at::date BETWEEN $1::date AND $2::date';
+      activityWhere = 'WHERE created_at::date BETWEEN $1::date AND $2::date';
+      campaignWhere = 'WHERE date BETWEEN $1::date AND $2::date';
+    } else if (period === 'today') {
+      goalWhere     = 'WHERE created_at::date = CURRENT_DATE';
+      activityWhere = 'WHERE created_at::date = CURRENT_DATE';
+      campaignWhere = 'WHERE date = CURRENT_DATE';
+    } else if (period === '7d') {
+      goalWhere     = "WHERE created_at::date >= CURRENT_DATE - INTERVAL '7 days'";
+      activityWhere = "WHERE created_at::date >= CURRENT_DATE - INTERVAL '7 days'";
+      campaignWhere = "WHERE date >= CURRENT_DATE - INTERVAL '7 days'";
+    } else if (period === '30d') {
+      goalWhere     = "WHERE created_at::date >= CURRENT_DATE - INTERVAL '30 days'";
+      activityWhere = "WHERE created_at::date >= CURRENT_DATE - INTERVAL '30 days'";
+      campaignWhere = "WHERE date >= CURRENT_DATE - INTERVAL '30 days'";
+    }
+    // period === 'all' -> no filters
+
+    const { rows } = await smtAdminPool.query(`
+      WITH goals_filtered AS (
+        SELECT role, client, created_at
+        FROM recruiters.goals
+        ${goalWhere}
+      ),
+      activities_filtered AS (
+        SELECT role, client, stage, created_at
+        FROM recruiters.activities
+        ${activityWhere}
+      ),
+      campaigns_filtered AS (
+        SELECT cr_sent, email_sent, date
+        FROM recruiters.campaigns
+        ${campaignWhere}
+      ),
+      active_recs AS (
+        SELECT role, client FROM goals_filtered
+        UNION
+        SELECT role, client FROM activities_filtered
+      )
+      SELECT
+        (
+          SELECT COUNT(DISTINCT NULLIF(CONCAT(
+            LOWER(TRIM(COALESCE(role, ''))), '|', LOWER(TRIM(COALESCE(client, '')))
+          ), '|'))::int
+          FROM active_recs
+        ) AS open_recs,
+        (SELECT COUNT(*)::int FROM goals_filtered) AS goal_count,
+        COUNT(*) FILTER (WHERE LOWER(TRIM(stage)) = 'sourced candidates')::int AS sourced_candidates,
+        COUNT(*) FILTER (WHERE LOWER(TRIM(stage)) IN ('scheduled calls', 'scheduled interview'))::int AS recruiter_interviews_scheduled,
+        COUNT(*) FILTER (WHERE LOWER(TRIM(stage)) = 'hiring manager interview')::int AS hiring_manager_interviews_scheduled,
+        COUNT(*) FILTER (WHERE LOWER(TRIM(stage)) = 'client ready')::int AS client_ready_candidates,
+        COUNT(*)::int AS activity_count,
+        (SELECT COALESCE(SUM(cr_sent), 0)::int FROM campaigns_filtered) AS cr_sent,
+        (SELECT COALESCE(SUM(email_sent), 0)::int FROM campaigns_filtered) AS emails_sent,
+        (SELECT COUNT(*)::int FROM campaigns_filtered) AS campaign_count,
+        MAX(created_at) AS latest_activity_at
+      FROM activities_filtered
+    `, params);
+
+    const r = rows[0] || {};
+    res.json({
+      ok: true,
+      period,
+      startDate,
+      endDate,
+      open_recs: Number(r.open_recs) || 0,
+      goal_count: Number(r.goal_count) || 0,
+      sourced_candidates: Number(r.sourced_candidates) || 0,
+      emails_sent: Number(r.emails_sent) || 0,
+      cr_sent: Number(r.cr_sent) || 0,
+      recruiter_interviews_scheduled: Number(r.recruiter_interviews_scheduled) || 0,
+      hiring_manager_interviews_scheduled: Number(r.hiring_manager_interviews_scheduled) || 0,
+      client_ready_candidates: Number(r.client_ready_candidates) || 0,
+      activity_count: Number(r.activity_count) || 0,
+      campaign_count: Number(r.campaign_count) || 0,
+      latest_activity_at: r.latest_activity_at || null,
+    });
+  } catch (e) {
+    console.error('GET /api/smt/recruiter/overview error:', e.message);
+    if (e.message.includes('does not exist')) {
+      return res.json({ ok: true, pending: true });
+    }
+    res.status(500).json({ ok: false, error: e.message });
+  }
+});
+
+/** GET /api/smt/recruiter/goals — goals with period-aware mid/end actuals */
 app.get('/api/smt/recruiter/goals', async (req, res) => {
   const { start, end, recruiter } = req.query;
   try {
@@ -4235,25 +4352,38 @@ app.get('/api/smt/recruiter/goals', async (req, res) => {
          g.mid_week_stage, g.mid_week_target,
          g.end_week_stage, g.weekly_target,
          g.notes, g.candidates, g.created_at,
-         COUNT(CASE
-           WHEN LOWER(TRIM(a.stage)) = LOWER(TRIM(g.mid_week_stage)) THEN 1
-         END)::int AS mid_actual,
-         COUNT(CASE
-           WHEN LOWER(TRIM(a.stage)) = LOWER(TRIM(g.end_week_stage)) THEN 1
-         END)::int AS end_actual
+         (
+           SELECT COUNT(*)::int
+           FROM recruiters.activities a
+           WHERE LOWER(REPLACE(a.recruiter_name,' ','')) = LOWER(REPLACE(g.recruiter_name,' ',''))
+             AND LOWER(TRIM(a.role))   = LOWER(TRIM(g.role))
+             AND LOWER(TRIM(a.client)) = LOWER(TRIM(g.client))
+             AND LOWER(TRIM(a.stage))  = LOWER(TRIM(g.mid_week_stage))
+             AND LOWER(TRIM(a.goal_period)) = 'mid-week'
+             AND a.created_at::date >= g.created_at::date
+             AND a.created_at::date <  g.created_at::date + INTERVAL '7 days'
+             ${aWhere}
+         ) AS mid_actual,
+         (
+           SELECT COUNT(*)::int
+           FROM recruiters.activities a
+           WHERE LOWER(REPLACE(a.recruiter_name,' ','')) = LOWER(REPLACE(g.recruiter_name,' ',''))
+             AND LOWER(TRIM(a.role))   = LOWER(TRIM(g.role))
+             AND LOWER(TRIM(a.client)) = LOWER(TRIM(g.client))
+             AND LOWER(TRIM(a.stage))  = LOWER(TRIM(g.end_week_stage))
+             AND (
+               LOWER(TRIM(a.goal_period)) = 'end-week'
+               OR (
+                 LOWER(TRIM(g.mid_week_stage)) = LOWER(TRIM(g.end_week_stage))
+                 AND LOWER(TRIM(a.goal_period)) = 'mid-week'
+               )
+             )
+             AND a.created_at::date >= g.created_at::date
+             AND a.created_at::date <  g.created_at::date + INTERVAL '7 days'
+             ${aWhere}
+         ) AS end_actual
        FROM recruiters.goals g
-       LEFT JOIN recruiters.activities a
-         ON LOWER(REPLACE(a.recruiter_name,' ','')) = LOWER(REPLACE(g.recruiter_name,' ',''))
-        AND LOWER(TRIM(a.role))   = LOWER(TRIM(g.role))
-        AND LOWER(TRIM(a.client)) = LOWER(TRIM(g.client))
-        AND (LOWER(TRIM(a.stage)) = LOWER(TRIM(g.mid_week_stage))
-          OR LOWER(TRIM(a.stage)) = LOWER(TRIM(g.end_week_stage)))
-        ${aWhere}
        ${gWhere}
-       GROUP BY g.id, g.recruiter_name, g.role, g.client,
-                g.mid_week_stage, g.mid_week_target,
-                g.end_week_stage, g.weekly_target,
-                g.notes, g.candidates, g.created_at
        ORDER BY g.created_at DESC, g.recruiter_name, g.role`,
       params
     );
@@ -4263,9 +4393,9 @@ app.get('/api/smt/recruiter/goals', async (req, res) => {
   }
 });
 
-/** GET /api/smt/recruiter/activities — drill-down, filtered by stage + date range (no mid/end time split: the "period" label is purely which target column was clicked, not a filter) */
+/** GET /api/smt/recruiter/activities — drill-down matching the goal actual logic */
 app.get('/api/smt/recruiter/activities', async (req, res) => {
-  const { start, end, recruiter, role, client, stage } = req.query;
+  const { start, end, recruiter, role, client, stage, period, continue: continueCount, goalStart } = req.query;
   try {
     const params = [];
     const conds  = [];
@@ -4277,6 +4407,20 @@ app.get('/api/smt/recruiter/activities', async (req, res) => {
     if (role)   { params.push(role);   conds.push(`LOWER(TRIM(role))   = LOWER(TRIM($${params.length}))`); }
     if (client) { params.push(client); conds.push(`LOWER(TRIM(client)) = LOWER(TRIM($${params.length}))`); }
     if (stage)  { params.push(stage);  conds.push(`LOWER(TRIM(stage))  = LOWER(TRIM($${params.length}))`); }
+    if (goalStart) {
+      params.push(goalStart);
+      conds.push(`created_at::date >= $${params.length}::date`);
+      conds.push(`created_at::date < $${params.length}::date + INTERVAL '7 days'`);
+    }
+    if (period === 'mid') {
+      conds.push(`LOWER(TRIM(goal_period)) = 'mid-week'`);
+    } else if (period === 'end') {
+      if (continueCount === 'true') {
+        conds.push(`LOWER(TRIM(goal_period)) IN ('mid-week', 'end-week')`);
+      } else {
+        conds.push(`LOWER(TRIM(goal_period)) = 'end-week'`);
+      }
+    }
     const where = conds.length ? 'WHERE ' + conds.join(' AND ') : '';
     const { rows } = await smtReadPool.query(
       `SELECT id, recruiter_name, role, client, candidate_name, stage,
@@ -4345,6 +4489,172 @@ app.post('/api/smt/recruiter/campaigns', async (req, res) => {
     );
     res.json({ ok: true, campaign: rows[0] });
   } catch (e) {
+    res.status(500).json({ ok: false, error: e.message });
+  }
+});
+
+// ── Recruiter Dashboard Tasks (recruiters.dashboard_tasks in smt_db) ──────────
+// Mirrors the Sales dashboard task list, but keeps recruiting tasks in the
+// recruiters schema.
+
+/** GET /api/smt/recruiter/dashboard-tasks */
+app.get('/api/smt/recruiter/dashboard-tasks', async (req, res) => {
+  try {
+    const { status } = req.query;
+    let where = '';
+    const params = [];
+    if (status && status !== 'all') { params.push(status); where = `WHERE t.status = $1`; }
+    const { rows } = await smtAdminPool.query(
+      `SELECT t.id, t.title, t.description, t.assigned_to, t.due_date, t.status,
+              t.created_at, t.updated_at,
+              u.name AS created_by_name,
+              COALESCE(
+                (SELECT json_agg(json_build_object('id', au.id, 'name', au.name, 'email', au.email))
+                 FROM users.users au WHERE au.id = ANY(COALESCE(t.assigned_to, ARRAY[]::integer[]))),
+                '[]'::json
+              ) AS assignees
+       FROM recruiters.dashboard_tasks t
+       LEFT JOIN users.users u ON u.id = t.created_by
+       ${where}
+       ORDER BY
+         CASE t.status WHEN 'pending' THEN 1 WHEN 'in_progress' THEN 2 WHEN 'done' THEN 3 ELSE 4 END,
+         t.due_date ASC NULLS LAST, t.created_at DESC`,
+      params
+    );
+    res.json({ ok: true, tasks: rows });
+  } catch (e) {
+    console.error('GET /api/smt/recruiter/dashboard-tasks error:', e.message);
+    res.status(500).json({ ok: false, tasks: [] });
+  }
+});
+
+/** POST /api/smt/recruiter/dashboard-tasks */
+app.post('/api/smt/recruiter/dashboard-tasks', async (req, res) => {
+  try {
+    const { title, description, assigned_to, due_date, status = 'pending' } = req.body;
+    if (!title) return res.status(400).json({ error: 'title is required' });
+    const email = req.user?.email || null;
+    const userRow = email ? await smtAdminPool.query(`SELECT id FROM users.users WHERE email = $1 LIMIT 1`, [email]) : { rows: [] };
+    const createdBy = userRow.rows[0]?.id || null;
+    const assigneeArr = Array.isArray(assigned_to) ? assigned_to.map(Number).filter(Boolean) : [];
+    const { rows } = await smtAdminPool.query(
+      `INSERT INTO recruiters.dashboard_tasks (title, description, assigned_to, due_date, status, created_by)
+       VALUES ($1, $2, $3, $4::date, $5, $6) RETURNING *`,
+      [title, description || null, assigneeArr, due_date || null, status, createdBy]
+    );
+    res.status(201).json({ ok: true, task: rows[0] });
+  } catch (e) {
+    console.error('POST /api/smt/recruiter/dashboard-tasks error:', e.message);
+    res.status(500).json({ ok: false, error: e.message });
+  }
+});
+
+/** PATCH /api/smt/recruiter/dashboard-tasks/:id */
+app.patch('/api/smt/recruiter/dashboard-tasks/:id', async (req, res) => {
+  try {
+    const { title, description, assigned_to, due_date, status } = req.body;
+    const hasAssignees = 'assigned_to' in req.body;
+    const assigneeArr = hasAssignees ? (Array.isArray(assigned_to) ? assigned_to.map(Number).filter(Boolean) : []) : undefined;
+    const { rows } = await smtAdminPool.query(
+      `UPDATE recruiters.dashboard_tasks SET
+         title       = COALESCE($1, title),
+         description = COALESCE($2, description),
+         assigned_to = CASE WHEN $3 THEN $4::integer[] ELSE assigned_to END,
+         due_date    = CASE WHEN $5::date IS NOT NULL THEN $5::date ELSE due_date END,
+         status      = COALESCE($6, status),
+         updated_at  = now()
+       WHERE id = $7 RETURNING *`,
+      [title || null, description !== undefined ? (description || null) : null,
+       hasAssignees, hasAssignees ? assigneeArr : [],
+       due_date || null, status || null, req.params.id]
+    );
+    if (!rows.length) return res.status(404).json({ error: 'Task not found' });
+    res.json({ ok: true, task: rows[0] });
+  } catch (e) {
+    console.error('PATCH /api/smt/recruiter/dashboard-tasks error:', e.message);
+    res.status(500).json({ ok: false, error: e.message });
+  }
+});
+
+/** DELETE /api/smt/recruiter/dashboard-tasks/:id */
+app.delete('/api/smt/recruiter/dashboard-tasks/:id', async (req, res) => {
+  try {
+    await smtAdminPool.query(`DELETE FROM recruiters.dashboard_tasks WHERE id = $1`, [req.params.id]);
+    res.json({ ok: true });
+  } catch (e) {
+    console.error('DELETE /api/smt/recruiter/dashboard-tasks error:', e.message);
+    res.status(500).json({ ok: false, error: e.message });
+  }
+});
+
+// ── Recruiter Dashboard Library (recruiters.dashboard_library in smt_db) ──────
+
+/** GET /api/smt/recruiter/dashboard-library */
+app.get('/api/smt/recruiter/dashboard-library', async (req, res) => {
+  try {
+    const { rows } = await smtAdminPool.query(
+      `SELECT l.id, l.title, l.url, l.link_type, l.description, l.created_at, l.updated_at,
+              u.name AS created_by_name
+       FROM recruiters.dashboard_library l
+       LEFT JOIN users.users u ON u.id = l.created_by
+       ORDER BY l.created_at DESC`
+    );
+    res.json({ ok: true, links: rows });
+  } catch (e) {
+    console.error('GET /api/smt/recruiter/dashboard-library error:', e.message);
+    res.status(500).json({ ok: false, links: [] });
+  }
+});
+
+/** POST /api/smt/recruiter/dashboard-library */
+app.post('/api/smt/recruiter/dashboard-library', async (req, res) => {
+  try {
+    const { title, url, link_type = 'spreadsheet', description } = req.body;
+    if (!title || !url) return res.status(400).json({ error: 'title and url are required' });
+    const email = req.user?.email || null;
+    const userRow = email ? await smtAdminPool.query(`SELECT id FROM users.users WHERE email = $1 LIMIT 1`, [email]) : { rows: [] };
+    const userId = userRow.rows[0]?.id || null;
+    const { rows } = await smtAdminPool.query(
+      `INSERT INTO recruiters.dashboard_library (title, url, link_type, description, created_by)
+       VALUES ($1, $2, $3, $4, $5) RETURNING *`,
+      [title, url, link_type, description || null, userId]
+    );
+    res.status(201).json({ ok: true, link: rows[0] });
+  } catch (e) {
+    console.error('POST /api/smt/recruiter/dashboard-library error:', e.message);
+    res.status(500).json({ ok: false, error: e.message });
+  }
+});
+
+/** PATCH /api/smt/recruiter/dashboard-library/:id */
+app.patch('/api/smt/recruiter/dashboard-library/:id', async (req, res) => {
+  try {
+    const { title, url, link_type, description } = req.body;
+    const { rows } = await smtAdminPool.query(
+      `UPDATE recruiters.dashboard_library SET
+         title       = COALESCE($1, title),
+         url         = COALESCE($2, url),
+         link_type   = COALESCE($3, link_type),
+         description = COALESCE($4, description),
+         updated_at  = now()
+       WHERE id = $5 RETURNING *`,
+      [title || null, url || null, link_type || null, description !== undefined ? (description || null) : null, req.params.id]
+    );
+    if (!rows.length) return res.status(404).json({ error: 'Link not found' });
+    res.json({ ok: true, link: rows[0] });
+  } catch (e) {
+    console.error('PATCH /api/smt/recruiter/dashboard-library error:', e.message);
+    res.status(500).json({ ok: false, error: e.message });
+  }
+});
+
+/** DELETE /api/smt/recruiter/dashboard-library/:id */
+app.delete('/api/smt/recruiter/dashboard-library/:id', async (req, res) => {
+  try {
+    await smtAdminPool.query(`DELETE FROM recruiters.dashboard_library WHERE id = $1`, [req.params.id]);
+    res.json({ ok: true });
+  } catch (e) {
+    console.error('DELETE /api/smt/recruiter/dashboard-library error:', e.message);
     res.status(500).json({ ok: false, error: e.message });
   }
 });
@@ -7115,47 +7425,80 @@ const INTENT_TAB_CFG = {
 // Handles natural-language commands to create/update/delete dashboard data:
 // campaign briefs, call records, tasks — without going through the AI gateway.
 
+const RECRUITING_CHAT_BRIEF_SEQUENCE = [
+  { title: 'LinkedIn CR Note', meta: 'Step 1', subject: '', body: 'Send a concise connection request note referencing the role, client, and candidate fit.', color: '#818CF8' },
+  { title: 'Email/InMail', meta: 'Step 2', subject: '', body: 'Send the main outreach message with role context and a clear reply CTA.', color: '#A78BFA' },
+  { title: 'Email/LinkedIn follow-up', meta: 'Step 3', subject: '', body: 'Follow up with one useful nudge through email or LinkedIn.', color: '#5AC8FA' },
+];
+
+function normalizeDashboardTarget(target) {
+  if (!target) return null;
+  return /^recruit/i.test(target) ? 'recruiting' : 'sales';
+}
+
+function resolveDashboardTarget(intent, taskRef, agentName, message) {
+  if (intent?.target) return intent.target;
+  const lo = (message || '').toLowerCase();
+  if (/\brecruit(?:ing|er|ers)?\b/.test(lo)) return 'recruiting';
+  if (/\bsales\b/.test(lo)) return 'sales';
+  if (['zara', 'camilla'].includes((agentName || '').toLowerCase())) return 'recruiting';
+  if (/^(ZARA|CAMILLA|RECRUIT)/i.test(taskRef || '')) return 'recruiting';
+  return 'sales';
+}
+
+function targetLabel(target) {
+  return target === 'recruiting' ? 'Recruiting' : 'Sales';
+}
+
 function parseDashboardIntent(msg) {
   const m = msg.trim();
   const lo = m.toLowerCase();
 
   // ── CAMPAIGN BRIEFS ────────────────────────────────────────────────────────
   // Add brief: "add campaign brief <title>" / "create a new brief called <title>"
-  let r = m.match(/^(?:add|create|new)\s+(?:a\s+)?(?:campaign\s+)?brief(?:\s+called|\s+named|:)?\s+(.+)$/i);
-  if (r) return { action: 'brief_add', title: r[1].trim() };
+  let r = m.match(/^(?:add|create|new)\s+(?:a\s+)?(?:(sales|recruiting|recruiter)\s+)?(?:campaign\s+)?brief(?:\s+called|\s+named|:)?\s+(.+)$/i);
+  if (r) return { action: 'brief_add', target: normalizeDashboardTarget(r[1]), title: r[2].trim() };
 
   // Delete brief: "delete brief <title>" / "remove campaign brief <title>"
-  r = m.match(/^(?:delete|remove)\s+(?:campaign\s+)?brief\s+(.+)$/i);
-  if (r) return { action: 'brief_delete', title: r[1].trim() };
+  r = m.match(/^(?:delete|remove)\s+(?:(sales|recruiting|recruiter)\s+)?(?:campaign\s+)?brief\s+(.+)$/i);
+  if (r) return { action: 'brief_delete', target: normalizeDashboardTarget(r[1]), title: r[2].trim() };
 
   // Update brief title: "rename brief <old> to <new>"
-  r = m.match(/^rename\s+(?:campaign\s+)?brief\s+(.+?)\s+to\s+(.+)$/i);
-  if (r) return { action: 'brief_rename', oldTitle: r[1].trim(), newTitle: r[2].trim() };
+  r = m.match(/^rename\s+(?:(sales|recruiting|recruiter)\s+)?(?:campaign\s+)?brief\s+(.+?)\s+to\s+(.+)$/i);
+  if (r) return { action: 'brief_rename', target: normalizeDashboardTarget(r[1]), oldTitle: r[2].trim(), newTitle: r[3].trim() };
 
   // Update brief field: "set brief <title> assignee to Laura"
-  r = m.match(/^(?:set|update)\s+(?:campaign\s+)?brief\s+(.+?)\s+(assignee|channel|activity|icp|subtitle)\s+to\s+(.+)$/i);
-  if (r) return { action: 'brief_update_field', title: r[1].trim(), field: r[2].toLowerCase(), value: r[3].trim() };
+  r = m.match(/^(?:set|update)\s+(?:(sales|recruiting|recruiter)\s+)?(?:campaign\s+)?brief\s+(.+?)\s+(assignee|channel|activity|icp|subtitle)\s+to\s+(.+)$/i);
+  if (r) return { action: 'brief_update_field', target: normalizeDashboardTarget(r[1]), title: r[2].trim(), field: r[3].toLowerCase(), value: r[4].trim() };
 
   // List briefs
-  if (/^(?:list|show)\s+(?:all\s+)?(?:campaign\s+)?briefs?$/.test(lo))
-    return { action: 'brief_list' };
+  r = m.match(/^(?:list|show)\s+(?:all\s+)?(?:(sales|recruiting|recruiter)\s+)?(?:campaign\s+)?briefs?$/i);
+  if (r) return { action: 'brief_list', target: normalizeDashboardTarget(r[1]) };
 
   // ── TASKS ─────────────────────────────────────────────────────────────────
+  // Add task with the task noun at the end: "add a test task on the sales dashboard"
+  r = m.match(/^(?:add|create|new)\s+(?:a\s+)?(.+?)\s+task\s+(?:on|to|in)\s+(?:the\s+)?(sales|recruiting|recruiter)(?:\s+dashboard)?$/i);
+  if (r) return { action: 'task_add', target: normalizeDashboardTarget(r[2]), description: `${r[1].trim()} task` };
+
+  // Add task to a dashboard with the description after the target: "add task on sales dashboard: follow up"
+  r = m.match(/^(?:add|create|new)\s+(?:a\s+)?task\s+(?:on|to|in)\s+(?:the\s+)?(sales|recruiting|recruiter)(?:\s+dashboard)?(?::|\s+called|\s+named)?\s+(.+)$/i);
+  if (r) return { action: 'task_add', target: normalizeDashboardTarget(r[1]), description: r[2].trim() };
+
   // Add task: "add task <description>" / "create task: <desc>"
-  r = m.match(/^(?:add|create|new)\s+(?:a\s+)?task:?\s+(.+)$/i);
-  if (r) return { action: 'task_add', description: r[1].trim() };
+  r = m.match(/^(?:add|create|new)\s+(?:a\s+)?(?:(sales|recruiting|recruiter)\s+)?task:?\s+(.+)$/i);
+  if (r) return { action: 'task_add', target: normalizeDashboardTarget(r[1]), description: r[2].trim() };
 
   // Update task status: "mark task <id> as done" / "update task <id> status to pending"
-  r = m.match(/^(?:mark|update|set)\s+task\s+(\d+)\s+(?:as\s+|status\s+to\s+)(.+)$/i);
-  if (r) return { action: 'task_update', id: r[1], status: r[2].trim().toLowerCase() };
+  r = m.match(/^(?:mark|update|set)\s+(?:(sales|recruiting|recruiter)\s+)?task\s+(\d+)\s+(?:as\s+|status\s+to\s+)(.+)$/i);
+  if (r) return { action: 'task_update', target: normalizeDashboardTarget(r[1]), id: r[2], status: r[3].trim().toLowerCase() };
 
   // Delete task: "delete task <id>"
-  r = m.match(/^(?:delete|remove)\s+task\s+(\d+)$/i);
-  if (r) return { action: 'task_delete', id: r[1] };
+  r = m.match(/^(?:delete|remove)\s+(?:(sales|recruiting|recruiter)\s+)?task\s+(\d+)$/i);
+  if (r) return { action: 'task_delete', target: normalizeDashboardTarget(r[1]), id: r[2] };
 
   // List tasks
-  if (/^(?:list|show)\s+(?:all\s+)?(?:open\s+|pending\s+)?tasks?$/.test(lo))
-    return { action: 'task_list' };
+  r = m.match(/^(?:list|show)\s+(?:all\s+)?(?:(sales|recruiting|recruiter)\s+)?(?:open\s+|pending\s+)?tasks?$/i);
+  if (r) return { action: 'task_list', target: normalizeDashboardTarget(r[1]) };
 
   // ── CALL RECORDS ──────────────────────────────────────────────────────────
   // Log call: "log call with <name> at <company> outcome <result>"
@@ -7169,48 +7512,71 @@ async function handleDashboardIntent(userMessage, sessionId, taskRef, agentName,
   const intent = parseDashboardIntent(userMessage);
   if (!intent) return null;
 
+  const target = resolveDashboardTarget(intent, taskRef, agentName, userMessage);
+  const label = targetLabel(target);
+  const briefTable = target === 'recruiting' ? 'recruiters.campaign_briefs' : 'sales.campaign_briefs';
+  const taskTable = target === 'recruiting' ? 'recruiters.dashboard_tasks' : 'sales.dashboard_tasks';
   let replyText = '';
   try {
     // ── CAMPAIGN BRIEFS ──────────────────────────────────────────────────────
     if (intent.action === 'brief_add') {
       const sortRes = await smtAdminPool.query(
-        `SELECT COALESCE(MAX(sort_order),0)+1 AS next FROM sales.campaign_briefs WHERE is_deleted=false OR is_deleted IS NULL`
+        `SELECT COALESCE(MAX(sort_order),0)+1 AS next FROM ${briefTable} WHERE is_deleted=false OR is_deleted IS NULL`
       );
       const sortOrder = Number(sortRes.rows[0].next) || 1;
-      const assignee = agentName === 'darren' ? 'Darren' : 'Laura';
-      const account_id = agentName === 'darren' ? 32893 : 32891;
-      const res = await smtAdminPool.query(
-        `INSERT INTO sales.campaign_briefs (title, assignee, account_id, channel, sort_order, created_at)
-         VALUES ($1,$2,$3,'LinkedIn + Email',$4,CURRENT_DATE) RETURNING id, title`,
-        [intent.title, assignee, account_id, sortOrder]
-      );
-      replyText = `✅ Campaign brief "${res.rows[0].title}" added (id=${res.rows[0].id}, assigned to ${assignee}). Refresh the Campaign Brief section to see it.`;
+      if (target === 'recruiting') {
+        const briefJson = {
+          sdr: 'Unassigned',
+          title: intent.title,
+          color: null,
+          sequence: RECRUITING_CHAT_BRIEF_SEQUENCE,
+        };
+        const res = await smtAdminPool.query(
+          `INSERT INTO recruiters.campaign_briefs
+             (title, assignee, channel, sort_order, brief_json, created_at)
+           VALUES ($1,'Unassigned',NULL,$2,$3,CURRENT_DATE) RETURNING id, title`,
+          [intent.title, sortOrder, JSON.stringify(briefJson)]
+        );
+        replyText = `✅ Recruiting campaign brief "${res.rows[0].title}" added (id=${res.rows[0].id}) with the 3-step outreach sequence. Refresh the Campaign Brief section to see it.`;
+      } else {
+        const assignee = agentName === 'darren' ? 'Darren' : 'Laura';
+        const account_id = agentName === 'darren' ? 32893 : 32891;
+        const res = await smtAdminPool.query(
+          `INSERT INTO sales.campaign_briefs (title, assignee, account_id, channel, sort_order, created_at)
+           VALUES ($1,$2,$3,'LinkedIn + Email',$4,CURRENT_DATE) RETURNING id, title`,
+          [intent.title, assignee, account_id, sortOrder]
+        );
+        replyText = `✅ Sales campaign brief "${res.rows[0].title}" added (id=${res.rows[0].id}, assigned to ${assignee}). Refresh the Campaign Brief section to see it.`;
+      }
     }
 
     else if (intent.action === 'brief_delete') {
       const res = await smtAdminPool.query(
-        `UPDATE sales.campaign_briefs SET is_deleted=true, updated_at=NOW()
+        `UPDATE ${briefTable} SET is_deleted=true, updated_at=NOW()
          WHERE LOWER(title) LIKE $1 AND (is_deleted=false OR is_deleted IS NULL)
          RETURNING id, title`,
         [`%${intent.title.toLowerCase()}%`]
       );
       if (!res.rows.length) replyText = `❌ No active brief found matching "${intent.title}". Check the exact title.`;
-      else if (res.rows.length === 1) replyText = `✅ Deleted brief "${res.rows[0].title}".`;
-      else replyText = `✅ Deleted ${res.rows.length} briefs matching "${intent.title}": ${res.rows.map(r=>r.title).join(', ')}.`;
+      else if (res.rows.length === 1) replyText = `✅ Deleted ${label} brief "${res.rows[0].title}".`;
+      else replyText = `✅ Deleted ${res.rows.length} ${label} briefs matching "${intent.title}": ${res.rows.map(r=>r.title).join(', ')}.`;
     }
 
     else if (intent.action === 'brief_rename') {
       const res = await smtAdminPool.query(
-        `UPDATE sales.campaign_briefs SET title=$1, updated_at=NOW()
+        `UPDATE ${briefTable} SET title=$1, updated_at=NOW()
          WHERE LOWER(title) LIKE $2 AND (is_deleted=false OR is_deleted IS NULL)
          RETURNING id, title`,
         [intent.newTitle, `%${intent.oldTitle.toLowerCase()}%`]
       );
       if (!res.rows.length) replyText = `❌ No brief found matching "${intent.oldTitle}".`;
-      else replyText = `✅ Renamed to "${intent.newTitle}" (id=${res.rows[0].id}).`;
+      else replyText = `✅ Renamed ${label} brief to "${intent.newTitle}" (id=${res.rows[0].id}).`;
     }
 
     else if (intent.action === 'brief_update_field') {
+      if (target === 'recruiting') {
+        replyText = '❌ Recruiting campaign briefs only use a brief name plus the fixed 3-step outreach. Use “rename recruiting brief <old> to <new>” for title changes, or edit the three outreach messages in the Campaign Brief modal.';
+      } else {
       const colMap = { assignee:'assignee', channel:'channel', activity:'activity', icp:'subtitle', subtitle:'subtitle' };
       const col = colMap[intent.field];
       if (!col) { replyText = `❌ Unknown field "${intent.field}". Options: assignee, channel, activity, icp.`; }
@@ -7224,55 +7590,64 @@ async function handleDashboardIntent(userMessage, sessionId, taskRef, agentName,
         if (!res.rows.length) replyText = `❌ No brief found matching "${intent.title}".`;
         else replyText = `✅ Updated ${intent.field} → "${intent.value}" on "${res.rows[0].title}".`;
       }
+      }
     }
 
     else if (intent.action === 'brief_list') {
       const res = await smtAdminPool.query(
-        `SELECT id, title, assignee, channel FROM sales.campaign_briefs
+        `SELECT id, title, assignee, channel FROM ${briefTable}
          WHERE is_deleted=false OR is_deleted IS NULL ORDER BY sort_order ASC NULLS LAST, id ASC LIMIT 30`
       );
       if (!res.rows.length) replyText = 'No campaign briefs found.';
-      else replyText = `**Campaign Briefs (${res.rows.length})**\n` +
+      else replyText = `**${label} Campaign Briefs (${res.rows.length})**\n` +
         res.rows.map((r,i) => `${i+1}. ${r.title} · ${r.assignee||'?'}`).join('\n');
     }
 
     // ── TASKS ────────────────────────────────────────────────────────────────
     else if (intent.action === 'task_add') {
-      const res = await pgPool.query(
-        `INSERT INTO user_tasks (description, status, task_type, horizon, accountable_person)
-         VALUES ($1,'pending','Next Action','Ground',$2) RETURNING id, description`,
-        [intent.description, agentName === 'darren' ? 'Darren' : 'Laura']
+      const title = intent.description.length > 90 ? `${intent.description.slice(0, 87)}...` : intent.description;
+      const res = await smtAdminPool.query(
+        `INSERT INTO ${taskTable} (title, description, assigned_to, status, created_by)
+         VALUES ($1,$2,ARRAY[]::integer[],'pending',NULL) RETURNING id, title`,
+        [title, intent.description]
       );
-      replyText = `✅ Task #${res.rows[0].id} created: "${res.rows[0].description}".`;
+      replyText = `✅ ${label} task #${res.rows[0].id} created: "${res.rows[0].title}". Refresh the Task list to see it.`;
     }
 
     else if (intent.action === 'task_update') {
-      const validStatuses = ['pending','captured','done','dismissed'];
-      const status = validStatuses.find(s => intent.status.includes(s)) || intent.status;
-      const res = await pgPool.query(
-        `UPDATE user_tasks SET status=$1, updated_at=NOW() WHERE id=$2 RETURNING id, description, status`,
-        [status, intent.id]
+      const validStatuses = ['pending','in_progress','done'];
+      const normalized = intent.status.includes('progress') ? 'in_progress'
+        : intent.status.includes('done') || intent.status.includes('complete') ? 'done'
+        : intent.status.includes('pending') ? 'pending'
+        : intent.status;
+      if (!validStatuses.includes(normalized)) {
+        replyText = `❌ Unsupported task status "${intent.status}". Use pending, in_progress, or done.`;
+      } else {
+      const res = await smtAdminPool.query(
+        `UPDATE ${taskTable} SET status=$1, updated_at=NOW() WHERE id=$2 RETURNING id, title, status`,
+        [normalized, intent.id]
       );
       if (!res.rows.length) replyText = `❌ Task #${intent.id} not found.`;
-      else replyText = `✅ Task #${res.rows[0].id} "${res.rows[0].description}" → ${res.rows[0].status}.`;
+      else replyText = `✅ ${label} task #${res.rows[0].id} "${res.rows[0].title}" → ${res.rows[0].status}.`;
+      }
     }
 
     else if (intent.action === 'task_delete') {
-      const res = await pgPool.query(
-        `DELETE FROM user_tasks WHERE id=$1 RETURNING id, description`, [intent.id]
+      const res = await smtAdminPool.query(
+        `DELETE FROM ${taskTable} WHERE id=$1 RETURNING id, title`, [intent.id]
       );
       if (!res.rows.length) replyText = `❌ Task #${intent.id} not found.`;
-      else replyText = `✅ Deleted task #${res.rows[0].id} "${res.rows[0].description}".`;
+      else replyText = `✅ Deleted ${label} task #${res.rows[0].id} "${res.rows[0].title}".`;
     }
 
     else if (intent.action === 'task_list') {
-      const res = await pgPool.query(
-        `SELECT id, description, status, horizon FROM user_tasks
-         WHERE status NOT IN ('done','dismissed') ORDER BY id DESC LIMIT 20`
+      const res = await smtAdminPool.query(
+        `SELECT id, title, status FROM ${taskTable}
+         WHERE status <> 'done' ORDER BY id DESC LIMIT 20`
       );
       if (!res.rows.length) replyText = 'No open tasks found.';
-      else replyText = `**Open Tasks (${res.rows.length})**\n` +
-        res.rows.map(r => `#${r.id} [${r.status}] ${r.description}`).join('\n');
+      else replyText = `**${label} Open Tasks (${res.rows.length})**\n` +
+        res.rows.map(r => `#${r.id} [${r.status}] ${r.title}`).join('\n');
     }
 
     // ── CALL RECORDS ─────────────────────────────────────────────────────────

@@ -45,6 +45,10 @@ const SUGGESTIONS = {
   laura_dashboard:['List briefs', 'List tasks', 'Top actions today?'],
   darren_dashboard:['DWDM campaign status?', 'BEAD pipeline?', 'DC outreach progress?'],
   overview:       ['List briefs', 'Combined pipeline stats?', 'Top wins this week?'],
+  ZARA_CANDIDATES:['Add recruiting brief: <name>', 'List recruiting briefs', 'Add recruiting task: <description>'],
+  CAMILLA_CANDIDATES:['Add recruiting brief: <name>', 'List recruiting briefs', 'Add recruiting task: <description>'],
+  ZARA_TASKS:     ['List recruiting tasks', 'Add recruiting task: <description>', 'Mark recruiting task <id> as done'],
+  CAMILLA_TASKS:  ['List recruiting tasks', 'Add recruiting task: <description>', 'Mark recruiting task <id> as done'],
   analytics:      ['Cost trend this week?', 'Most active agent?', 'Token efficiency?'],
   costs:          ['Highest cost session?', 'Cost vs output?', 'Budget status?'],
   tasks:          ['List tasks', 'Add task: <description>', 'What to prioritize?'],
@@ -82,20 +86,20 @@ function TypingBubble({ agentColor = '#06E5EC' }) {
              : `Still working… (${elapsed}s)`;
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 4 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 6 }}>
       <div style={{
         background: '#001654',
         border: `1px solid ${agentColor}30`,
-        borderRadius: '12px 12px 12px 2px',
-        padding: '10px 16px',
+        borderRadius: '14px 14px 14px 3px',
+        padding: '12px 18px',
         display: 'flex',
-        gap: 5,
+        gap: 6,
         alignItems: 'center',
       }}>
         {[0, 1, 2].map(i => (
           <div key={i} style={{
-            width: 7,
-            height: 7,
+            width: 8,
+            height: 8,
             borderRadius: '50%',
             background: agentColor,
             opacity: 0.8,
@@ -103,7 +107,7 @@ function TypingBubble({ agentColor = '#06E5EC' }) {
           }} />
         ))}
       </div>
-      <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)', paddingLeft: 4 }}>{hint}</span>
+      <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', paddingLeft: 4 }}>{hint}</span>
       <style>{`
         @keyframes typingPulse {
           0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
@@ -118,29 +122,29 @@ function TypingBubble({ agentColor = '#06E5EC' }) {
 function MessageBubble({ m, agentColor, agentAvatar, agentLabel }) {
   const isUser = m.sender === 'ed';
   return (
-    <div style={{ display: 'flex', alignItems: 'flex-end', gap: 7, flexDirection: isUser ? 'row-reverse' : 'row' }}>
+    <div style={{ display: 'flex', alignItems: 'flex-end', gap: 10, flexDirection: isUser ? 'row-reverse' : 'row', width: '100%' }}>
       {/* Agent avatar next to message */}
       {!isUser && (
         <AgentAvatar
           src={agentAvatar}
           alt={agentLabel}
           color={agentColor}
-          size={28}
+          size={34}
           style={{
             border: `1.5px solid ${agentColor}50`,
-            marginBottom: 18,
+            marginBottom: 20,
           }}
         />
       )}
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: isUser ? 'flex-end' : 'flex-start' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: isUser ? 'flex-end' : 'flex-start', flex: 1, minWidth: 0 }}>
         <div style={{
           background: isUser ? agentColor : '#001654',
           color: isUser ? '#0a0e1a' : '#e8eaf0',
-          borderRadius: isUser ? '12px 12px 2px 12px' : '12px 12px 12px 2px',
-          padding: '9px 13px',
-          fontSize: 13,
-          maxWidth: '86%',
-          lineHeight: 1.5,
+          borderRadius: isUser ? '16px 16px 4px 16px' : '16px 16px 16px 4px',
+          padding: '12px 16px',
+          fontSize: 15,
+          maxWidth: '88%',
+          lineHeight: 1.65,
           border: isUser ? 'none' : `1px solid ${agentColor}20`,
           wordBreak: 'break-word',
         }}>
@@ -149,7 +153,7 @@ function MessageBubble({ m, agentColor, agentAvatar, agentLabel }) {
             : <div dangerouslySetInnerHTML={{ __html: renderMarkdown(m.message) }} />
           }
         </div>
-        <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.28)', marginTop: 3 }}>
+        <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', marginTop: 5 }}>
           {fmtTime(m.timestamp)}
         </span>
       </div>
@@ -243,14 +247,23 @@ export default function AgentChat({ taskRef, taskContext, isOpen, onToggle, defa
 
   const sessionId        = useRef(getSessionId());
   const bottomRef        = useRef(null);
+  const messagesPaneRef  = useRef(null);
   const threadSinceRef   = useRef('1970-01-01T00:00:00Z');
   const globalSinceRef   = useRef('1970-01-01T00:00:00Z');
   const threadErrRef     = useRef(0);
   const globalErrRef     = useRef(0);
   const lastMsgCountRef  = useRef(0);
+  const shouldStickToBottomRef = useRef(true);
 
   const AGENT_CHAT_COLORS  = { laura: '#06E5EC', darren: '#F59E0B', zara: '#A855F7', camilla: '#F43F5E', overview: '#8B5CF6' };
   const AGENT_CHAT_LABELS  = { laura: 'Laura', darren: 'Darren', zara: 'Zara', camilla: 'Camilla', overview: 'Overview' };
+  const AGENT_CHAT_TITLES  = {
+    laura: 'Laura Petersen · Sales SDR',
+    darren: 'Darren Stuart · DWDM & BEAD',
+    zara: 'Zara · Recruiting',
+    camilla: 'Camilla · Recruiting',
+    overview: 'Bold Business · Combined Pipeline',
+  };
   const isOverview  = defaultAgent === 'overview' && !['laura','darren','zara','camilla'].includes(chatAgent);
   const resolvedAgent = isOverview ? 'overview' : (AGENT_IDS[chatAgent] ? chatAgent : 'laura');
   const agentColor  = AGENT_CHAT_COLORS[resolvedAgent] || '#06E5EC';
@@ -266,20 +279,26 @@ export default function AgentChat({ taskRef, taskContext, isOpen, onToggle, defa
   const agentAvatar = resolveAvatar(resolvedAgent);
 
   const agentLabel  = AGENT_CHAT_LABELS[resolvedAgent] || resolvedAgent;
-  const agentTitle  = chatAgent === 'darren'
-    ? 'Darren Stuart · DWDM & BEAD'
-    : isOverview
-      ? 'Bold Business · Combined Pipeline'
-      : 'Laura Petersen · Sales SDR';
+  const agentTitle  = AGENT_CHAT_TITLES[resolvedAgent] || 'Laura Petersen · Sales SDR';
 
   // Reset thread when taskRef changes
   useEffect(() => {
     setActiveTaskRef(taskRef);
     setMessages([]);
+    shouldStickToBottomRef.current = true;
     const since24h = new Date(Date.now() - 86400000).toISOString();
     threadSinceRef.current = since24h;
     lastMsgCountRef.current = 0;
   }, [taskRef]);
+
+  const isNearBottom = useCallback((el) => {
+    if (!el) return true;
+    return el.scrollHeight - el.scrollTop - el.clientHeight < 96;
+  }, []);
+
+  const handleMessagesScroll = useCallback((e) => {
+    shouldStickToBottomRef.current = isNearBottom(e.currentTarget);
+  }, [isNearBottom]);
 
   const mergeMessages = useCallback((prev, incoming) => {
     try {
@@ -292,9 +311,17 @@ export default function AgentChat({ taskRef, taskContext, isOpen, onToggle, defa
         if (optKey) map.delete(optKey);
         map.set(String(m.id), m);
       }
-      return [...map.values()].sort((a, b) =>
+      const merged = [...map.values()].sort((a, b) =>
         new Date(a.timestamp || 0) - new Date(b.timestamp || 0)
       );
+      const unchanged = prev.length === merged.length && prev.every((m, i) => {
+        const n = merged[i];
+        return String(m.id) === String(n.id)
+          && m.sender === n.sender
+          && m.message === n.message
+          && m.timestamp === n.timestamp;
+      });
+      return unchanged ? prev : merged;
     } catch { return [...prev, ...incoming]; }
   }, []);
 
@@ -363,8 +390,19 @@ export default function AgentChat({ taskRef, taskContext, isOpen, onToggle, defa
 
   // Auto-scroll
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, isTyping]);
+    if (!isOpen || !shouldStickToBottomRef.current) return;
+    requestAnimationFrame(() => {
+      bottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+    });
+  }, [messages, isTyping, isOpen]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    shouldStickToBottomRef.current = true;
+    requestAnimationFrame(() => {
+      bottomRef.current?.scrollIntoView({ behavior: 'auto', block: 'end' });
+    });
+  }, [isOpen, activeTaskRef]);
 
   const sendMessage = async (text) => {
     const msg = (text || input).trim();
@@ -380,6 +418,7 @@ export default function AgentChat({ taskRef, taskContext, isOpen, onToggle, defa
       message: msg,
       timestamp: new Date().toISOString(),
     };
+    shouldStickToBottomRef.current = true;
     setMessages(prev => [...prev, optimistic]);
     setIsTyping(true);
 
@@ -412,7 +451,7 @@ export default function AgentChat({ taskRef, taskContext, isOpen, onToggle, defa
   const suggestions = getSuggestions(activeTaskRef);
 
   return (
-    <div style={{ position: 'fixed', bottom: 24, right: 24, zIndex: 9999, fontFamily: 'inherit' }}>
+    <div style={{ position: 'fixed', bottom: 20, right: 20, zIndex: 9999, fontFamily: 'inherit' }}>
       {/* Pulsing ring keyframes */}
       <style>{`
         @keyframes fabPulse {
@@ -465,21 +504,21 @@ export default function AgentChat({ taskRef, taskContext, isOpen, onToggle, defa
               src={agentAvatar}
               alt={agentLabel}
               color={agentColor}
-              size={62}
+              size={68}
               style={{
                 border: `2.5px solid ${agentColor}`,
-                boxShadow: `0 0 20px ${agentColor}70, 0 4px 16px rgba(0,0,0,0.55)`,
+                boxShadow: `0 0 24px ${agentColor}70, 0 6px 20px rgba(0,0,0,0.55)`,
                 transition: 'box-shadow 0.25s, transform 0.25s',
               }}
             />
             {/* Chat badge */}
             <div style={{
               position: 'absolute', bottom: 0, right: 0,
-              width: 22, height: 22, borderRadius: '50%',
+              width: 25, height: 25, borderRadius: '50%',
               background: agentColor,
               border: '2px solid #0a0e1a',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: 11, lineHeight: 1,
+              fontSize: 12, lineHeight: 1,
               boxShadow: `0 0 8px ${agentColor}80`,
             }}>💬</div>
           </button>
@@ -488,7 +527,7 @@ export default function AgentChat({ taskRef, taskContext, isOpen, onToggle, defa
             <div style={{
               position: 'absolute', top: -4, right: -4,
               background: '#ef4444', color: '#fff', borderRadius: '50%',
-              width: 20, height: 20, fontSize: 11, fontWeight: 700,
+              width: 22, height: 22, fontSize: 12, fontWeight: 700,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               border: '2px solid #0a0e1a', pointerEvents: 'none',
               zIndex: 1,
@@ -496,10 +535,10 @@ export default function AgentChat({ taskRef, taskContext, isOpen, onToggle, defa
           )}
           {/* Name tooltip on hover */}
           <div style={{
-            position: 'absolute', bottom: 68, right: 0,
+            position: 'absolute', bottom: 76, right: 0,
             background: 'rgba(10,14,26,0.92)', border: `1px solid ${agentColor}40`,
             borderRadius: 8, padding: '5px 10px',
-            fontSize: 11, fontWeight: 600, color: agentColor,
+            fontSize: 12, fontWeight: 700, color: agentColor,
             whiteSpace: 'nowrap', pointerEvents: 'none',
             opacity: 0,
             animation: 'none',
@@ -510,10 +549,11 @@ export default function AgentChat({ taskRef, taskContext, isOpen, onToggle, defa
         </div>
       ) : (
         <div style={{
-          width: 400, height: 560,
+          width: 'min(560px, calc(100vw - 32px))',
+          height: 'min(720px, calc(100vh - 48px))',
           display: 'flex', flexDirection: 'column',
-          borderRadius: 14, overflow: 'hidden',
-          boxShadow: `0 8px 40px rgba(0,0,0,0.6), 0 0 30px ${agentColor}20`,
+          borderRadius: 18, overflow: 'hidden',
+          boxShadow: `0 16px 56px rgba(0,0,0,0.68), 0 0 34px ${agentColor}22`,
           background: '#0a0e1a',
           border: `1px solid ${agentColor}35`,
           transition: 'border-color 0.3s',
@@ -521,43 +561,43 @@ export default function AgentChat({ taskRef, taskContext, isOpen, onToggle, defa
           {/* Header */}
           <div style={{
             background: `linear-gradient(135deg, ${agentColor === '#F59E0B' ? '#92400e, #78350f' : '#003BDF, #001654'})`,
-            padding: '13px 16px',
+            padding: '18px 20px',
             display: 'flex', alignItems: 'center', justifyContent: 'space-between',
           }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
               {/* Avatar in header */}
               <AgentAvatar
                 src={agentAvatar}
                 alt={agentLabel}
                 color={agentColor}
-                size={38}
+                size={46}
                 style={{
                   border: `2px solid ${agentColor}60`,
                   boxShadow: `0 0 10px ${agentColor}40`,
                 }}
               />
-              <div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <span style={{ color: '#fff', fontWeight: 700, fontSize: 14, lineHeight: 1 }}>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                  <span style={{ color: '#fff', fontWeight: 800, fontSize: 17, lineHeight: 1 }}>
                     {agentLabel}
                   </span>
                   {/* Online dot */}
-                  <div style={{ width: 7, height: 7, borderRadius: '50%', background: '#22c55e', boxShadow: '0 0 5px #22c55e' }} />
-                  <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: 0.8, padding: '2px 6px', borderRadius: 4, background: `${agentColor}20`, border: `1px solid ${agentColor}40`, color: agentColor }}>
+                  <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#22c55e', boxShadow: '0 0 5px #22c55e' }} />
+                  <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: 0.6, padding: '3px 7px', borderRadius: 6, background: `${agentColor}20`, border: `1px solid ${agentColor}40`, color: agentColor }}>
                     ⚡ FULL AGENT
                   </span>
                 </div>
-                <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', marginTop: 2 }}>{agentTitle}</div>
+                <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.55)', marginTop: 4, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{agentTitle}</div>
               </div>
             </div>
-            <button onClick={onToggle} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.6)', cursor: 'pointer', fontSize: 20, lineHeight: 1, padding: 0 }}>×</button>
+            <button onClick={onToggle} style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 8, color: 'rgba(255,255,255,0.75)', cursor: 'pointer', fontSize: 22, lineHeight: 1, width: 34, height: 34, padding: 0, flexShrink: 0 }}>×</button>
           </div>
 
           {/* Task context */}
           {activeTaskRef && (
             <div style={{
               background: `${agentColor}12`, borderBottom: `1px solid ${agentColor}25`,
-              padding: '5px 14px', fontSize: 11, color: agentColor,
+              padding: '9px 18px', fontSize: 13, color: agentColor,
               display: 'flex', alignItems: 'center', gap: 6,
             }}>
               <span>📋</span>
@@ -568,27 +608,31 @@ export default function AgentChat({ taskRef, taskContext, isOpen, onToggle, defa
           {/* Error banner */}
           {chatError && (
             <div style={{
-              fontSize: 12, color: '#fff', padding: '8px 14px',
+              fontSize: 13, color: '#fff', padding: '10px 18px',
               background: 'rgba(239,68,68,0.15)',
               borderBottom: '1px solid rgba(239,68,68,0.3)',
               display: 'flex', alignItems: 'center', gap: 6,
             }}>
               ⚠️ {chatError}
-              <button onClick={() => setChatError(null)} style={{ marginLeft: 'auto', background: 'none', border: 'none', color: 'rgba(255,255,255,0.5)', cursor: 'pointer', fontSize: 14 }}>×</button>
+              <button onClick={() => setChatError(null)} style={{ marginLeft: 'auto', background: 'none', border: 'none', color: 'rgba(255,255,255,0.5)', cursor: 'pointer', fontSize: 16 }}>×</button>
             </div>
           )}
 
           {/* Messages */}
-          <div style={{ flex: 1, overflowY: 'auto', padding: '14px 14px 6px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <div
+            ref={messagesPaneRef}
+            onScroll={handleMessagesScroll}
+            style={{ flex: 1, overflowY: 'auto', padding: '18px 18px 8px', display: 'flex', flexDirection: 'column', gap: 14 }}
+          >
             {!activeTaskRef ? (
-              <div style={{ textAlign: 'center', color: 'rgba(255,255,255,0.35)', fontSize: 13, marginTop: 60, padding: '0 24px', lineHeight: 1.7 }}>
-                <div style={{ fontSize: 32, marginBottom: 12 }}>💡</div>
+              <div style={{ textAlign: 'center', color: 'rgba(255,255,255,0.45)', fontSize: 15, marginTop: 72, padding: '0 28px', lineHeight: 1.7 }}>
+                <div style={{ fontSize: 36, marginBottom: 14 }}>💡</div>
                 <div>Open any task or campaign page</div>
                 <div>and the chat will focus on that context.</div>
               </div>
             ) : messages.length === 0 && !isTyping ? (
-              <div style={{ color: 'rgba(255,255,255,0.3)', fontSize: 12, textAlign: 'center', marginTop: 40 }}>
-                Ask {chatAgent === 'darren' ? 'Darren' : 'Laura'} about <strong style={{ color: 'rgba(255,255,255,0.5)' }}>{activeTaskRef}</strong>
+              <div style={{ color: 'rgba(255,255,255,0.45)', fontSize: 14, textAlign: 'center', marginTop: 48 }}>
+                Ask {agentLabel} about <strong style={{ color: 'rgba(255,255,255,0.5)' }}>{activeTaskRef}</strong>
               </div>
             ) : null}
 
@@ -600,8 +644,8 @@ export default function AgentChat({ taskRef, taskContext, isOpen, onToggle, defa
           {/* Smart suggestion pills */}
           {activeTaskRef && (
             <div style={{
-              padding: '6px 12px 4px',
-              display: 'flex', gap: 5, flexWrap: 'wrap',
+              padding: '10px 16px 8px',
+              display: 'flex', gap: 8, flexWrap: 'wrap',
               borderTop: '1px solid rgba(255,255,255,0.06)',
             }}>
               {suggestions.map(s => (
@@ -609,9 +653,10 @@ export default function AgentChat({ taskRef, taskContext, isOpen, onToggle, defa
                   background: `${agentColor}12`,
                   border: `1px solid ${agentColor}30`,
                   color: agentColor,
-                  borderRadius: 12, padding: '3px 9px',
-                  fontSize: 11, cursor: sending ? 'not-allowed' : 'pointer',
+                  borderRadius: 999, padding: '7px 11px',
+                  fontSize: 12, cursor: sending ? 'not-allowed' : 'pointer',
                   fontWeight: 500, opacity: sending ? 0.5 : 1,
+                  lineHeight: 1.25,
                   transition: 'background 0.15s',
                 }}>{s}</button>
               ))}
@@ -619,13 +664,13 @@ export default function AgentChat({ taskRef, taskContext, isOpen, onToggle, defa
           )}
 
           {/* Agent toggle */}
-          <div style={{ display: 'flex', gap: 4, padding: '5px 12px', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
-            {[['laura','Laura','#06E5EC'],['darren','Darren','#F59E0B']].map(([a,label,color]) => (
+          <div style={{ display: 'flex', gap: 8, padding: '9px 16px', borderTop: '1px solid rgba(255,255,255,0.06)', flexWrap: 'wrap' }}>
+            {[['laura','Laura','#06E5EC'],['darren','Darren','#F59E0B'],['zara','Zara','#A855F7'],['camilla','Camilla','#F43F5E']].map(([a,label,color]) => (
               <button key={a} onClick={() => setChatAgent(a)} style={{
-                padding: '3px 10px', borderRadius: 5, fontSize: 11, fontWeight: 700, cursor: 'pointer',
-                background: chatAgent === a ? `${color}18` : 'transparent',
-                border: chatAgent === a ? `1px solid ${color}50` : '1px solid rgba(255,255,255,0.08)',
-                color: chatAgent === a ? color : 'rgba(255,255,255,0.35)',
+                padding: '7px 12px', borderRadius: 8, fontSize: 12, fontWeight: 800, cursor: 'pointer',
+                background: resolvedAgent === a ? `${color}18` : 'transparent',
+                border: resolvedAgent === a ? `1px solid ${color}50` : '1px solid rgba(255,255,255,0.08)',
+                color: resolvedAgent === a ? color : 'rgba(255,255,255,0.35)',
                 transition: 'all 0.15s',
               }}>{label}</button>
             ))}
@@ -634,8 +679,8 @@ export default function AgentChat({ taskRef, taskContext, isOpen, onToggle, defa
           {/* Input */}
           <div style={{
             borderTop: '1px solid rgba(255,255,255,0.08)',
-            padding: '10px 12px',
-            display: 'flex', gap: 8,
+            padding: '14px 16px',
+            display: 'flex', gap: 10,
             background: '#0d1120',
           }}>
             <input
@@ -643,13 +688,13 @@ export default function AgentChat({ taskRef, taskContext, isOpen, onToggle, defa
               value={input}
               onChange={e => setInput(e.target.value)}
               onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }}}
-              placeholder={activeTaskRef ? `Ask or command ${chatAgent === 'darren' ? 'Darren' : 'Laura'} — e.g. "add brief CET Designers" or "list tasks"…` : 'Open a task to start chatting…'}
+              placeholder={activeTaskRef ? `Ask or command ${agentLabel} — e.g. "add brief CET Designers" or "list tasks"…` : 'Open a task to start chatting…'}
               disabled={sending || !activeTaskRef}
               style={{
                 flex: 1, background: 'rgba(255,255,255,0.07)',
                 border: `1px solid ${input ? agentColor + '50' : 'rgba(255,255,255,0.12)'}`,
-                borderRadius: 8, padding: '8px 12px',
-                color: '#fff', fontSize: 13, outline: 'none',
+                borderRadius: 12, padding: '13px 14px',
+                color: '#fff', fontSize: 15, lineHeight: 1.4, outline: 'none',
                 opacity: activeTaskRef ? 1 : 0.5,
                 transition: 'border-color 0.2s',
               }}
@@ -660,8 +705,8 @@ export default function AgentChat({ taskRef, taskContext, isOpen, onToggle, defa
               style={{
                 background: input.trim() && !sending && activeTaskRef ? agentColor : 'rgba(255,255,255,0.08)',
                 color: input.trim() && !sending && activeTaskRef ? '#0a0e1a' : 'rgba(255,255,255,0.3)',
-                border: 'none', borderRadius: 8, padding: '8px 14px',
-                fontSize: 13, fontWeight: 700,
+                border: 'none', borderRadius: 12, padding: '0 17px',
+                minWidth: 48, fontSize: 18, fontWeight: 800,
                 cursor: input.trim() && !sending && activeTaskRef ? 'pointer' : 'not-allowed',
                 transition: 'all 0.2s',
               }}
@@ -670,7 +715,7 @@ export default function AgentChat({ taskRef, taskContext, isOpen, onToggle, defa
             </button>
           </div>
 
-          <div style={{ padding: '3px 14px 7px', fontSize: 10, color: 'rgba(255,255,255,0.2)', textAlign: 'center', background: '#0d1120' }}>
+          <div style={{ padding: '6px 16px 10px', fontSize: 11, color: 'rgba(255,255,255,0.3)', textAlign: 'center', background: '#0d1120' }}>
             Responses also appear in Google Chat · Powered by Claude
           </div>
         </div>

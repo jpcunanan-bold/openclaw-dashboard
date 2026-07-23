@@ -1,7 +1,7 @@
 # Bold Business — Laura Dashboard
 ## Complete Documentation for Agents & Operators
 
-**Last updated:** 2026-07-10  
+**Last updated:** 2026-07-23  
 **Maintained by:** Ron Rivero / Alex Olivar  
 **Purpose:** Reference for connecting an OpenClaw agent to read or edit this dashboard programmatically.
 
@@ -79,6 +79,10 @@ Google SSO via `@boldbusiness.com` account. Token returned as a session token st
 | `sales.campaign_briefs` | smt_db | Campaign brief planning content (ICP, personas, hook, value prop, sequence steps) |
 | `sales.dashboard_call_records` | smt_db | Call logs tied to campaigns |
 | `sales.dashboard_skylead_ids` | smt_db | SDR account ID → name mapping (Skylead accounts) |
+| `sales.dashboard_tasks` | smt_db | Sales mode dashboard task list |
+| `users.library_links` | smt_db | Sales mode dashboard library links |
+| `recruiters.dashboard_tasks` | smt_db | Recruiting mode dashboard task list |
+| `recruiters.dashboard_library` | smt_db | Recruiting mode dashboard library links |
 | `users.user_tasks` | smt_db | Task list per user |
 | `users.users` | smt_db | User records (email → user_id) |
 | `laura.activities` | bb_agents | Laura agent activity log |
@@ -97,7 +101,7 @@ Every section is listed below with exactly where it pulls its data from.
 
 ### Sales Mode
 
-#### Command Center Overview (`/api/skylead/*` + `/api/hubspot/followups` + `/api/campaign-briefs` + `/api/user-tasks`)
+#### Command Center Overview (`/api/skylead/*` + `/api/hubspot/followups` + `/api/campaign-briefs` + `/api/dashboard-tasks` + `/api/library-links`)
 
 | Section | API Endpoint | Database / Source |
 |---|---|---|
@@ -107,7 +111,8 @@ Every section is listed below with exactly where it pulls its data from.
 | **HubSpot follow-ups** | `GET /api/hubspot/followups` | HubSpot CRM API (live, not cached in DB) |
 | **Campaign performance sandbox** | `GET /api/skylead/sandbox` | `smt_db → sales.dashboard_campaigns` (Skylead rows + manually-added rows, distinguished by `is_manual`) JOIN `sales.dashboard_skylead_ids` + `sales.dashboard_call_records` |
 | **Campaign briefs** | `GET /api/campaign-briefs` | `smt_db → sales.campaign_briefs` (dedicated table — separate from performance data) |
-| **Task list** | `GET /api/user-tasks` | `smt_db → users.user_tasks` JOIN `users.users` (scoped to logged-in user email) |
+| **Task list** | `GET /api/dashboard-tasks` | `smt_db → sales.dashboard_tasks` JOIN `users.users` |
+| **Library** | `GET /api/library-links` | `smt_db → users.library_links` JOIN `users.users` |
 
 #### Contacts Tab
 | Section | API Endpoint | Database / Source |
@@ -259,9 +264,12 @@ Every section is listed below with exactly where it pulls its data from.
 ### Recruiter Performance (SMT)
 | Section | API Endpoint | Database / Source |
 |---|---|---|
+| **Recruiter overview KPIs** | `GET /api/smt/recruiter/overview` | `smt_db → recruiters.goals`, `recruiters.activities`, `recruiters.campaigns` |
 | **Recruiter goals** | `GET /api/smt/recruiter/goals` | `smt_db → recruiters schema` (smtPool — lola_readwrite) |
 | **Recruiter activities** | `GET /api/smt/recruiter/activities` | `smt_db → recruiters schema` (smtPool) |
 | **Recruiter names** | `GET /api/smt/recruiter/names` | `smt_db → recruiters schema` (smtReadPool — lola_readonly) |
+| **Recruiter task list** | `GET /api/smt/recruiter/dashboard-tasks` | `smt_db → recruiters.dashboard_tasks` JOIN `users.users` |
+| **Recruiter library** | `GET /api/smt/recruiter/dashboard-library` | `smt_db → recruiters.dashboard_library` JOIN `users.users` |
 
 ---
 
